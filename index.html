@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Control financiero y trazabilidad de proyectos de EMPRESA DEMO" />
+    <title>Control Solar Demo</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
+      crossorigin="anonymous"
+    />
+    <link rel="stylesheet" href="src/assets/css/styles.css" />
+  </head>
+  <body>
+    <section id="loginView" class="login-shell">
+      <div class="login-card">
+        <div class="brand brand-login" aria-label="Control Solar Demo">
+          <span>Control Sol</span><span class="brand-sun">a</span><span>r</span>
+        </div>
+        <p class="eyebrow">Gestión de proyectos</p>
+        <h1>Bienvenido</h1>
+        <p class="text-secondary">Consulta contratos, avances mensuales, facturación, pagos y costos desde un solo lugar.</p>
+
+        <form id="loginForm" novalidate>
+          <label class="form-label" for="email">Correo institucional</label>
+          <input class="form-control mb-3" id="email" type="email" autocomplete="username" placeholder="usuario@empresa-demo.com" required />
+
+          <label class="form-label" for="password">Contraseña</label>
+          <input class="form-control mb-3" id="password" type="password" autocomplete="current-password" placeholder="••••••••" required />
+
+          <button class="btn btn-primary w-100" type="submit">Iniciar sesión</button>
+          <button class="btn btn-outline-secondary w-100 mt-2" id="demoAccess" type="button">Entrar al prototipo</button>
+          <p id="loginMessage" class="form-message" role="status" aria-live="polite"></p>
+        </form>
+      </div>
+    </section>
+
+    <div id="appView" class="app-shell" hidden>
+      <aside class="sidebar">
+        <div class="brand"><span>Control Sol</span><span class="brand-sun">a</span><span>r</span></div>
+        <nav class="side-nav" aria-label="Navegación principal">
+          <button class="nav-item active" data-view="dashboard"><span>IN</span>Inicio</button>
+          <button class="nav-item" data-view="projects"><span>PR</span>Proyectos</button>
+          <button class="nav-item" data-view="monthly"><span>SM</span>Seguimiento mensual</button>
+          <button class="nav-item" data-view="finance"><span>FP</span>Facturación y pagos</button>
+          <button class="nav-item" data-view="costs"><span>CG</span>Costos y gastos</button>
+          <button class="nav-item" data-view="reports"><span>RE</span>Reportes</button>
+          <button class="nav-item" data-view="admin"><span>AD</span>Administración</button>
+        </nav>
+        <div class="period-card">
+          <small>PERIODO ACTIVO</small>
+          <strong>Agosto 2026</strong>
+          <span><i></i> 5 de 6 periodos al día</span>
+        </div>
+      </aside>
+
+      <main class="main-area">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow mb-1">EMPRESA DEMO / <span id="breadcrumb">INICIO</span></p>
+            <h2 id="pageTitle">Resumen general</h2>
+          </div>
+          <div class="topbar-actions">
+            <select class="form-select" aria-label="Periodo activo">
+              <option>Agosto 2026</option>
+              <option>Julio 2026</option>
+              <option>Junio 2026</option>
+            </select>
+            <div class="user-chip">
+              <span class="avatar">UA</span>
+              <span><strong>Usuario administrador</strong><small>Administrador financiero</small></span>
+            </div>
+            <button id="logoutButton" class="btn btn-sm btn-outline-secondary">Salir</button>
+          </div>
+        </header>
+
+        <div class="content-area">
+          <section id="dashboardView" class="content-view">
+            <div class="section-heading">
+              <div><h3>Resumen financiero</h3><p>Consolidado de todos los proyectos activos.</p></div>
+              <button class="btn btn-outline-primary">Generar reporte</button>
+            </div>
+
+            <div class="kpi-grid">
+              <article class="kpi-card accent-blue"><span>Valor contractual vigente</span><strong id="contractValue"></strong><small>7 proyectos activos</small></article>
+              <article class="kpi-card accent-green"><span>Total facturado</span><strong id="invoicedValue"></strong><small class="positive">▲ 8,4 % frente a julio</small></article>
+              <article class="kpi-card accent-gold"><span>Total pagado</span><strong id="paidValue"></strong><small id="receivableValue"></small></article>
+              <article class="kpi-card accent-red"><span>Costos y gastos</span><strong id="costValue"></strong><small id="costRatio"></small></article>
+            </div>
+
+            <div class="dashboard-grid">
+              <article class="panel chart-panel">
+                <h4>Comportamiento mensual</h4>
+                <canvas id="monthlyChart" aria-label="Facturación, pagos y costos por mes"></canvas>
+                <div id="chartFallback" class="chart-fallback" aria-hidden="true"></div>
+              </article>
+              <article class="panel alerts-panel">
+                <h4>Alertas que requieren atención</h4>
+                <div class="alert-row"><span class="alert-dot red"></span><div><strong>3 facturas pendientes</strong><small>$350.000.000 por recaudar</small></div></div>
+                <div class="alert-row"><span class="alert-dot gold"></span><div><strong>Agosto sin cerrar</strong><small>Falta validar un proyecto</small></div></div>
+                <div class="alert-row"><span class="alert-dot blue"></span><div><strong>Proyecto al 92 %</strong><small>Revisar saldo contractual</small></div></div>
+              </article>
+            </div>
+
+            <article class="panel projects-table-panel">
+              <div class="panel-heading"><h4>Proyectos recientes</h4><button class="link-button" data-view="projects">Ver todos</button></div>
+              <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                  <thead><tr><th>Centro de costo</th><th>Proyecto</th><th>Municipio</th><th>Avance financiero</th><th>Saldo contractual</th><th></th></tr></thead>
+                  <tbody id="projectRows"></tbody>
+                </table>
+              </div>
+            </article>
+          </section>
+
+          <section id="detailView" class="content-view" hidden>
+            <article class="panel project-hero">
+              <div class="project-title-row">
+                <div><p class="code">DEMO-001</p><h3>Proyecto Solar Demostrativo</h3><p><span class="badge-soft">Activo</span> Construcción EPC · Municipio A</p></div>
+                <button class="btn btn-outline-primary">Editar proyecto</button>
+              </div>
+              <div class="project-kpis">
+                <div><span>Valor contractual vigente</span><strong>$1.000.000.000</strong></div>
+                <div><span>Avance financiero acumulado</span><strong class="positive">75 %</strong></div>
+                <div><span>Pago pendiente</span><strong>$100.000.000</strong></div>
+              </div>
+            </article>
+
+            <div class="detail-tabs" role="tablist">
+              <button class="active">Resumen</button><button>Seguimiento mensual</button><button>Facturas</button><button>Pagos</button><button>Costos y gastos</button><button>Documentos</button><button>Historial</button>
+            </div>
+
+            <div class="detail-grid">
+              <article class="panel">
+                <h4>Resumen financiero</h4>
+                <div class="summary-grid">
+                  <div><span>Total facturado</span><strong>$750.000.000</strong></div>
+                  <div><span>Total pagado</span><strong>$650.000.000</strong></div>
+                  <div><span>Costos y gastos</span><strong>$480.000.000</strong></div>
+                  <div><span>Saldo contractual</span><strong>$250.000.000</strong></div>
+                </div>
+                <div class="progress-label"><strong>Avance financiero</strong><strong>75 %</strong></div>
+                <div class="progress"><div class="progress-bar bg-success" style="width:75%"></div></div>
+              </article>
+              <article class="panel">
+                <h4>Últimas novedades</h4>
+                <div class="timeline-row"><span></span><div><strong>Factura FAC-DEMO-001</strong><small>Registrada por $100.000.000 · 28 ago</small></div></div>
+                <div class="timeline-row"><span></span><div><strong>Seguimiento de julio validado</strong><small>Por Usuario administrador · 03 ago</small></div></div>
+                <div class="timeline-row"><span></span><div><strong>Adición contractual aprobada</strong><small>$50.000.000 · 18 jul</small></div></div>
+              </article>
+            </div>
+            <button class="btn btn-link px-0 mt-3" data-view="dashboard">← Volver al resumen</button>
+          </section>
+
+          <section id="placeholderView" class="content-view" hidden>
+            <article class="panel empty-state">
+              <span class="empty-icon">SC</span>
+              <h3 id="placeholderTitle">Módulo preparado</h3>
+              <p>La navegación y el espacio de trabajo ya están configurados. Las operaciones de este módulo se implementarán en las siguientes actividades.</p>
+            </article>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="src/assets/js/config.js"></script>
+    <script type="module" src="src/assets/js/app.js"></script>
+  </body>
+</html>
+
