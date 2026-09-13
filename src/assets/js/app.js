@@ -1,7 +1,7 @@
-import { dashboard as demoDashboard } from "./data/mock-data.js?v=0.3.0";
-import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=0.3.0";
-import { createApplicationDataGateway } from "./services/application-data.js?v=0.3.0";
-import { isDemoMode, signIn, signOut } from "./services/supabase.js?v=0.3.0";
+import { dashboard as demoDashboard } from "./data/mock-data.js?v=0.3.1";
+import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=0.3.1";
+import { createApplicationDataGateway } from "./services/application-data.js?v=0.3.1";
+import { isDemoMode, signIn, signOut } from "./services/supabase.js?v=0.3.1";
 
 const loginView = document.querySelector("#loginView");
 const appView = document.querySelector("#appView");
