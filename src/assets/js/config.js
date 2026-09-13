@@ -6,3 +6,4 @@ window.SOLAR_DEMO_CONFIG = {
   supabasePublishableKey: "",
   demoMode: true
 };
+
