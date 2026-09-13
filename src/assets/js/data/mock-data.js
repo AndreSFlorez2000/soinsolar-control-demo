@@ -15,3 +15,4 @@ export const projects = [
   { costCenter: "DEMO-003", name: "Proyecto Solar Empresarial", city: "Municipio C", advance: 48, balance: 300000000 }
 ];
 
+
