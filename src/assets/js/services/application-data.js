@@ -1,6 +1,6 @@
-import { createDemoStore } from "../data/demo-store.js?v=0.3.0";
-import { createDataService } from "./data.js?v=0.3.0";
-import { getCurrentSession, isDemoMode, requireSupabaseClient } from "./supabase.js?v=0.3.0";
+import { createDemoStore } from "../data/demo-store.js?v=0.3.1";
+import { createDataService } from "./data.js?v=0.3.1";
+import { getCurrentSession, isDemoMode, requireSupabaseClient } from "./supabase.js?v=0.3.1";
 
 export async function createApplicationDataGateway() {
   if (isDemoMode()) return createDemoStore();
