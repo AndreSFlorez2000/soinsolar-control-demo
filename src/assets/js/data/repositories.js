@@ -10,7 +10,7 @@ import {
   normalizeProjectSummary,
   projectInputToRecord,
   VALIDATION_STATUSES
-} from "./models.js?v=0.3.0";
+} from "./models.js?v=0.3.1";
 
 export class DataAccessError extends Error {
   constructor(message, cause = null) {
