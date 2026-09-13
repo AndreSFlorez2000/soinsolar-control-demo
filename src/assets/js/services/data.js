@@ -4,8 +4,8 @@ import {
   MonthlyTrackingRepository,
   PeriodRepository,
   ProjectRepository
-} from "../data/repositories.js";
-import { requireSupabaseClient } from "./supabase.js";
+} from "../data/repositories.js?v=0.3.0";
+import { requireSupabaseClient } from "./supabase.js?v=0.3.0";
 
 export function createDataService(client = requireSupabaseClient()) {
   if (!client?.from || !client?.auth) {
@@ -20,4 +20,3 @@ export function createDataService(client = requireSupabaseClient()) {
     finance: new FinanceRepository(client)
   });
 }
-
