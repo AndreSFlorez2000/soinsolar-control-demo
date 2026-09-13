@@ -5,7 +5,7 @@ import {
   normalizeProject,
   normalizeProjectSummary,
   projectInputToRecord
-} from "./models.js?v=0.3.0";
+} from "./models.js?v=0.3.1";
 
 const STORAGE_KEY = "soinsolar-control-demo-v2";
 
