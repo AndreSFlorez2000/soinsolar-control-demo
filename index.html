@@ -11,13 +11,13 @@
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.0.0" />
+    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.1.0" />
   </head>
   <body>
     <section id="loginView" class="login-shell">
       <div class="login-card">
         <div class="brand brand-login" aria-label="Control Solar Demo">
-          <span>Control Sol</span><span class="brand-sun">a</span><span>r</span>
+          <span>Soinsol</span><span class="brand-sun">a</span><span>r</span>
         </div>
         <p class="eyebrow">Gestión de proyectos</p>
         <h1>Bienvenido</h1>
@@ -25,7 +25,7 @@
 
         <form id="loginForm" novalidate>
           <label class="form-label" for="email">Correo institucional</label>
-          <input class="form-control mb-3" id="email" type="email" autocomplete="username" placeholder="usuario@empresa-demo.com" required />
+          <input class="form-control mb-3" id="email" type="email" autocomplete="username" placeholder="usuario@empresa.test" required />
 
           <label class="form-label" for="password">Contraseña</label>
           <input class="form-control mb-3" id="password" type="password" autocomplete="current-password" placeholder="••••••••" required />
@@ -39,13 +39,16 @@
 
     <div id="appView" class="app-shell" hidden>
       <aside class="sidebar">
-        <div class="brand"><span>Control Sol</span><span class="brand-sun">a</span><span>r</span></div>
+        <div class="brand"><span>Soinsol</span><span class="brand-sun">a</span><span>r</span></div>
         <nav class="side-nav" aria-label="Navegación principal">
           <button class="nav-item active" data-view="dashboard"><span>IN</span>Inicio</button>
           <button class="nav-item" data-view="projects"><span>PR</span>Proyectos</button>
           <button class="nav-item" data-view="monthly"><span>SM</span>Seguimiento mensual</button>
+          <button class="nav-item" data-view="finance"><span>FP</span>Facturación y pagos</button>
           <button class="nav-item" data-view="costs"><span>CG</span>Costos y gastos</button>
+          <button class="nav-item" data-view="reports"><span>RE</span>Reportes</button>
           <button class="nav-item" data-view="history"><span>HI</span>Historial</button>
+          <button class="nav-item" data-view="admin"><span>AD</span>Administración</button>
         </nav>
         <div class="period-card">
           <small>PERIODO ACTIVO</small>
@@ -57,7 +60,7 @@
       <main class="main-area">
         <header class="topbar">
           <div>
-            <p class="eyebrow mb-1">EMPRESA DEMO / <span id="breadcrumb">INICIO</span></p>
+            <p class="eyebrow mb-1">CONTROL SOLAR / <span id="breadcrumb">INICIO</span></p>
             <h2 id="pageTitle">Resumen general</h2>
           </div>
           <div class="topbar-actions">
@@ -80,8 +83,8 @@
               <option>Junio 2026</option>
             </select>
             <div class="user-chip">
-              <span class="avatar">UA</span>
-              <span><strong>Usuario administrador</strong><small>Administrador financiero</small></span>
+              <span class="avatar">AG</span>
+              <span><strong>Administrador Demo</strong><small>Administrador financiero</small></span>
             </div>
             <button id="logoutButton" class="btn btn-sm btn-outline-secondary">Salir</button>
           </div>
@@ -136,22 +139,24 @@
           <section id="detailView" class="content-view" hidden>
             <article class="panel project-hero">
               <div class="project-title-row">
-                <div><p id="detailCostCenter" class="code">DEMO-001</p><h3 id="detailProjectName">Proyecto Solar Demostrativo</h3><p><span id="detailProjectStatus" class="badge-soft">Activo</span> <span id="detailServiceType">Construcción EPC</span> · <span id="detailMunicipality">Municipio A</span></p></div>
+                <div><p id="detailCostCenter" class="code">CC-101</p><h3 id="detailProjectName">Parque Solar La Esperanza</h3><p><span id="detailProjectStatus" class="badge-soft">Activo</span> <span id="detailServiceType">Construcción EPC</span> · <span id="detailMunicipality">Valledupar</span></p></div>
                 <div class="heading-actions project-title-actions">
                   <button class="btn btn-outline-secondary" type="button" data-view="projects">← Volver</button>
-                  <button id="detailEditProject" class="btn btn-outline-primary" type="button">Editar proyecto</button>
+                  <button id="detailContractButton" class="btn btn-outline-primary" type="button">Gestionar contrato</button>
+                  <button id="detailEditProject" class="btn btn-primary" type="button">Editar proyecto</button>
                 </div>
               </div>
               <div class="project-kpis">
-                <div><span>Valor contractual vigente</span><strong id="detailContractValue">$1.000.000.000</strong></div>
+                <div><span>Valor contractual vigente</span><strong id="detailContractValue">$2.850.000.000</strong></div>
                 <div><span>Avance financiero acumulado</span><strong id="detailFinancialProgress" class="positive">75 %</strong></div>
-                <div><span>Pago pendiente</span><strong id="detailPaymentPending">$100.000.000</strong></div>
+                <div><span>Pago pendiente</span><strong id="detailPaymentPending">$297.500.000</strong></div>
               </div>
             </article>
 
             <div class="detail-tabs" role="navigation" aria-label="Secciones relacionadas con el proyecto">
               <button class="active" type="button" aria-current="page">Resumen</button>
               <button type="button" data-project-tab="monthly">Seguimiento mensual</button>
+              <button type="button" data-project-tab="finance">Facturación y pagos</button>
               <button type="button" data-project-tab="costs">Costos y gastos</button>
               <button type="button" data-project-tab="history">Historial</button>
             </div>
@@ -160,10 +165,10 @@
               <article class="panel">
                 <h4>Resumen financiero</h4>
                 <div class="summary-grid">
-                  <div><span>Total facturado</span><strong id="detailInvoiced">$750.000.000</strong></div>
-                  <div><span>Total pagado</span><strong id="detailPaid">$650.000.000</strong></div>
-                  <div><span>Costos y gastos</span><strong id="detailCosts">$480.000.000</strong></div>
-                  <div><span>Saldo contractual</span><strong id="detailContractBalance">$250.000.000</strong></div>
+                  <div><span>Total facturado</span><strong id="detailInvoiced">$2.137.500.000</strong></div>
+                  <div><span>Total pagado</span><strong id="detailPaid">$1.840.000.000</strong></div>
+                  <div><span>Costos y gastos</span><strong id="detailCosts">$1.563.000.000</strong></div>
+                  <div><span>Saldo contractual</span><strong id="detailContractBalance">$712.500.000</strong></div>
                 </div>
                 <div class="progress-label"><strong>Avance financiero</strong><strong id="detailProgressLabel">75 %</strong></div>
                 <div class="progress"><div id="detailProgressBar" class="progress-bar bg-success" style="width:75%"></div></div>
@@ -188,6 +193,7 @@
               </div>
               <div class="quick-action-grid">
                 <button class="quick-action" type="button" data-project-tab="monthly"><strong>Seguimiento mensual</strong><span>Avances y validación por periodo</span></button>
+                <button class="quick-action" type="button" data-project-tab="finance"><strong>Facturación y pagos</strong><span>Facturas, recaudos y cartera</span></button>
                 <button class="quick-action" type="button" data-project-tab="costs"><strong>Costos y gastos</strong><span>Movimientos asociados al proyecto</span></button>
                 <button class="quick-action" type="button" data-project-tab="history"><strong>Historial</strong><span>Cambios y trazabilidad del registro</span></button>
               </div>
@@ -280,7 +286,7 @@
             <article class="panel filter-panel project-filter-panel">
               <form id="projectFilters" class="filter-grid filter-grid-projects" autocomplete="off">
                 <label>Proyecto o cliente<input id="projectFilterName" class="form-control" type="search" placeholder="Buscar por nombre" /></label>
-                <label>Centro de costo<input id="projectFilterCenter" class="form-control" type="search" placeholder="Ej. DEMO-001" /></label>
+                <label>Centro de costo<input id="projectFilterCenter" class="form-control" type="search" placeholder="Ej. CC-101" /></label>
                 <label>Municipio<input id="projectFilterMunicipality" class="form-control" type="search" placeholder="Municipio" /></label>
                 <label>Estado<select id="projectFilterStatus" class="form-select"><option value="">Todos</option><option value="planeado">Planeado</option><option value="activo">Activo</option><option value="suspendido">Suspendido</option><option value="finalizado">Finalizado</option><option value="cancelado">Cancelado</option></select></label>
                 <label>Tipo de servicio<input id="projectFilterService" class="form-control" type="search" placeholder="Ej. Construcción EPC" /></label>
@@ -370,11 +376,107 @@
             </article>
           </section>
 
-          <section id="placeholderView" class="content-view" hidden>
-            <article class="panel empty-state">
-              <span class="empty-icon">SC</span>
-              <h3 id="placeholderTitle">Módulo preparado</h3>
-              <p>La navegación y el espacio de trabajo ya están configurados. Las operaciones de este módulo se implementarán en las siguientes actividades.</p>
+          <section id="financeView" class="content-view" hidden>
+            <div class="section-heading">
+              <div><h3>Facturación y pagos</h3><p>Registro de facturas, recaudos y cartera por proyecto.</p></div>
+              <div class="heading-actions"><button id="newPaymentButton" class="btn btn-outline-primary" type="button">Registrar pago</button><button id="newInvoiceButton" class="btn btn-primary" type="button">Nueva factura</button></div>
+            </div>
+
+            <div class="cost-summary-grid">
+              <article class="mini-kpi"><span>Total facturado</span><strong id="financeInvoicedTotal">$0</strong></article>
+              <article class="mini-kpi"><span>Total pagado</span><strong id="financePaidTotal">$0</strong></article>
+              <article class="mini-kpi"><span>Cartera pendiente</span><strong id="financePendingTotal">$0</strong></article>
+              <article class="mini-kpi"><span>Facturas con saldo</span><strong id="financePendingInvoices">0</strong></article>
+            </div>
+
+            <article class="panel filter-panel finance-filter-panel">
+              <form id="financeFilters" class="filter-grid filter-grid-finance" autocomplete="off">
+                <label>Proyecto<select id="financeFilterProject" class="form-select"><option value="">Todos</option></select></label>
+                <label>Periodo<select id="financeFilterPeriod" class="form-select"><option value="">Todos</option></select></label>
+                <label>Desde<input id="financeFilterFrom" class="form-control" type="date" /></label>
+                <label>Hasta<input id="financeFilterTo" class="form-control" type="date" /></label>
+                <div class="filter-actions"><button class="btn btn-primary" type="submit">Aplicar</button><button id="clearFinanceFilters" class="btn btn-outline-secondary" type="button">Limpiar</button></div>
+              </form>
+            </article>
+            <div id="financeActiveFilters" class="active-filter-list" aria-live="polite" hidden></div>
+            <div id="financeModuleMessage" class="module-message module-message-block" role="status" aria-live="polite"></div>
+
+            <article class="panel data-panel finance-data-panel">
+              <div class="panel-heading"><div><h4>Facturas</h4><small>El saldo se calcula descontando los pagos activos de cada factura.</small></div></div>
+              <div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Factura</th><th>Fecha</th><th>Proyecto</th><th>Periodo</th><th>Estado</th><th>Valor</th><th>Saldo</th><th>Acción</th></tr></thead><tbody id="invoiceRows"></tbody></table></div>
+              <div id="invoiceEmpty" class="inline-empty" hidden>No se encontraron facturas.</div>
+            </article>
+
+            <article class="panel data-panel finance-data-panel">
+              <div class="panel-heading"><div><h4>Pagos registrados</h4><small>Cada pago queda vinculado con una factura, proyecto, contrato y periodo.</small></div></div>
+              <div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Referencia</th><th>Fecha</th><th>Factura</th><th>Proyecto</th><th>Periodo</th><th>Estado</th><th>Valor</th></tr></thead><tbody id="paymentRows"></tbody></table></div>
+              <div id="paymentEmpty" class="inline-empty" hidden>No se encontraron pagos.</div>
+            </article>
+          </section>
+
+          <section id="reportsView" class="content-view" hidden>
+            <div class="section-heading">
+              <div><h3>Reportes gerenciales</h3><p>Consolidado financiero y de ejecución de los proyectos consultados.</p></div>
+              <button id="exportReportButton" class="btn btn-primary" type="button">Exportar reporte CSV</button>
+            </div>
+
+            <article class="panel filter-panel">
+              <form id="reportFilters" class="filter-grid filter-grid-reports" autocomplete="off">
+                <label>Proyecto<select id="reportFilterProject" class="form-select"><option value="">Todos</option></select></label>
+                <label>Estado<select id="reportFilterStatus" class="form-select"><option value="">Todos</option><option value="planeado">Planeado</option><option value="activo">Activo</option><option value="suspendido">Suspendido</option><option value="finalizado">Finalizado</option><option value="cancelado">Cancelado</option></select></label>
+                <label>Municipio<input id="reportFilterMunicipality" class="form-control" type="search" placeholder="Municipio" /></label>
+                <div class="filter-actions"><button class="btn btn-primary" type="submit">Generar</button><button id="clearReportFilters" class="btn btn-outline-secondary" type="button">Limpiar</button></div>
+              </form>
+            </article>
+            <div id="reportActiveFilters" class="active-filter-list" aria-live="polite" hidden></div>
+
+            <div class="report-kpi-grid">
+              <article class="mini-kpi"><span>Valor contractual</span><strong id="reportContractValue">$0</strong></article>
+              <article class="mini-kpi"><span>Facturado</span><strong id="reportInvoiced">$0</strong></article>
+              <article class="mini-kpi"><span>Pagado</span><strong id="reportPaid">$0</strong></article>
+              <article class="mini-kpi"><span>Costos y gastos</span><strong id="reportCosts">$0</strong></article>
+              <article class="mini-kpi"><span>Saldo contractual</span><strong id="reportBalance">$0</strong></article>
+              <article class="mini-kpi"><span>Cartera pendiente</span><strong id="reportPending">$0</strong></article>
+            </div>
+
+            <article class="panel report-formulas">
+              <h4>Lectura del reporte</h4>
+              <div class="formula-grid">
+                <span>Avance financiero = facturado ÷ contrato vigente</span>
+                <span>Cobro = pagado ÷ facturado</span>
+                <span>Saldo contractual = contrato vigente − facturado</span>
+                <span>Cartera = facturado − pagado</span>
+              </div>
+            </article>
+
+            <article class="panel data-panel report-data-panel">
+              <div class="panel-heading"><div><h4>Resultados por proyecto</h4><small id="reportResultCount">0 proyectos incluidos</small></div></div>
+              <div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Centro</th><th>Proyecto</th><th>Contrato</th><th>Facturado</th><th>Pagado</th><th>Costos</th><th>Saldo</th><th>Cartera</th><th>Avance</th></tr></thead><tbody id="reportRows"></tbody></table></div>
+              <div id="reportEmpty" class="inline-empty" hidden>No hay proyectos que coincidan con los filtros.</div>
+            </article>
+          </section>
+
+          <section id="adminView" class="content-view" hidden>
+            <div class="section-heading">
+              <div><h3>Administración</h3><p>Perfiles, roles y estado de acceso de los usuarios registrados.</p></div>
+              <button id="reloadProfilesButton" class="btn btn-outline-primary" type="button">Actualizar usuarios</button>
+            </div>
+
+            <div class="cost-summary-grid">
+              <article class="mini-kpi"><span>Usuarios registrados</span><strong id="profileTotalCount">0</strong></article>
+              <article class="mini-kpi"><span>Usuarios activos</span><strong id="profileActiveCount">0</strong></article>
+              <article class="mini-kpi"><span>Administradores</span><strong id="profileAdminCount">0</strong></article>
+              <article class="mini-kpi"><span>Gerencia</span><strong id="profileManagementCount">0</strong></article>
+            </div>
+
+            <article class="panel security-note">
+              <h4>Control de seguridad</h4>
+              <p>Los usuarios se crean mediante Supabase Auth. Desde esta vista un administrador puede cambiar el nombre, rol y estado de perfiles existentes sin utilizar llaves administrativas en el navegador.</p>
+            </article>
+            <div id="adminModuleMessage" class="module-message module-message-block" role="status" aria-live="polite"></div>
+            <article class="panel data-panel">
+              <div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Última actualización</th><th>Acción</th></tr></thead><tbody id="profileRows"></tbody></table></div>
+              <div id="profileEmpty" class="inline-empty" hidden>No hay perfiles disponibles para esta sesión.</div>
             </article>
           </section>
         </div>
@@ -452,6 +554,65 @@
       </form>
     </dialog>
 
+    <dialog id="contractDialog" class="app-dialog">
+      <form id="contractForm" method="dialog" novalidate>
+        <div class="dialog-heading"><div><p class="eyebrow">Gestión contractual</p><h3 id="contractDialogTitle">Contrato del proyecto</h3></div><button class="dialog-close" type="button" data-close-dialog="contractDialog" aria-label="Cerrar">×</button></div>
+        <input id="contractId" type="hidden" />
+        <input id="contractProjectId" type="hidden" />
+        <div class="form-grid">
+          <label class="span-2">Proyecto<input id="contractProjectLabel" class="form-control" readonly /></label>
+          <label>Número de contrato *<input id="contractNumber" class="form-control" maxlength="80" required /></label>
+          <label>Estado *<select id="contractStatus" class="form-select" required><option value="borrador">Borrador</option><option value="vigente">Vigente</option><option value="suspendido">Suspendido</option><option value="finalizado">Finalizado</option><option value="cancelado">Cancelado</option></select></label>
+          <label>Valor inicial (COP) *<input id="contractInitialValue" class="form-control" type="number" min="0.01" step="0.01" required /></label>
+          <label>Adiciones (COP)<input id="contractAdditionsValue" class="form-control" type="number" min="0" step="0.01" value="0" /></label>
+          <label>Deducciones (COP)<input id="contractDeductionsValue" class="form-control" type="number" min="0" step="0.01" value="0" /></label>
+          <label>Valor vigente calculado<input id="contractCurrentValue" class="form-control" readonly /></label>
+          <label>Fecha inicial *<input id="contractStartDate" class="form-control" type="date" required /></label>
+          <label>Fecha final<input id="contractEndDate" class="form-control" type="date" /></label>
+        </div>
+        <p class="dialog-note">Valor contractual vigente = valor inicial + adiciones − deducciones. No puede ser inferior a la facturación ni al avance reconocido.</p>
+        <p id="contractFormMessage" class="form-message" role="alert"></p>
+        <div class="dialog-actions"><button class="btn btn-outline-secondary" type="button" data-close-dialog="contractDialog">Cancelar</button><button id="saveContractButton" class="btn btn-primary" type="submit">Guardar contrato</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="invoiceDialog" class="app-dialog">
+      <form id="invoiceForm" method="dialog" novalidate>
+        <div class="dialog-heading"><div><p class="eyebrow">Facturación</p><h3>Nueva factura</h3></div><button class="dialog-close" type="button" data-close-dialog="invoiceDialog" aria-label="Cerrar">×</button></div>
+        <div class="form-grid">
+          <label class="span-2">Proyecto con contrato *<select id="invoiceProject" class="form-select" required></select></label>
+          <label>Periodo abierto *<select id="invoicePeriod" class="form-select" required></select></label>
+          <label>Fecha de emisión *<input id="invoiceDate" class="form-control" type="date" required /></label>
+          <label>Número de factura *<input id="invoiceNumber" class="form-control" maxlength="80" required /></label>
+          <label>Estado *<select id="invoiceStatus" class="form-select" required><option value="registrada">Registrada</option><option value="emitida">Emitida</option></select></label>
+          <label>Valor facturado (COP) *<input id="invoiceAmount" class="form-control" type="number" min="0.01" step="0.01" required /></label>
+          <label>Ruta o referencia del soporte<input id="invoiceSupportPath" class="form-control" maxlength="250" placeholder="Carpeta/archivo.pdf" /></label>
+        </div>
+        <p class="dialog-note">La facturación acumulada no puede superar el valor contractual vigente y la fecha debe corresponder al periodo.</p>
+        <p id="invoiceFormMessage" class="form-message" role="alert"></p>
+        <div class="dialog-actions"><button class="btn btn-outline-secondary" type="button" data-close-dialog="invoiceDialog">Cancelar</button><button id="saveInvoiceButton" class="btn btn-primary" type="submit">Guardar factura</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="paymentDialog" class="app-dialog">
+      <form id="paymentForm" method="dialog" novalidate>
+        <div class="dialog-heading"><div><p class="eyebrow">Pagos</p><h3>Registrar pago</h3></div><button class="dialog-close" type="button" data-close-dialog="paymentDialog" aria-label="Cerrar">×</button></div>
+        <div class="form-grid">
+          <label class="span-2">Factura con saldo *<select id="paymentInvoice" class="form-select" required></select></label>
+          <label>Periodo abierto *<select id="paymentPeriod" class="form-select" required></select></label>
+          <label>Fecha del pago *<input id="paymentDate" class="form-control" type="date" required /></label>
+          <label>Referencia del pago *<input id="paymentReference" class="form-control" maxlength="80" required /></label>
+          <label>Estado *<select id="paymentStatus" class="form-select" required><option value="registrado">Registrado</option><option value="confirmado">Confirmado</option></select></label>
+          <label>Valor pagado (COP) *<input id="paymentAmount" class="form-control" type="number" min="0.01" step="0.01" required /></label>
+          <label>Saldo disponible de la factura<input id="paymentAvailable" class="form-control" readonly /></label>
+          <label>Ruta o referencia del soporte<input id="paymentSupportPath" class="form-control" maxlength="250" placeholder="Carpeta/archivo.pdf" /></label>
+        </div>
+        <p class="dialog-note">La suma de pagos activos no puede superar el valor de la factura.</p>
+        <p id="paymentFormMessage" class="form-message" role="alert"></p>
+        <div class="dialog-actions"><button class="btn btn-outline-secondary" type="button" data-close-dialog="paymentDialog">Cancelar</button><button id="savePaymentButton" class="btn btn-primary" type="submit">Guardar pago</button></div>
+      </form>
+    </dialog>
+
     <dialog id="historyDialog" class="app-dialog">
       <div class="history-dialog-content">
         <div class="dialog-heading"><div><p class="eyebrow">Trazabilidad</p><h3>Detalle del cambio</h3></div><button class="dialog-close" type="button" data-close-dialog="historyDialog" aria-label="Cerrar">×</button></div>
@@ -464,6 +625,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="src/assets/js/config.js"></script>
-    <script type="module" src="src/assets/js/app.js?v=1.0.0"></script>
+    <script type="module" src="src/assets/js/app.js?v=1.1.0"></script>
   </body>
 </html>
