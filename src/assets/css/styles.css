@@ -257,3 +257,30 @@ button, input, select, textarea { font: inherit; }
   .project-info-grid .span-2 { grid-column: auto; }
   .quick-action { min-width: 0; }
 }
+
+
+/* Actividad 16: búsqueda global y filtros visibles */
+.global-search { position: relative; width: min(340px, 30vw); }
+.global-search-control { position: relative; }
+.global-search-control .form-control { min-height: 42px; padding-right: 38px; border-color: var(--border); font-size: 12px; }
+.global-search-clear { position: absolute; top: 50%; right: 7px; width: 28px; height: 28px; padding: 0; transform: translateY(-50%); color: var(--muted); background: transparent; border: 0; border-radius: 50%; font-size: 20px; line-height: 1; }
+.global-search-clear:hover, .global-search-clear:focus-visible { color: var(--text); background: #e9f3fb; }
+.global-search-results { position: absolute; z-index: 30; top: calc(100% + 7px); left: 0; width: min(430px, 80vw); max-height: 360px; padding: 7px; overflow-y: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 18px 45px rgba(11,45,82,.2); }
+.global-search-result { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 11px 10px; text-align: left; color: var(--text); background: transparent; border: 0; border-radius: 7px; }
+.global-search-result:hover, .global-search-result:focus-visible { background: #edf6fc; }
+.global-search-result > span:first-child { display: grid; gap: 3px; min-width: 0; }
+.global-search-result strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.global-search-result small { color: var(--muted); font-size: 10px; }
+.global-search-empty { padding: 18px 12px; color: var(--muted); text-align: center; font-size: 12px; }
+.active-filter-list { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; min-height: 42px; padding: 10px 0 2px; }
+.active-filter-label { color: var(--muted); font-size: 11px; font-weight: 700; }
+.active-filter-chip { padding: 5px 9px; color: var(--navy); background: #e9f3fb; border: 1px solid #cfe3f2; border-radius: 999px; font-size: 10px; }
+.active-filter-chip strong { font-weight: 750; }
+
+@media (max-width: 1050px) {
+  .global-search { width: min(300px, 36vw); }
+}
+@media (max-width: 760px) {
+  .global-search { width: 100%; }
+  .global-search-results { width: 100%; max-width: none; }
+}
