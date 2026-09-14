@@ -4,9 +4,10 @@ import {
   FinanceRepository,
   MonthlyTrackingRepository,
   PeriodRepository,
+  ProfileRepository,
   ProjectRepository
-} from "../data/repositories.js?v=0.4.0";
-import { requireSupabaseClient } from "./supabase.js?v=0.4.0";
+} from "../data/repositories.js?v=1.1.0";
+import { requireSupabaseClient } from "./supabase.js?v=1.1.0";
 
 export function createDataService(client = requireSupabaseClient()) {
   if (!client?.from || !client?.auth) {
@@ -14,6 +15,7 @@ export function createDataService(client = requireSupabaseClient()) {
   }
 
   return Object.freeze({
+    profiles: new ProfileRepository(client),
     projects: new ProjectRepository(client),
     contracts: new ContractRepository(client),
     periods: new PeriodRepository(client),
