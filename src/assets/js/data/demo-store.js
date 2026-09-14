@@ -1,27 +1,57 @@
 import {
+  assertDate,
+  assertEnum,
+  assertMoney,
+  assertText,
   assertUuid,
   costExpenseInputToRecord,
   monthlyTrackingInputToRecord,
   normalizeAuditEvent,
+  normalizeContract,
   normalizeCostExpense,
+  normalizeInvoice,
   normalizeMonthlySummary,
+  normalizePayment,
+  normalizeProfile,
   normalizePeriod,
   normalizeProject,
   normalizeProjectSummary,
   periodInputToRecord,
-  projectInputToRecord
-} from "./models.js?v=0.4.0";
+  projectInputToRecord,
+  APP_ROLES,
+  CONTRACT_STATUSES,
+  INVOICE_STATUSES,
+  PAYMENT_STATUSES
+} from "./models.js?v=1.1.0";
 
-const STORAGE_KEY = "soinsolar-control-demo-v3";
+const STORAGE_KEY = "soinsolar-control-demo-v4";
 
 const initialState = Object.freeze({
+  profiles: [
+    {
+      id: "80000000-0000-4000-8000-000000000001",
+      full_name: "Administrador demostrativo",
+      role: "administrador",
+      active: true,
+      created_at: "2026-08-01T12:00:00Z",
+      updated_at: "2026-08-01T12:00:00Z"
+    },
+    {
+      id: "80000000-0000-4000-8000-000000000002",
+      full_name: "Gerencia demostrativa",
+      role: "gerencia",
+      active: true,
+      created_at: "2026-08-01T12:00:00Z",
+      updated_at: "2026-08-01T12:00:00Z"
+    }
+  ],
   projects: [
     {
       id: "10000000-0000-4000-8000-000000000001",
-      cost_center: "DEMO-001",
-      name: "Proyecto Solar Demostrativo",
+      cost_center: "CC-101",
+      name: "Parque Solar La Esperanza",
       client_name: "Cliente demostrativo A",
-      municipality: "Municipio A",
+      municipality: "Valledupar",
       service_type: "Construcción EPC",
       power_kwp: 420,
       status: "activo",
@@ -36,10 +66,10 @@ const initialState = Object.freeze({
     },
     {
       id: "10000000-0000-4000-8000-000000000002",
-      cost_center: "DEMO-002",
-      name: "Proyecto Solar Comercial",
+      cost_center: "CC-118",
+      name: "Cubierta Industrial Norte",
       client_name: "Cliente demostrativo B",
-      municipality: "Municipio B",
+      municipality: "Ibagué",
       service_type: "Instalación fotovoltaica",
       power_kwp: 185.5,
       status: "activo",
@@ -50,14 +80,14 @@ const initialState = Object.freeze({
       contract_number: "CTR-DEMO-002",
       contract_value: 2000000000,
       total_invoiced: 1840000000,
-      total_paid: 800000000
+      total_paid: 1640000000
     },
     {
       id: "10000000-0000-4000-8000-000000000003",
-      cost_center: "DEMO-003",
-      name: "Proyecto Solar Empresarial",
+      cost_center: "CC-124",
+      name: "Sistema Solar Empresarial",
       client_name: "Cliente demostrativo C",
-      municipality: "Municipio C",
+      municipality: "Bogotá",
       service_type: "Suministro e instalación",
       power_kwp: 310,
       status: "activo",
@@ -115,6 +145,110 @@ const initialState = Object.freeze({
       costs_expenses_value: 1183000000, observations: "Datos mensuales registrados.",
       validation_status: "borrador", validated_at: null,
       created_at: "2026-09-13T14:00:00Z", updated_at: "2026-09-13T14:00:00Z"
+    }
+  ],
+  invoices: [
+    {
+      id: "60000000-0000-4000-8000-000000000001",
+      project_id: "10000000-0000-4000-8000-000000000001",
+      contract_id: "20000000-0000-4000-8000-000000000001",
+      period_id: "30000000-0000-4000-8000-000000000001",
+      invoice_number: "FAC-DEMO-001",
+      issue_date: "2026-08-28",
+      amount: 1800000000,
+      status: "emitida",
+      support_path: "Soportes/FAC-DEMO-001.pdf",
+      created_at: "2026-08-28T14:00:00Z"
+    },
+    {
+      id: "60000000-0000-4000-8000-000000000002",
+      project_id: "10000000-0000-4000-8000-000000000001",
+      contract_id: "20000000-0000-4000-8000-000000000001",
+      period_id: "30000000-0000-4000-8000-000000000002",
+      invoice_number: "FAC-DEMO-002",
+      issue_date: "2026-09-12",
+      amount: 337500000,
+      status: "emitida",
+      support_path: "Soportes/FAC-DEMO-002.pdf",
+      created_at: "2026-09-12T14:00:00Z"
+    },
+    {
+      id: "60000000-0000-4000-8000-000000000003",
+      project_id: "10000000-0000-4000-8000-000000000002",
+      contract_id: "20000000-0000-4000-8000-000000000002",
+      period_id: "30000000-0000-4000-8000-000000000002",
+      invoice_number: "FAC-DEMO-003",
+      issue_date: "2026-09-15",
+      amount: 1840000000,
+      status: "emitida",
+      support_path: "Soportes/FAC-DEMO-003.pdf",
+      created_at: "2026-09-15T14:00:00Z"
+    },
+    {
+      id: "60000000-0000-4000-8000-000000000004",
+      project_id: "10000000-0000-4000-8000-000000000003",
+      contract_id: "20000000-0000-4000-8000-000000000003",
+      period_id: "30000000-0000-4000-8000-000000000002",
+      invoice_number: "FAC-DEMO-004",
+      issue_date: "2026-09-18",
+      amount: 1660000000,
+      status: "emitida",
+      support_path: "Soportes/FAC-DEMO-004.pdf",
+      created_at: "2026-09-18T14:00:00Z"
+    }
+  ],
+  payments: [
+    {
+      id: "65000000-0000-4000-8000-000000000001",
+      invoice_id: "60000000-0000-4000-8000-000000000001",
+      project_id: "10000000-0000-4000-8000-000000000001",
+      contract_id: "20000000-0000-4000-8000-000000000001",
+      period_id: "30000000-0000-4000-8000-000000000001",
+      payment_reference: "PAG-DEMO-001",
+      payment_date: "2026-08-30",
+      amount: 1600000000,
+      status: "confirmado",
+      support_path: "Soportes/PAG-DEMO-001.pdf",
+      created_at: "2026-08-30T14:00:00Z"
+    },
+    {
+      id: "65000000-0000-4000-8000-000000000002",
+      invoice_id: "60000000-0000-4000-8000-000000000002",
+      project_id: "10000000-0000-4000-8000-000000000001",
+      contract_id: "20000000-0000-4000-8000-000000000001",
+      period_id: "30000000-0000-4000-8000-000000000002",
+      payment_reference: "PAG-DEMO-002",
+      payment_date: "2026-09-20",
+      amount: 240000000,
+      status: "confirmado",
+      support_path: "Soportes/PAG-DEMO-002.pdf",
+      created_at: "2026-09-20T14:00:00Z"
+    },
+    {
+      id: "65000000-0000-4000-8000-000000000003",
+      invoice_id: "60000000-0000-4000-8000-000000000003",
+      project_id: "10000000-0000-4000-8000-000000000002",
+      contract_id: "20000000-0000-4000-8000-000000000002",
+      period_id: "30000000-0000-4000-8000-000000000002",
+      payment_reference: "PAG-DEMO-003",
+      payment_date: "2026-09-22",
+      amount: 1640000000,
+      status: "confirmado",
+      support_path: "Soportes/PAG-DEMO-003.pdf",
+      created_at: "2026-09-22T14:00:00Z"
+    },
+    {
+      id: "65000000-0000-4000-8000-000000000004",
+      invoice_id: "60000000-0000-4000-8000-000000000004",
+      project_id: "10000000-0000-4000-8000-000000000003",
+      contract_id: "20000000-0000-4000-8000-000000000003",
+      period_id: "30000000-0000-4000-8000-000000000002",
+      payment_reference: "PAG-DEMO-004",
+      payment_date: "2026-09-25",
+      amount: 1440000000,
+      status: "confirmado",
+      support_path: "Soportes/PAG-DEMO-004.pdf",
+      created_at: "2026-09-25T14:00:00Z"
     }
   ],
   costsExpenses: [
@@ -225,11 +359,34 @@ function readState(storage) {
   if (!storage) return clone(initialState);
   try {
     const stored = JSON.parse(storage.getItem(STORAGE_KEY));
-    if (stored?.projects && stored?.periods && stored?.costsExpenses && stored?.monthlyTracking && stored?.auditLog) return stored;
+    if (stored?.profiles && stored?.projects && stored?.periods && stored?.invoices && stored?.payments && stored?.costsExpenses && stored?.monthlyTracking && stored?.auditLog) return stored;
   } catch {
     // Si el almacenamiento fue alterado, se recupera la demostración inicial.
   }
   return clone(initialState);
+}
+
+function decorateInvoice(record, state) {
+  const project = state.projects.find((item) => item.id === record.project_id);
+  const period = state.periods.find((item) => item.id === record.period_id);
+  return {
+    ...record,
+    projects: project ? { id: project.id, cost_center: project.cost_center, name: project.name } : null,
+    contracts: project ? { contract_number: project.contract_number } : null,
+    periods: period ? { id: period.id, year: period.year, month: period.month, status: period.status } : null
+  };
+}
+
+function decoratePayment(record, state) {
+  const project = state.projects.find((item) => item.id === record.project_id);
+  const period = state.periods.find((item) => item.id === record.period_id);
+  const invoice = state.invoices.find((item) => item.id === record.invoice_id);
+  return {
+    ...record,
+    projects: project ? { id: project.id, cost_center: project.cost_center, name: project.name } : null,
+    invoices: invoice ? { invoice_number: invoice.invoice_number } : null,
+    periods: period ? { id: period.id, year: period.year, month: period.month, status: period.status } : null
+  };
 }
 
 function decorateCost(record, state) {
@@ -249,21 +406,29 @@ function decorateCost(record, state) {
 function decorateMonthly(record, state) {
   const project = state.projects.find((item) => item.id === record.project_id);
   const period = state.periods.find((item) => item.id === record.period_id);
-  const previous = state.monthlyTracking
-    .filter((item) => item.project_id === record.project_id)
-    .filter((item) => {
-      const itemPeriod = state.periods.find((candidate) => candidate.id === item.period_id);
-      if (!itemPeriod || !period) return false;
-      return itemPeriod.year < period.year || (itemPeriod.year === period.year && itemPeriod.month <= period.month);
-    });
-  const cumulativeInvoiced = previous.reduce((sum, item) => sum + Number(item.invoiced_value ?? 0), 0);
+  const orderedPeriods = state.periods.filter((candidate) => period && (
+    candidate.year < period.year || (candidate.year === period.year && candidate.month <= period.month)
+  )).map((candidate) => candidate.id);
+  const invoicedValue = state.invoices
+    .filter((item) => item.project_id === record.project_id && item.period_id === record.period_id && item.status !== "anulada")
+    .reduce((sum, item) => sum + Number(item.amount), 0);
+  const paidValue = state.payments
+    .filter((item) => item.project_id === record.project_id && item.period_id === record.period_id && item.status !== "anulado")
+    .reduce((sum, item) => sum + Number(item.amount), 0);
+  const cumulativeInvoiced = state.invoices
+    .filter((item) => item.project_id === record.project_id && orderedPeriods.includes(item.period_id) && item.status !== "anulada")
+    .reduce((sum, item) => sum + Number(item.amount), 0);
   return {
     ...record,
     tracking_id: record.id,
     cost_center: project?.cost_center ?? "",
     project_name: project?.name ?? "",
-    year: period?.year, month: period?.month, period_status: period?.status,
+    year: period?.year,
+    month: period?.month,
+    period_status: period?.status,
     contract_value: Number(project?.contract_value ?? 0),
+    invoiced_value: invoicedValue,
+    paid_value: paidValue,
     costs_expenses_value: state.costsExpenses
       .filter((item) => item.project_id === record.project_id && item.period_id === record.period_id)
       .reduce((sum, item) => sum + Number(item.amount), 0),
@@ -272,14 +437,37 @@ function decorateMonthly(record, state) {
 }
 
 function projectSummary(record, state) {
+  const totalInvoiced = state.invoices
+    .filter((item) => item.project_id === record.id && item.status !== "anulada")
+    .reduce((sum, item) => sum + Number(item.amount), 0);
+  const totalPaid = state.payments
+    .filter((item) => item.project_id === record.id && item.status !== "anulado")
+    .reduce((sum, item) => sum + Number(item.amount), 0);
   const totalCostsExpenses = state.costsExpenses
     .filter((item) => item.project_id === record.id)
     .reduce((sum, item) => sum + Number(item.amount), 0);
-
   return normalizeProjectSummary({
     ...record,
+    total_invoiced: totalInvoiced,
+    total_paid: totalPaid,
     total_costs_expenses: totalCostsExpenses
   });
+}
+
+function contractFromProject(project) {
+  if (!project?.contract_id) return null;
+  return {
+    id: project.contract_id,
+    project_id: project.id,
+    contract_number: project.contract_number,
+    initial_value: Number(project.contract_initial_value ?? project.contract_value ?? 0),
+    additions_value: Number(project.contract_additions_value ?? 0),
+    deductions_value: Number(project.contract_deductions_value ?? 0),
+    current_value: Number(project.contract_value ?? 0),
+    start_date: project.contract_start_date ?? project.start_date ?? "2026-01-01",
+    end_date: project.contract_end_date ?? project.end_date ?? null,
+    status: project.contract_status ?? "vigente"
+  };
 }
 
 export function createDemoStore({ storage = defaultStorage() } = {}) {
@@ -302,6 +490,28 @@ export function createDemoStore({ storage = defaultStorage() } = {}) {
 
   return Object.freeze({
     mode: "demo",
+
+    async getCurrentProfile() {
+      return normalizeProfile(state.profiles[0]);
+    },
+
+    async listProfiles() {
+      return state.profiles.map(normalizeProfile).sort((left, right) => left.fullName.localeCompare(right.fullName, "es"));
+    },
+
+    async updateProfile(profileId, input) {
+      const id = assertUuid(profileId, "usuario");
+      const profile = state.profiles.find((item) => item.id === id);
+      if (!profile) throw new Error("El usuario solicitado no existe.");
+      const previous = clone(profile);
+      profile.full_name = assertText(input.fullName, "nombre", { min: 3, max: 180 });
+      profile.role = assertEnum(input.role, APP_ROLES, "rol");
+      profile.active = Boolean(input.active);
+      profile.updated_at = new Date().toISOString();
+      recordAudit("profiles", id, "UPDATE", previous, profile);
+      persist();
+      return normalizeProfile(profile);
+    },
 
     async listProjects(filters = {}) {
       const name = String(filters.name ?? "").trim().toLocaleLowerCase("es");
@@ -387,14 +597,82 @@ export function createDemoStore({ storage = defaultStorage() } = {}) {
       const project = state.projects.find((item) => item.id === id);
       if (!project) throw new Error("El proyecto que intentas eliminar no existe.");
       const hasMovements = state.costsExpenses.some((item) => item.project_id === id)
-        || Number(project.total_invoiced) > 0
-        || Number(project.total_paid) > 0;
+        || state.monthlyTracking.some((item) => item.project_id === id)
+        || state.invoices.some((item) => item.project_id === id)
+        || state.payments.some((item) => item.project_id === id);
       if (hasMovements) {
         throw new Error("No se puede eliminar un proyecto con movimientos. Cambia su estado para conservar el histórico.");
       }
       state.projects = state.projects.filter((item) => item.id !== id);
       recordAudit("projects", id, "DELETE", project, null);
       persist();
+    },
+
+    async listContracts(projectId) {
+      const id = assertUuid(projectId, "proyecto");
+      const project = state.projects.find((item) => item.id === id);
+      if (!project) throw new Error("El proyecto solicitado no existe.");
+      const contract = contractFromProject(project);
+      return contract ? [normalizeContract(contract)] : [];
+    },
+
+    async createContract(input) {
+      const projectId = assertUuid(input.projectId, "proyecto");
+      const project = state.projects.find((item) => item.id === projectId);
+      if (!project) throw new Error("El proyecto solicitado no existe.");
+      if (project.contract_id) throw new Error("El proyecto ya tiene un contrato registrado.");
+      const initialValue = assertMoney(input.initialValue, "valor inicial", { allowZero: false });
+      const additionsValue = assertMoney(input.additionsValue ?? 0, "adiciones");
+      const deductionsValue = assertMoney(input.deductionsValue ?? 0, "deducciones");
+      const currentValue = initialValue + additionsValue - deductionsValue;
+      if (currentValue <= 0) throw new Error("El valor contractual vigente debe ser positivo.");
+      const startDate = assertDate(input.startDate, "fecha inicial");
+      const endDate = input.endDate ? assertDate(input.endDate, "fecha final") : null;
+      if (endDate && endDate < startDate) throw new Error("La fecha final no puede ser anterior a la fecha inicial.");
+      const contract = {
+        id: createUuid(), project_id: projectId,
+        contract_number: assertText(input.contractNumber, "número de contrato", { min: 2, max: 80 }),
+        initial_value: initialValue, additions_value: additionsValue, deductions_value: deductionsValue,
+        current_value: currentValue, start_date: startDate, end_date: endDate,
+        status: assertEnum(input.status ?? "borrador", CONTRACT_STATUSES, "estado")
+      };
+      Object.assign(project, {
+        contract_id: contract.id, contract_number: contract.contract_number,
+        contract_value: currentValue, contract_initial_value: initialValue,
+        contract_additions_value: additionsValue, contract_deductions_value: deductionsValue,
+        contract_start_date: startDate, contract_end_date: endDate, contract_status: contract.status
+      });
+      recordAudit("contracts", contract.id, "INSERT", null, contract);
+      persist();
+      return normalizeContract(contract);
+    },
+
+    async updateContract(contractId, input) {
+      const id = assertUuid(contractId, "contrato");
+      const project = state.projects.find((item) => item.contract_id === id);
+      if (!project) throw new Error("El contrato solicitado no existe.");
+      const previous = contractFromProject(project);
+      const initialValue = assertMoney(input.initialValue, "valor inicial", { allowZero: false });
+      const additionsValue = assertMoney(input.additionsValue ?? 0, "adiciones");
+      const deductionsValue = assertMoney(input.deductionsValue ?? 0, "deducciones");
+      const currentValue = initialValue + additionsValue - deductionsValue;
+      const invoiced = state.invoices.filter((item) => item.contract_id === id && item.status !== "anulada").reduce((sum, item) => sum + Number(item.amount), 0);
+      const recognized = state.monthlyTracking.filter((item) => item.contract_id === id).reduce((sum, item) => sum + Number(item.recognized_value), 0);
+      if (currentValue < invoiced || currentValue < recognized) throw new Error("El valor contractual no puede ser menor que la facturación o el avance reconocido.");
+      const startDate = assertDate(input.startDate, "fecha inicial");
+      const endDate = input.endDate ? assertDate(input.endDate, "fecha final") : null;
+      if (endDate && endDate < startDate) throw new Error("La fecha final no puede ser anterior a la fecha inicial.");
+      Object.assign(project, {
+        contract_number: assertText(input.contractNumber, "número de contrato", { min: 2, max: 80 }),
+        contract_value: currentValue, contract_initial_value: initialValue,
+        contract_additions_value: additionsValue, contract_deductions_value: deductionsValue,
+        contract_start_date: startDate, contract_end_date: endDate,
+        contract_status: assertEnum(input.status ?? "borrador", CONTRACT_STATUSES, "estado")
+      });
+      const updated = contractFromProject(project);
+      recordAudit("contracts", id, "UPDATE", previous, updated);
+      persist();
+      return normalizeContract(updated);
     },
 
     async listPeriods() {
@@ -419,7 +697,9 @@ export function createDemoStore({ storage = defaultStorage() } = {}) {
       if (period.status === "cerrado") throw new Error("El periodo ya está cerrado.");
       const projectsWithActivity = new Set([
         ...state.monthlyTracking.filter((item) => item.period_id === id).map((item) => item.project_id),
-        ...state.costsExpenses.filter((item) => item.period_id === id).map((item) => item.project_id)
+        ...state.costsExpenses.filter((item) => item.period_id === id).map((item) => item.project_id),
+        ...state.invoices.filter((item) => item.period_id === id).map((item) => item.project_id),
+        ...state.payments.filter((item) => item.period_id === id).map((item) => item.project_id)
       ]);
       const incomplete = [...projectsWithActivity].filter((projectId) => !state.monthlyTracking.some(
         (item) => item.period_id === id && item.project_id === projectId && item.validation_status === "validado"
@@ -492,6 +772,103 @@ export function createDemoStore({ storage = defaultStorage() } = {}) {
       record.validation_status = "validado"; record.validated_at = new Date().toISOString(); record.updated_at = record.validated_at;
       recordAudit("monthly_tracking", id, "UPDATE", previous, record); persist();
       return normalizeMonthlySummary(decorateMonthly(record, state));
+    },
+
+    async listInvoices(filters = {}) {
+      const dateFrom = filters.dateFrom || null;
+      const dateTo = filters.dateTo || null;
+      return state.invoices
+        .filter((item) => !filters.projectId || item.project_id === filters.projectId)
+        .filter((item) => !filters.periodId || item.period_id === filters.periodId)
+        .filter((item) => !filters.status || item.status === filters.status)
+        .filter((item) => !dateFrom || item.issue_date >= dateFrom)
+        .filter((item) => !dateTo || item.issue_date <= dateTo)
+        .sort((left, right) => right.issue_date.localeCompare(left.issue_date))
+        .map((item) => normalizeInvoice(decorateInvoice(item, state)));
+    },
+
+    async createInvoice(input) {
+      const projectId = assertUuid(input.projectId, "proyecto");
+      const contractId = assertUuid(input.contractId, "contrato");
+      const periodId = assertUuid(input.periodId, "periodo");
+      const project = state.projects.find((item) => item.id === projectId && item.contract_id === contractId);
+      const period = state.periods.find((item) => item.id === periodId);
+      if (!project) throw new Error("Selecciona un proyecto con contrato.");
+      if (!period || period.status !== "abierto") throw new Error("Selecciona un periodo abierto.");
+      const issueDate = assertDate(input.issueDate, "fecha de emisión");
+      if (!issueDate.startsWith(`${period.year}-${String(period.month).padStart(2, "0")}`)) {
+        throw new Error("La fecha de la factura debe corresponder al periodo seleccionado.");
+      }
+      const invoiceNumber = assertText(input.invoiceNumber, "número de factura", { min: 2, max: 80 });
+      if (state.invoices.some((item) => item.invoice_number.toLocaleLowerCase("es") === invoiceNumber.toLocaleLowerCase("es"))) {
+        throw new Error("Ya existe una factura con ese número.");
+      }
+      const amount = assertMoney(input.amount, "valor facturado", { allowZero: false });
+      const status = assertEnum(input.status ?? "registrada", INVOICE_STATUSES, "estado de factura");
+      const accumulated = state.invoices
+        .filter((item) => item.contract_id === contractId && item.status !== "anulada")
+        .reduce((sum, item) => sum + Number(item.amount), 0);
+      if (status !== "anulada" && accumulated + amount > Number(project.contract_value)) {
+        throw new Error("La facturación acumulada no puede superar el valor contractual vigente.");
+      }
+      const created = {
+        id: createUuid(), project_id: projectId, contract_id: contractId, period_id: periodId,
+        invoice_number: invoiceNumber, issue_date: issueDate, amount, status,
+        support_path: input.supportPath?.trim() || null, created_at: new Date().toISOString()
+      };
+      state.invoices.push(created);
+      recordAudit("invoices", created.id, "INSERT", null, created);
+      persist();
+      return normalizeInvoice(decorateInvoice(created, state));
+    },
+
+    async listPayments(filters = {}) {
+      const dateFrom = filters.dateFrom || null;
+      const dateTo = filters.dateTo || null;
+      return state.payments
+        .filter((item) => !filters.invoiceId || item.invoice_id === filters.invoiceId)
+        .filter((item) => !filters.projectId || item.project_id === filters.projectId)
+        .filter((item) => !filters.periodId || item.period_id === filters.periodId)
+        .filter((item) => !filters.status || item.status === filters.status)
+        .filter((item) => !dateFrom || item.payment_date >= dateFrom)
+        .filter((item) => !dateTo || item.payment_date <= dateTo)
+        .sort((left, right) => right.payment_date.localeCompare(left.payment_date))
+        .map((item) => normalizePayment(decoratePayment(item, state)));
+    },
+
+    async createPayment(input) {
+      const invoiceId = assertUuid(input.invoiceId, "factura");
+      const periodId = assertUuid(input.periodId, "periodo");
+      const invoice = state.invoices.find((item) => item.id === invoiceId);
+      const period = state.periods.find((item) => item.id === periodId);
+      if (!invoice || invoice.status === "anulada") throw new Error("Selecciona una factura activa.");
+      if (!period || period.status !== "abierto") throw new Error("Selecciona un periodo abierto.");
+      const paymentDate = assertDate(input.paymentDate, "fecha de pago");
+      if (!paymentDate.startsWith(`${period.year}-${String(period.month).padStart(2, "0")}`)) {
+        throw new Error("La fecha del pago debe corresponder al periodo seleccionado.");
+      }
+      const paymentReference = assertText(input.paymentReference, "referencia de pago", { min: 2, max: 80 });
+      if (state.payments.some((item) => item.payment_reference.toLocaleLowerCase("es") === paymentReference.toLocaleLowerCase("es"))) {
+        throw new Error("Ya existe un pago con esa referencia.");
+      }
+      const amount = assertMoney(input.amount, "valor pagado", { allowZero: false });
+      const status = assertEnum(input.status ?? "registrado", PAYMENT_STATUSES, "estado de pago");
+      const accumulated = state.payments
+        .filter((item) => item.invoice_id === invoiceId && item.status !== "anulado")
+        .reduce((sum, item) => sum + Number(item.amount), 0);
+      if (status !== "anulado" && accumulated + amount > Number(invoice.amount)) {
+        throw new Error("Los pagos activos no pueden superar el valor de la factura.");
+      }
+      const created = {
+        id: createUuid(), invoice_id: invoiceId, project_id: invoice.project_id,
+        contract_id: invoice.contract_id, period_id: periodId,
+        payment_reference: paymentReference, payment_date: paymentDate, amount, status,
+        support_path: input.supportPath?.trim() || null, created_at: new Date().toISOString()
+      };
+      state.payments.push(created);
+      recordAudit("payments", created.id, "INSERT", null, created);
+      persist();
+      return normalizePayment(decoratePayment(created, state));
     },
 
     async listCostsExpenses(filters = {}) {
