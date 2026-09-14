@@ -11,7 +11,7 @@
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="src/assets/css/styles.css?v=0.3.1" />
+    <link rel="stylesheet" href="src/assets/css/styles.css?v=0.4.0" />
   </head>
   <body>
     <section id="loginView" class="login-shell">
@@ -46,6 +46,7 @@
           <button class="nav-item" data-view="monthly"><span>SM</span>Seguimiento mensual</button>
           <button class="nav-item" data-view="finance"><span>FP</span>Facturación y pagos</button>
           <button class="nav-item" data-view="costs"><span>CG</span>Costos y gastos</button>
+          <button class="nav-item" data-view="history"><span>HI</span>Historial</button>
           <button class="nav-item" data-view="reports"><span>RE</span>Reportes</button>
           <button class="nav-item" data-view="admin"><span>AD</span>Administración</button>
         </nav>
@@ -129,7 +130,7 @@
             </article>
 
             <div class="detail-tabs" role="tablist">
-              <button class="active">Resumen</button><button>Seguimiento mensual</button><button>Facturas</button><button>Pagos</button><button>Costos y gastos</button><button>Documentos</button><button>Historial</button>
+              <button class="active">Resumen</button><button data-project-tab="monthly">Seguimiento mensual</button><button>Facturas</button><button>Pagos</button><button data-project-tab="costs">Costos y gastos</button><button>Documentos</button><button data-project-tab="history">Historial</button>
             </div>
 
             <div class="detail-grid">
@@ -152,6 +153,40 @@
               </article>
             </div>
             <button class="btn btn-link px-0 mt-3" data-view="dashboard">← Volver al resumen</button>
+          </section>
+
+          <section id="monthlyView" class="content-view" hidden>
+            <div class="section-heading">
+              <div><h3>Seguimiento mensual</h3><p>Control de periodos y avance financiero calculado desde la facturación.</p></div>
+              <div class="heading-actions"><button id="newPeriodButton" class="btn btn-outline-primary">Nuevo periodo</button><button id="newMonthlyButton" class="btn btn-primary">Registrar seguimiento</button></div>
+            </div>
+
+            <div class="cost-summary-grid">
+              <article class="mini-kpi"><span>Periodos registrados</span><strong id="periodCount">0</strong></article>
+              <article class="mini-kpi"><span>Periodo abierto</span><strong id="openPeriodCount">0</strong></article>
+              <article class="mini-kpi"><span>Registros mensuales</span><strong id="monthlyCount">0</strong></article>
+              <article class="mini-kpi"><span>Pendientes de validar</span><strong id="monthlyPendingCount">0</strong></article>
+            </div>
+
+            <article class="panel data-panel period-panel">
+              <div class="panel-heading"><div><h4>Periodos</h4><small>Solo puede existir un periodo abierto.</small></div><span id="periodModuleMessage" class="module-message" role="status" aria-live="polite"></span></div>
+              <div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Periodo</th><th>Estado</th><th>Fecha de cierre</th><th>Acción</th></tr></thead><tbody id="periodRows"></tbody></table></div>
+            </article>
+
+            <article class="panel filter-panel monthly-filter-panel">
+              <form id="monthlyFilters" class="filter-grid" autocomplete="off">
+                <label>Proyecto<select id="monthlyFilterProject" class="form-select"><option value="">Todos</option></select></label>
+                <label>Periodo<select id="monthlyFilterPeriod" class="form-select"><option value="">Todos</option></select></label>
+                <label>Validación<select id="monthlyFilterStatus" class="form-select"><option value="">Todos</option><option value="borrador">Borrador</option><option value="pendiente">Pendiente</option><option value="validado">Validado</option><option value="rechazado">Rechazado</option></select></label>
+                <div class="filter-actions"><button class="btn btn-primary" type="submit">Aplicar filtros</button><button id="clearMonthlyFilters" class="btn btn-outline-secondary" type="button">Limpiar</button></div>
+              </form>
+            </article>
+
+            <div id="monthlyModuleMessage" class="module-message module-message-block" role="status" aria-live="polite"></div>
+            <article class="panel data-panel">
+              <div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Periodo</th><th>Proyecto</th><th>Facturado mes</th><th>Avance mes</th><th>Avance acumulado</th><th>Costos y gastos</th><th>Validación</th><th>Acciones</th></tr></thead><tbody id="monthlyRows"></tbody></table></div>
+              <div id="monthlyEmpty" class="inline-empty" hidden>No se encontraron registros mensuales.</div>
+            </article>
           </section>
 
           <section id="projectsView" class="content-view" hidden>
@@ -223,6 +258,30 @@
             </article>
           </section>
 
+          <section id="historyView" class="content-view" hidden>
+            <div class="section-heading">
+              <div><h3>Historial y trazabilidad</h3><p>Registro cronológico de creaciones, modificaciones y eliminaciones.</p></div>
+              <button id="exportHistoryButton" class="btn btn-outline-primary">Exportar CSV</button>
+            </div>
+
+            <article class="panel filter-panel">
+              <form id="historyFilters" class="filter-grid filter-grid-history" autocomplete="off">
+                <label>Proyecto<select id="historyFilterProject" class="form-select"><option value="">Todos</option></select></label>
+                <label>Módulo<select id="historyFilterTable" class="form-select"><option value="">Todos</option><option value="projects">Proyectos</option><option value="periods">Periodos</option><option value="monthly_tracking">Seguimiento mensual</option><option value="contracts">Contratos</option><option value="invoices">Facturación</option><option value="payments">Pagos</option><option value="costs_expenses">Costos y gastos</option></select></label>
+                <label>Acción<select id="historyFilterAction" class="form-select"><option value="">Todas</option><option value="INSERT">Creación</option><option value="UPDATE">Modificación</option><option value="DELETE">Eliminación</option></select></label>
+                <label>Desde<input id="historyFilterFrom" class="form-control" type="date" /></label>
+                <label>Hasta<input id="historyFilterTo" class="form-control" type="date" /></label>
+                <div class="filter-actions"><button class="btn btn-primary" type="submit">Aplicar filtros</button><button id="clearHistoryFilters" class="btn btn-outline-secondary" type="button">Limpiar</button></div>
+              </form>
+            </article>
+
+            <div class="module-summary"><span><strong id="historyCount">0</strong> eventos encontrados</span><span id="historyModuleMessage" class="module-message" role="status" aria-live="polite"></span></div>
+            <article class="panel data-panel">
+              <div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Fecha y hora</th><th>Proyecto</th><th>Módulo</th><th>Acción</th><th>Descripción</th><th>Detalle</th></tr></thead><tbody id="historyRows"></tbody></table></div>
+              <div id="historyEmpty" class="inline-empty" hidden>No se encontraron eventos con los filtros seleccionados.</div>
+            </article>
+          </section>
+
           <section id="placeholderView" class="content-view" hidden>
             <article class="panel empty-state">
               <span class="empty-icon">SC</span>
@@ -275,10 +334,48 @@
       </form>
     </dialog>
 
+    <dialog id="periodDialog" class="app-dialog app-dialog-small">
+      <form id="periodForm" method="dialog" novalidate>
+        <div class="dialog-heading"><div><p class="eyebrow">Control mensual</p><h3>Nuevo periodo</h3></div><button class="dialog-close" type="button" data-close-dialog="periodDialog" aria-label="Cerrar">×</button></div>
+        <div class="form-grid">
+          <label>Año *<input id="periodYear" class="form-control" type="number" min="2020" max="2100" required /></label>
+          <label>Mes *<select id="periodMonth" class="form-select" required><option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option><option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option><option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option><option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option></select></label>
+        </div>
+        <p class="dialog-note">El periodo se crea abierto. Para mantener la integridad, primero debe cerrarse cualquier periodo activo.</p>
+        <p id="periodFormMessage" class="form-message" role="alert"></p>
+        <div class="dialog-actions"><button class="btn btn-outline-secondary" type="button" data-close-dialog="periodDialog">Cancelar</button><button id="savePeriodButton" class="btn btn-primary" type="submit">Crear periodo</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="monthlyDialog" class="app-dialog">
+      <form id="monthlyForm" method="dialog" novalidate>
+        <div class="dialog-heading"><div><p class="eyebrow">Seguimiento mensual</p><h3 id="monthlyDialogTitle">Registrar seguimiento</h3></div><button class="dialog-close" type="button" data-close-dialog="monthlyDialog" aria-label="Cerrar">×</button></div>
+        <input id="monthlyTrackingId" type="hidden" />
+        <div class="form-grid">
+          <label class="span-2">Proyecto con contrato *<select id="monthlyProject" class="form-select" required></select></label>
+          <label>Periodo abierto *<select id="monthlyPeriod" class="form-select" required></select></label>
+          <label>Estado *<select id="monthlyValidationStatus" class="form-select" required><option value="borrador">Borrador</option><option value="pendiente">Pendiente de validación</option></select></label>
+          <label class="span-2">Valor reconocido del mes (COP) *<input id="monthlyRecognizedValue" class="form-control" type="number" min="0" step="0.01" required /></label>
+          <label class="span-2">Observaciones<textarea id="monthlyObservations" class="form-control" rows="3" maxlength="500"></textarea></label>
+        </div>
+        <p class="dialog-note">El porcentaje de avance no se digita: se calcula con el valor facturado dividido entre el valor contractual vigente.</p>
+        <p id="monthlyFormMessage" class="form-message" role="alert"></p>
+        <div class="dialog-actions"><button class="btn btn-outline-secondary" type="button" data-close-dialog="monthlyDialog">Cancelar</button><button id="saveMonthlyButton" class="btn btn-primary" type="submit">Guardar seguimiento</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="historyDialog" class="app-dialog">
+      <div class="history-dialog-content">
+        <div class="dialog-heading"><div><p class="eyebrow">Trazabilidad</p><h3>Detalle del cambio</h3></div><button class="dialog-close" type="button" data-close-dialog="historyDialog" aria-label="Cerrar">×</button></div>
+        <div id="historyDetail" class="history-detail"></div>
+        <div class="dialog-actions"><button class="btn btn-primary" type="button" data-close-dialog="historyDialog">Cerrar</button></div>
+      </div>
+    </dialog>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="src/assets/js/config.js"></script>
-    <script type="module" src="src/assets/js/app.js?v=0.3.1"></script>
+    <script type="module" src="src/assets/js/app.js?v=0.4.0"></script>
   </body>
 </html>
