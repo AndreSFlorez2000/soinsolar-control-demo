@@ -11,7 +11,7 @@
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="src/assets/css/styles.css?v=0.6.0" />
+    <link rel="stylesheet" href="src/assets/css/styles.css?v=0.8.0" />
   </head>
   <body>
     <section id="loginView" class="login-shell">
@@ -88,33 +88,40 @@
         <div class="content-area">
           <section id="dashboardView" class="content-view">
             <div class="section-heading">
-              <div><h3>Resumen financiero</h3><p>Consolidado de todos los proyectos activos.</p></div>
-              <button class="btn btn-outline-primary">Generar reporte</button>
+              <div><h3>Indicadores generales</h3><p>Información consolidada de los proyectos autorizados.</p></div>
+              <button id="exportDashboardButton" class="btn btn-outline-primary" type="button">Exportar resumen CSV</button>
             </div>
 
             <div class="kpi-grid">
-              <article class="kpi-card accent-blue"><span>Valor contractual vigente</span><strong id="contractValue"></strong><small>7 proyectos activos</small></article>
-              <article class="kpi-card accent-green"><span>Total facturado</span><strong id="invoicedValue"></strong><small class="positive">▲ 8,4 % frente a julio</small></article>
-              <article class="kpi-card accent-gold"><span>Total pagado</span><strong id="paidValue"></strong><small id="receivableValue"></small></article>
-              <article class="kpi-card accent-red"><span>Costos y gastos</span><strong id="costValue"></strong><small id="costRatio"></small></article>
+              <article class="kpi-card accent-blue"><span>Valor contractual vigente</span><strong id="contractValue">$0</strong><small id="activeProjectKpi">0 proyectos activos</small></article>
+              <article class="kpi-card accent-green"><span>Total facturado</span><strong id="invoicedValue">$0</strong><small id="invoicedRatioText">0 % del valor contractual</small></article>
+              <article class="kpi-card accent-gold"><span>Total pagado</span><strong id="paidValue">$0</strong><small id="receivableValue">$0 por cobrar</small></article>
+              <article class="kpi-card accent-red"><span>Costos y gastos</span><strong id="costValue">$0</strong><small id="costRatio">0 % del contrato</small></article>
+            </div>
+
+            <div class="dashboard-secondary-grid">
+              <article class="mini-kpi"><span>Saldo contractual</span><strong id="contractualBalanceValue">$0</strong></article>
+              <article class="mini-kpi"><span>Pago pendiente</span><strong id="paymentPendingValue">$0</strong></article>
+              <article class="mini-kpi"><span>Avance financiero global</span><strong id="globalProgressValue">0 %</strong></article>
+              <article class="mini-kpi"><span>Proyectos registrados</span><strong id="projectCountValue">0</strong></article>
             </div>
 
             <div class="dashboard-grid">
               <article class="panel chart-panel">
-                <h4>Comportamiento mensual</h4>
+                <div class="panel-heading"><div><h4>Comportamiento mensual</h4><small id="monthlySeriesDescription">Sin periodos con movimientos</small></div></div>
                 <canvas id="monthlyChart" aria-label="Facturación, pagos y costos por mes"></canvas>
-                <div id="chartFallback" class="chart-fallback" aria-hidden="true"></div>
+                <div id="chartFallback" class="chart-fallback" aria-live="polite"></div>
               </article>
-              <article class="panel alerts-panel">
-                <h4>Alertas que requieren atención</h4>
-                <div class="alert-row"><span class="alert-dot red"></span><div><strong>3 facturas pendientes</strong><small>$350.000.000 por recaudar</small></div></div>
-                <div class="alert-row"><span class="alert-dot gold"></span><div><strong>Agosto sin cerrar</strong><small>Falta validar un proyecto</small></div></div>
-                <div class="alert-row"><span class="alert-dot blue"></span><div><strong>Proyecto al 92 %</strong><small>Revisar saldo contractual</small></div></div>
+              <article class="panel status-panel">
+                <h4>Estado de los proyectos</h4>
+                <div id="projectStatusStats" class="project-status-stats"></div>
+                <h4 class="dashboard-alert-title">Alertas generales</h4>
+                <div id="dashboardAlerts" aria-live="polite"></div>
               </article>
             </div>
 
             <article class="panel projects-table-panel">
-              <div class="panel-heading"><h4>Proyectos recientes</h4><button class="link-button" data-view="projects">Ver todos</button></div>
+              <div class="panel-heading"><h4>Proyectos con mayor avance</h4><button class="link-button" type="button" data-view="projects">Ver todos</button></div>
               <div class="table-responsive">
                 <table class="table align-middle mb-0">
                   <thead><tr><th>Centro de costo</th><th>Proyecto</th><th>Municipio</th><th>Avance financiero</th><th>Saldo contractual</th><th></th></tr></thead>
@@ -235,11 +242,14 @@
             </div>
 
             <article class="panel filter-panel project-filter-panel">
-              <form id="projectFilters" class="filter-grid" autocomplete="off">
+              <form id="projectFilters" class="filter-grid filter-grid-projects" autocomplete="off">
                 <label>Proyecto o cliente<input id="projectFilterName" class="form-control" type="search" placeholder="Buscar por nombre" /></label>
                 <label>Centro de costo<input id="projectFilterCenter" class="form-control" type="search" placeholder="Ej. DEMO-001" /></label>
                 <label>Municipio<input id="projectFilterMunicipality" class="form-control" type="search" placeholder="Municipio" /></label>
                 <label>Estado<select id="projectFilterStatus" class="form-select"><option value="">Todos</option><option value="planeado">Planeado</option><option value="activo">Activo</option><option value="suspendido">Suspendido</option><option value="finalizado">Finalizado</option><option value="cancelado">Cancelado</option></select></label>
+                <label>Tipo de servicio<input id="projectFilterService" class="form-control" type="search" placeholder="Ej. Construcción EPC" /></label>
+                <label>Avance mínimo (%)<input id="projectFilterProgressMin" class="form-control" type="number" min="0" max="100" step="0.1" placeholder="0" /></label>
+                <label>Avance máximo (%)<input id="projectFilterProgressMax" class="form-control" type="number" min="0" max="100" step="0.1" placeholder="100" /></label>
                 <div class="filter-actions"><button class="btn btn-primary" type="submit">Aplicar filtros</button><button id="clearProjectFilters" class="btn btn-outline-secondary" type="button">Limpiar</button></div>
               </form>
             </article>
@@ -418,6 +428,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="src/assets/js/config.js"></script>
-    <script type="module" src="src/assets/js/app.js?v=0.6.0"></script>
+    <script type="module" src="src/assets/js/app.js?v=0.8.0"></script>
   </body>
 </html>
