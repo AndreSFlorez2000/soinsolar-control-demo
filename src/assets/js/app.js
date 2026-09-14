@@ -1,7 +1,7 @@
-import { dashboard as demoDashboard } from "./data/mock-data.js?v=0.4.0";
-import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=0.4.0";
-import { createApplicationDataGateway } from "./services/application-data.js?v=0.4.0";
-import { isDemoMode, signIn, signOut } from "./services/supabase.js?v=0.4.0";
+import { dashboard as demoDashboard } from "./data/mock-data.js?v=0.5.0";
+import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=0.5.0";
+import { createApplicationDataGateway } from "./services/application-data.js?v=0.5.0";
+import { isDemoMode, signIn, signOut } from "./services/supabase.js?v=0.5.0";
 
 const loginView = document.querySelector("#loginView");
 const appView = document.querySelector("#appView");
@@ -226,14 +226,30 @@ function projectFilters() {
   };
 }
 
+function renderProjectOverview() {
+  const counts = currentProjects.reduce((summary, project) => {
+    summary.total += 1;
+    if (project.status === "activo") summary.active += 1;
+    if (project.status === "planeado") summary.planned += 1;
+    if (project.status === "finalizado") summary.finished += 1;
+    return summary;
+  }, { total: 0, active: 0, planned: 0, finished: 0 });
+
+  document.querySelector("#projectTotalCount").textContent = counts.total;
+  document.querySelector("#projectActiveCount").textContent = counts.active;
+  document.querySelector("#projectPlannedCount").textContent = counts.planned;
+  document.querySelector("#projectFinishedCount").textContent = counts.finished;
+}
+
 async function loadProjects(filters = projectFilters()) {
   const message = document.querySelector("#projectModuleMessage");
+  renderProjectOverview();
   setMessage(message, "Consultando proyectos…");
   try {
     const rows = await (await ensureGateway()).listProjects(filters);
     document.querySelector("#projectResultCount").textContent = rows.length;
     document.querySelector("#projectsManagementRows").innerHTML = rows.map((project) => `
-      <tr><td><strong>${escapeHtml(project.costCenter)}</strong></td><td><span class="project-name-cell"><strong>${escapeHtml(project.projectName)}</strong><small>${escapeHtml(project.contractNumber || "Sin contrato registrado")}</small></span></td><td>${escapeHtml(project.municipality)}</td><td>${escapeHtml(project.serviceType)}</td><td><span class="status-badge ${escapeHtml(project.status)}">${escapeHtml(project.status)}</span></td><td>${formatPercent(project.financialProgressPercentage)}</td><td><span class="table-actions"><button class="table-action" data-action="open-project" data-project-id="${project.projectId}">Abrir</button><button class="table-action" data-action="edit-project" data-project-id="${project.projectId}">Editar</button><button class="table-action danger" data-action="delete-project" data-project-id="${project.projectId}">Eliminar</button></span></td></tr>`).join("");
+      <tr><td><strong>${escapeHtml(project.costCenter)}</strong></td><td><span class="project-name-cell"><strong>${escapeHtml(project.projectName)}</strong><small>${escapeHtml(project.contractNumber || "Sin contrato registrado")}</small></span></td><td>${escapeHtml(project.municipality)}</td><td>${escapeHtml(project.serviceType)}</td><td><span class="status-badge ${escapeHtml(project.status)}">${escapeHtml(capitalize(project.status))}</span></td><td>${formatPercent(project.financialProgressPercentage)}</td><td><span class="table-actions"><button class="table-action" type="button" data-action="open-project" data-project-id="${project.projectId}">Abrir</button><button class="table-action" type="button" data-action="edit-project" data-project-id="${project.projectId}">Editar</button><button class="table-action danger" type="button" data-action="delete-project" data-project-id="${project.projectId}">Eliminar</button></span></td></tr>`).join("");
     document.querySelector("#projectsEmpty").hidden = rows.length > 0;
     setMessage(message, rows.length ? "Consulta actualizada." : "");
   } catch (error) {
@@ -322,10 +338,17 @@ async function deleteProject(projectId) {
 
 async function openProjectDetail(projectId) {
   selectedProjectId = projectId;
-  const project = await (await ensureGateway()).getProjectSummary(projectId);
+  const data = await ensureGateway();
+  const [project, projectRecord] = await Promise.all([
+    data.getProjectSummary(projectId),
+    data.getProject(projectId)
+  ]);
+
   document.querySelector("#detailCostCenter").textContent = project.costCenter;
   document.querySelector("#detailProjectName").textContent = project.projectName;
-  document.querySelector("#detailProjectStatus").textContent = capitalize(project.status);
+  const status = document.querySelector("#detailProjectStatus");
+  status.textContent = capitalize(project.status);
+  status.className = `status-badge ${project.status}`;
   document.querySelector("#detailServiceType").textContent = project.serviceType;
   document.querySelector("#detailMunicipality").textContent = project.municipality;
   document.querySelector("#detailContractValue").textContent = formatCop(project.contractValue);
@@ -337,6 +360,14 @@ async function openProjectDetail(projectId) {
   document.querySelector("#detailContractBalance").textContent = formatCop(project.contractualBalance);
   document.querySelector("#detailProgressLabel").textContent = formatPercent(project.financialProgressPercentage);
   document.querySelector("#detailProgressBar").style.width = `${Math.min(100, Math.max(0, project.financialProgressPercentage))}%`;
+
+  document.querySelector("#detailClient").textContent = projectRecord.clientName || "Sin registrar";
+  document.querySelector("#detailContractNumber").textContent = project.contractNumber || "Sin registrar";
+  document.querySelector("#detailPower").textContent = projectRecord.powerKwp === null ? "Sin registrar" : `${projectRecord.powerKwp.toLocaleString("es-CO")} kWp`;
+  document.querySelector("#detailStartDate").textContent = formatDate(projectRecord.startDate);
+  document.querySelector("#detailEndDate").textContent = formatDate(projectRecord.endDate);
+  document.querySelector("#detailNotes").textContent = projectRecord.notes || "Sin observaciones";
+
   await showView("detail");
 }
 
