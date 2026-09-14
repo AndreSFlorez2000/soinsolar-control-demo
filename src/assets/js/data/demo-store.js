@@ -307,15 +307,22 @@ export function createDemoStore({ storage = defaultStorage() } = {}) {
       const name = String(filters.name ?? "").trim().toLocaleLowerCase("es");
       const costCenter = String(filters.costCenter ?? "").trim().toLocaleLowerCase("es");
       const municipality = String(filters.municipality ?? "").trim().toLocaleLowerCase("es");
+      const serviceType = String(filters.serviceType ?? "").trim().toLocaleLowerCase("es");
+      const progressMin = filters.progressMin === null || filters.progressMin === undefined || filters.progressMin === "" ? null : Number(filters.progressMin);
+      const progressMax = filters.progressMax === null || filters.progressMax === undefined || filters.progressMax === "" ? null : Number(filters.progressMax);
 
       return state.projects
         .filter((project) => {
+          const summary = projectSummary(project, state);
           const matchesName = !name || [project.name, project.client_name]
             .some((value) => String(value ?? "").toLocaleLowerCase("es").includes(name));
           const matchesCenter = !costCenter || project.cost_center.toLocaleLowerCase("es").includes(costCenter);
           const matchesMunicipality = !municipality || project.municipality.toLocaleLowerCase("es").includes(municipality);
           const matchesStatus = !filters.status || project.status === filters.status;
-          return matchesName && matchesCenter && matchesMunicipality && matchesStatus;
+          const matchesService = !serviceType || project.service_type.toLocaleLowerCase("es").includes(serviceType);
+          const matchesMinimum = progressMin === null || summary.financialProgressPercentage >= progressMin;
+          const matchesMaximum = progressMax === null || summary.financialProgressPercentage <= progressMax;
+          return matchesName && matchesCenter && matchesMunicipality && matchesStatus && matchesService && matchesMinimum && matchesMaximum;
         })
         .sort((left, right) => left.name.localeCompare(right.name, "es"))
         .map((project) => projectSummary(project, state));
