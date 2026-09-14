@@ -1,7 +1,8 @@
-import { buildMonthlySeries, calculateDashboardIndicators } from "./domain/dashboard.js?v=0.8.0";
-import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=0.8.0";
-import { createApplicationDataGateway } from "./services/application-data.js?v=0.8.0";
-import { isDemoMode, signIn, signOut } from "./services/supabase.js?v=0.8.0";
+import { buildMonthlySeries, calculateDashboardIndicators } from "./domain/dashboard.js?v=1.0.0";
+import { calculateProjectIndicators } from "./domain/project-analytics.js?v=1.0.0";
+import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=1.0.0";
+import { createApplicationDataGateway } from "./services/application-data.js?v=1.0.0";
+import { isDemoMode, signIn, signOut } from "./services/supabase.js?v=1.0.0";
 
 const loginView = document.querySelector("#loginView");
 const appView = document.querySelector("#appView");
@@ -64,7 +65,12 @@ let currentPeriods = [];
 let currentCosts = [];
 let currentMonthly = [];
 let currentAudit = [];
+let selectedProjectMonthly = [];
+let selectedProjectHistory = [];
 let dashboardChart = null;
+let projectChart = null;
+
+const functionalViews = new Set(["dashboard", "projects", "monthly", "costs", "history"]);
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -130,6 +136,22 @@ async function loadReferenceData() {
   populatePeriodOptions();
 }
 
+function routeFromHash() {
+  const hash = location.hash.replace(/^#/, "");
+  if (hash.startsWith("detail/")) {
+    const projectId = decodeURIComponent(hash.slice("detail/".length));
+    return projectId ? { view: "detail", projectId } : { view: "dashboard" };
+  }
+  return { view: functionalViews.has(hash) ? hash : "dashboard" };
+}
+
+function updateSystemStatus() {
+  const badge = document.querySelector("#systemModeBadge");
+  badge.textContent = isDemoMode() ? "Demo local" : "Datos conectados";
+  badge.classList.toggle("connected", !isDemoMode());
+  document.querySelector("#lastSyncLabel").textContent = `Actualizado ${new Intl.DateTimeFormat("es-CO", { hour: "2-digit", minute: "2-digit", timeZone: "America/Bogota" }).format(new Date())}`;
+}
+
 async function openApp() {
   const loginMessage = document.querySelector("#loginMessage");
   try {
@@ -137,8 +159,13 @@ async function openApp() {
     await loadReferenceData();
     loginView.hidden = true;
     appView.hidden = false;
-    renderDashboard();
-    await showView("dashboard");
+    updateSystemStatus();
+    const route = routeFromHash();
+    if (route.view === "detail" && currentProjects.some((project) => project.projectId === route.projectId)) {
+      await openProjectDetail(route.projectId);
+    } else {
+      await showView(route.view === "detail" ? "dashboard" : route.view);
+    }
   } catch (error) {
     setMessage(loginMessage, error.message || "No fue posible cargar la aplicación.", true);
   }
@@ -149,10 +176,20 @@ function closeApp() {
   loginView.hidden = false;
   gateway = null;
   selectedProjectId = null;
+  selectedProjectMonthly = [];
+  selectedProjectHistory = [];
+  if (projectChart) {
+    projectChart.destroy();
+    projectChart = null;
+  }
   document.querySelector("#loginForm").reset();
 }
 
-async function showView(view) {
+async function showView(requestedView) {
+  const view = requestedView === "detail" && selectedProjectId
+    ? "detail"
+    : functionalViews.has(requestedView) ? requestedView : "dashboard";
+
   document.querySelectorAll(".nav-item").forEach((button) => {
     button.classList.toggle("active", button.dataset.view === view || (view === "detail" && button.dataset.view === "projects"));
   });
@@ -163,17 +200,35 @@ async function showView(view) {
   };
   [dashboardView, detailView, projectsView, monthlyView, costsView, historyView, placeholderView]
     .forEach((element) => { element.hidden = true; });
-  (visible[view] ?? placeholderView).hidden = false;
-  title.textContent = viewLabels[view] ?? "Control Solar Demo";
-  breadcrumb.textContent = view === "detail" ? "PROYECTOS / DETALLE" : (viewLabels[view] ?? view).toUpperCase();
-  if (!placeholderView.hidden) document.querySelector("#placeholderTitle").textContent = `${viewLabels[view]} preparado`;
-  history.replaceState({}, "", `#${view}`);
+  visible[view].hidden = false;
+  title.textContent = viewLabels[view];
+  breadcrumb.textContent = view === "detail" ? "PROYECTOS / DETALLE" : viewLabels[view].toUpperCase();
+  history.replaceState({}, "", view === "detail" ? `#detail/${encodeURIComponent(selectedProjectId)}` : `#${view}`);
 
   if (view === "dashboard") renderDashboard();
   if (view === "projects") await loadProjects();
   if (view === "monthly") await loadMonthlyModule();
   if (view === "costs") await loadCosts();
   if (view === "history") await loadHistory();
+}
+
+async function refreshApplication() {
+  const button = document.querySelector("#refreshAppButton");
+  setBusy(button, true, "Actualizando…");
+  try {
+    const route = routeFromHash();
+    await loadReferenceData();
+    if (route.view === "detail" && currentProjects.some((project) => project.projectId === route.projectId)) {
+      await openProjectDetail(route.projectId);
+    } else {
+      await showView(route.view === "detail" ? "dashboard" : route.view);
+    }
+    updateSystemStatus();
+  } catch (error) {
+    window.alert(error.message || "No fue posible actualizar la información.");
+  } finally {
+    setBusy(button, false);
+  }
 }
 
 function renderDashboard() {
@@ -545,13 +600,102 @@ async function deleteProject(projectId) {
   }
 }
 
+function renderProjectHistory() {
+  const events = [...selectedProjectHistory]
+    .sort((left, right) => new Date(right.changedAt) - new Date(left.changedAt))
+    .slice(0, 5);
+  document.querySelector("#projectHistoryRows").innerHTML = events.map((event) => `
+    <tr>
+      <td>${escapeHtml(formatDateTime(event.changedAt))}</td>
+      <td>${escapeHtml(tableLabels[event.tableName] ?? event.tableName)}</td>
+      <td><span class="history-action ${event.action.toLocaleLowerCase()}">${escapeHtml(actionLabels[event.action] ?? event.action)}</span></td>
+      <td>${escapeHtml(auditSummary(event))}</td>
+    </tr>`).join("");
+  document.querySelector("#projectHistoryEmpty").hidden = events.length > 0;
+}
+
+function renderProjectChart() {
+  const canvas = document.querySelector("#projectMonthlyChart");
+  const fallback = document.querySelector("#projectChartFallback");
+  const series = buildMonthlySeries(selectedProjectMonthly, 12);
+  document.querySelector("#projectMonthlyDescription").textContent = series.length
+    ? `Últimos ${series.length} periodo(s) con movimientos, valores en millones de pesos`
+    : "Sin periodos con movimientos";
+
+  if (projectChart) {
+    projectChart.destroy();
+    projectChart = null;
+  }
+
+  if (!series.length) {
+    canvas.hidden = true;
+    fallback.style.display = "grid";
+    fallback.innerHTML = '<div class="chart-empty">No existen movimientos mensuales para representar.</div>';
+    return;
+  }
+
+  const labels = series.map((row) => `${monthNames[row.month - 1].slice(0, 3)} ${row.year}`);
+  const invoiced = series.map((row) => row.invoiced / 1000000);
+  const paid = series.map((row) => row.paid / 1000000);
+  const costs = series.map((row) => row.costsExpenses / 1000000);
+
+  if (!window.Chart) {
+    canvas.hidden = true;
+    fallback.style.display = "flex";
+    const maximum = Math.max(...invoiced, ...paid, ...costs, 1);
+    fallback.innerHTML = labels.map((label, index) => `
+      <div class="month">
+        <span style="height:${Math.max(3, invoiced[index] / maximum * 100)}%;background:#337fbc"></span>
+        <span style="height:${Math.max(3, paid[index] / maximum * 100)}%;background:#2f8f59"></span>
+        <span style="height:${Math.max(3, costs[index] / maximum * 100)}%;background:#edaf25"></span>
+        <label>${escapeHtml(label)}</label>
+      </div>`).join("");
+    return;
+  }
+
+  fallback.style.display = "none";
+  fallback.innerHTML = "";
+  canvas.hidden = false;
+  projectChart = new window.Chart(canvas, {
+    type: "line",
+    data: { labels, datasets: [
+      { label: "Facturación", data: invoiced, borderColor: "#337fbc", backgroundColor: "#337fbc", tension: .28 },
+      { label: "Pagos", data: paid, borderColor: "#2f8f59", backgroundColor: "#2f8f59", tension: .28 },
+      { label: "Costos y gastos", data: costs, borderColor: "#edaf25", backgroundColor: "#edaf25", tension: .28 }
+    ] },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: "bottom", labels: { usePointStyle: true, boxWidth: 7 } } },
+      scales: {
+        x: { grid: { display: false } },
+        y: { beginAtZero: true, ticks: { callback: (value) => `$${value} M` }, grid: { color: "#edf2f6" } }
+      }
+    }
+  });
+}
+
+function renderProjectAnalytics(project) {
+  const indicators = calculateProjectIndicators(project, selectedProjectMonthly);
+  document.querySelector("#projectPaymentCompliance").textContent = formatPercent(indicators.paymentCompliance);
+  document.querySelector("#projectCostExecution").textContent = formatPercent(indicators.costExecution);
+  document.querySelector("#projectActiveMonths").textContent = indicators.activeMonths;
+  document.querySelector("#projectPendingValidations").textContent = indicators.pendingValidations;
+  renderProjectChart();
+  renderProjectHistory();
+}
+
 async function openProjectDetail(projectId) {
   selectedProjectId = projectId;
   const data = await ensureGateway();
-  const [project, projectRecord] = await Promise.all([
+  const [project, projectRecord, monthlyRows, auditRows] = await Promise.all([
     data.getProjectSummary(projectId),
-    data.getProject(projectId)
+    data.getProject(projectId),
+    data.listMonthlyTracking({ projectId }),
+    data.listAudit({ projectId })
   ]);
+  selectedProjectMonthly = monthlyRows;
+  selectedProjectHistory = auditRows;
 
   document.querySelector("#detailCostCenter").textContent = project.costCenter;
   document.querySelector("#detailProjectName").textContent = project.projectName;
@@ -577,6 +721,7 @@ async function openProjectDetail(projectId) {
   document.querySelector("#detailEndDate").textContent = formatDate(projectRecord.endDate);
   document.querySelector("#detailNotes").textContent = projectRecord.notes || "Sin observaciones";
 
+  renderProjectAnalytics(project);
   await showView("detail");
 }
 
@@ -1063,6 +1208,7 @@ document.querySelector("#clearGlobalSearch").addEventListener("click", () => {
 document.querySelector("#demoAccess").hidden = !isDemoMode();
 document.querySelector("#demoAccess").addEventListener("click", openApp);
 document.querySelector("#logoutButton").addEventListener("click", async () => { await signOut(); closeApp(); });
+document.querySelector("#refreshAppButton").addEventListener("click", refreshApplication);
 document.querySelector("#newProjectButton").addEventListener("click", openNewProject);
 document.querySelector("#projectForm").addEventListener("submit", saveProject);
 document.querySelector("#newPeriodButton").addEventListener("click", openNewPeriod);
@@ -1134,4 +1280,17 @@ document.addEventListener("click", async (event) => {
   if (target) await showView(target.dataset.view);
 });
 
-if (new URLSearchParams(location.search).get("demo") === "1" || (isDemoMode() && location.hash === "#dashboard")) openApp();
+window.addEventListener("hashchange", async () => {
+  if (appView.hidden) return;
+  const route = routeFromHash();
+  if (route.view === "detail" && currentProjects.some((project) => project.projectId === route.projectId)) {
+    await openProjectDetail(route.projectId);
+  } else {
+    await showView(route.view === "detail" ? "dashboard" : route.view);
+  }
+});
+
+if (
+  new URLSearchParams(location.search).get("demo") === "1"
+  || (isDemoMode() && (functionalViews.has(location.hash.slice(1)) || location.hash.startsWith("#detail/")))
+) openApp();
