@@ -350,3 +350,40 @@ button, input, select, textarea { font: inherit; }
   #refreshAppButton, #activePeriodSelect { width: 100%; }
   .project-history-panel .panel-heading { flex-direction: column; }
 }
+
+
+/* Cierre técnico previo al Objetivo 4: contratos, facturación, reportes y administración */
+.quick-action-grid { grid-template-columns: repeat(4, minmax(145px, 1fr)); }
+.finance-filter-panel { margin-top: 18px; }
+.filter-grid-finance { grid-template-columns: repeat(4, minmax(145px, 1fr)) auto; }
+.filter-grid-reports { grid-template-columns: repeat(3, minmax(170px, 1fr)) auto; }
+.finance-data-panel, .report-data-panel { margin-top: 17px; padding-top: 18px; }
+.finance-data-panel .panel-heading, .report-data-panel .panel-heading { align-items: flex-start; padding: 0 2px 8px; }
+.finance-data-panel .panel-heading small, .report-data-panel .panel-heading small { display: block; margin-top: 5px; color: var(--muted); font-size: 10px; }
+.finance-status { display: inline-flex; padding: 4px 8px; border-radius: 999px; font-size: 10px; font-weight: 750; text-transform: capitalize; }
+.finance-status.emitida, .finance-status.confirmado { color: var(--green); background: #e5f5eb; }
+.finance-status.registrada, .finance-status.registrado { color: var(--blue); background: #e7f0f8; }
+.finance-status.anulada, .finance-status.anulado { color: var(--red); background: #fae8e8; }
+.report-kpi-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
+.report-kpi-grid .mini-kpi strong { font-size: clamp(15px, 1.15vw, 19px); }
+.report-formulas { margin-top: 17px; padding: 19px 22px; }
+.formula-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 14px; }
+.formula-grid span { padding: 10px 12px; color: var(--muted); background: #f5f8fa; border-radius: 7px; font-size: 10px; }
+.security-note { margin-top: 18px; padding: 20px 22px; border-left: 4px solid var(--blue); }
+.security-note p { margin: 8px 0 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.profile-active-control { display: inline-flex; align-items: center; gap: 7px; font-size: 11px; }
+.profile-active-control input { accent-color: var(--green); }
+#contractCurrentValue, #paymentAvailable, #contractProjectLabel { background: #f3f6f8; font-weight: 700; }
+@media (max-width: 1250px) {
+  .report-kpi-grid { grid-template-columns: repeat(3, 1fr); }
+  .formula-grid { grid-template-columns: 1fr 1fr; }
+  .quick-action-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 1050px) {
+  .filter-grid-finance, .filter-grid-reports { grid-template-columns: 1fr 1fr; }
+  .filter-grid-finance .filter-actions, .filter-grid-reports .filter-actions { grid-column: 1 / -1; }
+}
+@media (max-width: 760px) {
+  .filter-grid-finance, .filter-grid-reports, .report-kpi-grid, .formula-grid, .quick-action-grid { grid-template-columns: 1fr; }
+  .filter-grid-finance .filter-actions, .filter-grid-reports .filter-actions { grid-column: auto; }
+}
