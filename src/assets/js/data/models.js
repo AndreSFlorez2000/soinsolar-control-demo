@@ -23,6 +23,10 @@ export const VALIDATION_STATUSES = [
 
 export const MOVEMENT_TYPES = ["costo", "gasto"];
 export const PERIOD_STATUSES = ["abierto", "cerrado"];
+export const CONTRACT_STATUSES = ["borrador", "vigente", "suspendido", "finalizado", "cancelado"];
+export const INVOICE_STATUSES = ["registrada", "emitida", "anulada"];
+export const PAYMENT_STATUSES = ["registrado", "confirmado", "anulado"];
+export const APP_ROLES = ["administrador", "gerencia"];
 export const AUDIT_ACTIONS = ["INSERT", "UPDATE", "DELETE"];
 
 export function assertDate(value, field) {
@@ -284,6 +288,98 @@ export function projectInputToRecord(input, userId) {
     notes: input.notes?.trim() || null,
     updated_by: userId ? assertUuid(userId, "usuario") : null
   };
+}
+
+
+export function normalizeContract(record) {
+  return Object.freeze({
+    id: assertUuid(record.id),
+    projectId: assertUuid(record.project_id, "proyecto"),
+    contractNumber: assertText(record.contract_number, "número de contrato", { min: 2, max: 80 }),
+    initialValue: assertMoney(record.initial_value, "valor inicial", { allowZero: false }),
+    additionsValue: assertMoney(record.additions_value ?? 0, "adiciones"),
+    deductionsValue: assertMoney(record.deductions_value ?? 0, "deducciones"),
+    currentValue: assertMoney(
+      record.current_value ?? Number(record.initial_value) + Number(record.additions_value ?? 0) - Number(record.deductions_value ?? 0),
+      "valor vigente",
+      { allowZero: false }
+    ),
+    startDate: assertDate(record.start_date, "fecha inicial"),
+    endDate: record.end_date ? assertDate(record.end_date, "fecha final") : null,
+    status: assertEnum(record.status, CONTRACT_STATUSES, "estado del contrato")
+  });
+}
+
+export function normalizeInvoice(record) {
+  const project = record.projects ?? record.project ?? null;
+  const period = record.periods ?? record.period ?? null;
+  const contract = record.contracts ?? record.contract ?? null;
+  return Object.freeze({
+    id: assertUuid(record.id),
+    projectId: assertUuid(record.project_id, "proyecto"),
+    contractId: assertUuid(record.contract_id, "contrato"),
+    periodId: assertUuid(record.period_id, "periodo"),
+    invoiceNumber: assertText(record.invoice_number, "número de factura", { min: 2, max: 80 }),
+    issueDate: assertDate(record.issue_date, "fecha de emisión"),
+    amount: assertMoney(record.amount, "valor facturado", { allowZero: false }),
+    status: assertEnum(record.status, INVOICE_STATUSES, "estado de factura"),
+    supportPath: record.support_path || null,
+    project: project ? {
+      id: String(project.id ?? record.project_id),
+      costCenter: String(project.cost_center ?? ""),
+      name: String(project.name ?? "")
+    } : null,
+    contractNumber: String(contract?.contract_number ?? record.contract_number ?? ""),
+    period: period ? {
+      id: String(period.id ?? record.period_id),
+      year: Number(period.year),
+      month: Number(period.month),
+      status: String(period.status ?? "")
+    } : null,
+    createdAt: record.created_at || null
+  });
+}
+
+export function normalizePayment(record) {
+  const project = record.projects ?? record.project ?? null;
+  const period = record.periods ?? record.period ?? null;
+  const invoice = record.invoices ?? record.invoice ?? null;
+  return Object.freeze({
+    id: assertUuid(record.id),
+    invoiceId: assertUuid(record.invoice_id, "factura"),
+    projectId: assertUuid(record.project_id, "proyecto"),
+    contractId: assertUuid(record.contract_id, "contrato"),
+    periodId: assertUuid(record.period_id, "periodo"),
+    paymentReference: assertText(record.payment_reference, "referencia de pago", { min: 2, max: 80 }),
+    paymentDate: assertDate(record.payment_date, "fecha de pago"),
+    amount: assertMoney(record.amount, "valor pagado", { allowZero: false }),
+    status: assertEnum(record.status, PAYMENT_STATUSES, "estado de pago"),
+    supportPath: record.support_path || null,
+    invoiceNumber: String(invoice?.invoice_number ?? record.invoice_number ?? ""),
+    project: project ? {
+      id: String(project.id ?? record.project_id),
+      costCenter: String(project.cost_center ?? ""),
+      name: String(project.name ?? "")
+    } : null,
+    period: period ? {
+      id: String(period.id ?? record.period_id),
+      year: Number(period.year),
+      month: Number(period.month),
+      status: String(period.status ?? "")
+    } : null,
+    createdAt: record.created_at || null
+  });
+}
+
+export function normalizeProfile(record) {
+  return Object.freeze({
+    id: assertUuid(record.id),
+    fullName: assertText(record.full_name, "nombre", { min: 3, max: 180 }),
+    role: assertEnum(record.role, APP_ROLES, "rol"),
+    active: Boolean(record.active),
+    createdAt: record.created_at || null,
+    updatedAt: record.updated_at || null
+  });
 }
 
 export function costExpenseInputToRecord(input, userId) {
