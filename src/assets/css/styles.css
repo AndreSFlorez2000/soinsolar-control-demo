@@ -317,3 +317,36 @@ button, input, select, textarea { font: inherit; }
 @media (max-width: 760px) {
   .filter-grid-projects, .dashboard-secondary-grid { grid-template-columns: 1fr; }
 }
+
+
+/* Actividades 19 y 20: analítica por proyecto e integración funcional */
+.system-status { display: grid; gap: 3px; min-width: 105px; }
+.system-status small { color: var(--muted); font-size: 9px; }
+.system-mode-badge { width: max-content; padding: 4px 8px; color: #926400; background: #fff3d8; border-radius: 999px; font-size: 10px; font-weight: 750; }
+.system-mode-badge.connected { color: var(--green); background: #e5f5eb; }
+.project-analytics-grid { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(260px, .75fr); gap: 17px; margin-top: 17px; }
+.project-chart-panel, .project-indicators-panel, .project-history-panel { padding: 20px 22px; }
+.project-chart-panel { min-height: 390px; }
+.project-chart-panel canvas { max-height: 295px; margin-top: 18px; }
+.project-chart-panel .panel-heading { align-items: flex-start; }
+.project-chart-panel .panel-heading small, .project-history-panel .panel-heading small { display: block; margin-top: 5px; color: var(--muted); font-size: 10px; }
+.project-indicator-list { display: grid; gap: 0; margin-top: 17px; }
+.project-indicator-list div { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 17px 0; border-bottom: 1px solid var(--border); }
+.project-indicator-list div:last-child { border-bottom: 0; }
+.project-indicator-list span { color: var(--muted); font-size: 11px; }
+.project-indicator-list strong { font-size: 17px; }
+.project-history-panel { margin-top: 17px; }
+.project-history-panel .panel-heading { align-items: flex-start; }
+.project-history-panel .table td:last-child { min-width: 240px; }
+@media (max-width: 1120px) {
+  .system-status { display: none; }
+}
+@media (max-width: 1050px) {
+  .project-analytics-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 760px) {
+  .topbar { flex-direction: column; }
+  .topbar-actions { width: 100%; }
+  #refreshAppButton, #activePeriodSelect { width: 100%; }
+  .project-history-panel .panel-heading { flex-direction: column; }
+}
