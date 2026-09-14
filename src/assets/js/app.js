@@ -1,8 +1,9 @@
-import { buildMonthlySeries, calculateDashboardIndicators } from "./domain/dashboard.js?v=1.0.0";
-import { calculateProjectIndicators } from "./domain/project-analytics.js?v=1.0.0";
-import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=1.0.0";
-import { createApplicationDataGateway } from "./services/application-data.js?v=1.0.0";
-import { isDemoMode, signIn, signOut } from "./services/supabase.js?v=1.0.0";
+import { buildMonthlySeries, calculateDashboardIndicators } from "./domain/dashboard.js?v=1.1.0";
+import { calculateProjectIndicators } from "./domain/project-analytics.js?v=1.1.0";
+import { buildManagementReport } from "./domain/reports.js?v=1.1.0";
+import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=1.1.0";
+import { createApplicationDataGateway } from "./services/application-data.js?v=1.1.0";
+import { isDemoMode, signIn, signOut } from "./services/supabase.js?v=1.1.0";
 
 const loginView = document.querySelector("#loginView");
 const appView = document.querySelector("#appView");
@@ -10,15 +11,20 @@ const dashboardView = document.querySelector("#dashboardView");
 const detailView = document.querySelector("#detailView");
 const projectsView = document.querySelector("#projectsView");
 const monthlyView = document.querySelector("#monthlyView");
+const financeView = document.querySelector("#financeView");
 const costsView = document.querySelector("#costsView");
+const reportsView = document.querySelector("#reportsView");
 const historyView = document.querySelector("#historyView");
-const placeholderView = document.querySelector("#placeholderView");
+const adminView = document.querySelector("#adminView");
 const title = document.querySelector("#pageTitle");
 const breadcrumb = document.querySelector("#breadcrumb");
 const projectDialog = document.querySelector("#projectDialog");
 const costDialog = document.querySelector("#costDialog");
 const periodDialog = document.querySelector("#periodDialog");
 const monthlyDialog = document.querySelector("#monthlyDialog");
+const contractDialog = document.querySelector("#contractDialog");
+const invoiceDialog = document.querySelector("#invoiceDialog");
+const paymentDialog = document.querySelector("#paymentDialog");
 const historyDialog = document.querySelector("#historyDialog");
 
 const viewLabels = {
@@ -41,7 +47,8 @@ const tableLabels = {
   contracts: "Contratos",
   invoices: "Facturación",
   payments: "Pagos",
-  costs_expenses: "Costos y gastos"
+  costs_expenses: "Costos y gastos",
+  profiles: "Usuarios"
 };
 const actionLabels = { INSERT: "Creación", UPDATE: "Modificación", DELETE: "Eliminación" };
 const fieldLabels = {
@@ -50,7 +57,11 @@ const fieldLabels = {
   invoiced_value: "valor facturado", paid_value: "valor pagado",
   validation_status: "estado de validación", amount: "valor",
   movement_type: "tipo de movimiento", category: "categoría",
-  observations: "observaciones", closed_at: "fecha de cierre"
+  observations: "observaciones", closed_at: "fecha de cierre",
+  full_name: "nombre", role: "rol", active: "estado de acceso",
+  contract_number: "número de contrato", initial_value: "valor inicial",
+  additions_value: "adiciones", deductions_value: "deducciones",
+  invoice_number: "número de factura", payment_reference: "referencia de pago"
 };
 
 const monthNames = [
@@ -65,12 +76,18 @@ let currentPeriods = [];
 let currentCosts = [];
 let currentMonthly = [];
 let currentAudit = [];
+let currentInvoices = [];
+let currentPayments = [];
+let balancePayments = [];
+let currentProfiles = [];
+let currentUserProfile = null;
+let currentReport = buildManagementReport([]);
 let selectedProjectMonthly = [];
 let selectedProjectHistory = [];
 let dashboardChart = null;
 let projectChart = null;
 
-const functionalViews = new Set(["dashboard", "projects", "monthly", "costs", "history"]);
+const functionalViews = new Set(["dashboard", "projects", "monthly", "finance", "costs", "reports", "history", "admin"]);
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -196,10 +213,10 @@ async function showView(requestedView) {
 
   const visible = {
     dashboard: dashboardView, detail: detailView, projects: projectsView,
-    monthly: monthlyView, costs: costsView, history: historyView
+    monthly: monthlyView, finance: financeView, costs: costsView,
+    reports: reportsView, history: historyView, admin: adminView
   };
-  [dashboardView, detailView, projectsView, monthlyView, costsView, historyView, placeholderView]
-    .forEach((element) => { element.hidden = true; });
+  Object.values(visible).forEach((element) => { element.hidden = true; });
   visible[view].hidden = false;
   title.textContent = viewLabels[view];
   breadcrumb.textContent = view === "detail" ? "PROYECTOS / DETALLE" : viewLabels[view].toUpperCase();
@@ -208,8 +225,11 @@ async function showView(requestedView) {
   if (view === "dashboard") renderDashboard();
   if (view === "projects") await loadProjects();
   if (view === "monthly") await loadMonthlyModule();
+  if (view === "finance") await loadFinance();
   if (view === "costs") await loadCosts();
+  if (view === "reports") await loadReports();
   if (view === "history") await loadHistory();
+  if (view === "admin") await loadProfiles();
 }
 
 async function refreshApplication() {
@@ -725,6 +745,68 @@ async function openProjectDetail(projectId) {
   await showView("detail");
 }
 
+function updateContractCurrentValue() {
+  const initial = Number(document.querySelector("#contractInitialValue").value || 0);
+  const additions = Number(document.querySelector("#contractAdditionsValue").value || 0);
+  const deductions = Number(document.querySelector("#contractDeductionsValue").value || 0);
+  document.querySelector("#contractCurrentValue").value = formatCop(Math.max(initial + additions - deductions, 0));
+}
+
+async function openContractDialog() {
+  if (!selectedProjectId) return;
+  const data = await ensureGateway();
+  const [project, contracts] = await Promise.all([
+    data.getProject(selectedProjectId),
+    data.listContracts(selectedProjectId)
+  ]);
+  const contract = contracts[0] ?? null;
+  document.querySelector("#contractForm").reset();
+  document.querySelector("#contractId").value = contract?.id ?? "";
+  document.querySelector("#contractProjectId").value = selectedProjectId;
+  document.querySelector("#contractProjectLabel").value = `${project.costCenter} · ${project.name}`;
+  document.querySelector("#contractDialogTitle").textContent = contract ? "Actualizar contrato" : "Registrar contrato";
+  document.querySelector("#contractNumber").value = contract?.contractNumber ?? "";
+  document.querySelector("#contractStatus").value = contract?.status ?? "vigente";
+  document.querySelector("#contractInitialValue").value = contract?.initialValue ?? "";
+  document.querySelector("#contractAdditionsValue").value = contract?.additionsValue ?? 0;
+  document.querySelector("#contractDeductionsValue").value = contract?.deductionsValue ?? 0;
+  document.querySelector("#contractStartDate").value = contract?.startDate ?? project.startDate ?? "";
+  document.querySelector("#contractEndDate").value = contract?.endDate ?? project.endDate ?? "";
+  setMessage(document.querySelector("#contractFormMessage"));
+  updateContractCurrentValue();
+  contractDialog.showModal();
+}
+
+async function saveContract(event) {
+  event.preventDefault();
+  const button = document.querySelector("#saveContractButton");
+  const message = document.querySelector("#contractFormMessage");
+  const contractId = document.querySelector("#contractId").value;
+  const input = {
+    projectId: document.querySelector("#contractProjectId").value,
+    contractNumber: document.querySelector("#contractNumber").value,
+    status: document.querySelector("#contractStatus").value,
+    initialValue: document.querySelector("#contractInitialValue").value,
+    additionsValue: document.querySelector("#contractAdditionsValue").value || 0,
+    deductionsValue: document.querySelector("#contractDeductionsValue").value || 0,
+    startDate: document.querySelector("#contractStartDate").value,
+    endDate: document.querySelector("#contractEndDate").value
+  };
+  try {
+    setBusy(button, true, "Guardando…");
+    const data = await ensureGateway();
+    if (contractId) await data.updateContract(contractId, input);
+    else await data.createContract(input);
+    contractDialog.close();
+    await loadReferenceData();
+    await openProjectDetail(input.projectId);
+  } catch (error) {
+    setMessage(message, error.message || "No fue posible guardar el contrato.", true);
+  } finally {
+    setBusy(button, false);
+  }
+}
+
 function setSelectOptions(select, firstOption, options, selectedValue = "") {
   select.innerHTML = `${firstOption}${options}`;
   if ([...select.options].some((option) => option.value === selectedValue && !option.disabled)) select.value = selectedValue;
@@ -733,12 +815,13 @@ function setSelectOptions(select, firstOption, options, selectedValue = "") {
 function populateProjectOptions() {
   const options = currentProjects.map((project) => `<option value="${project.projectId}">${escapeHtml(project.costCenter)} · ${escapeHtml(project.projectName)}</option>`).join("");
   const contractOptions = currentProjects.filter((project) => project.contractId).map((project) => `<option value="${project.projectId}">${escapeHtml(project.costCenter)} · ${escapeHtml(project.projectName)}</option>`).join("");
-  ["costFilterProject", "monthlyFilterProject", "historyFilterProject"].forEach((id) => {
+  ["costFilterProject", "monthlyFilterProject", "financeFilterProject", "reportFilterProject", "historyFilterProject"].forEach((id) => {
     const select = document.querySelector(`#${id}`);
     setSelectOptions(select, '<option value="">Todos</option>', options, select.value);
   });
   setSelectOptions(document.querySelector("#costProject"), '<option value="">Selecciona un proyecto</option>', options);
   setSelectOptions(document.querySelector("#monthlyProject"), '<option value="">Selecciona un proyecto con contrato</option>', contractOptions);
+  setSelectOptions(document.querySelector("#invoiceProject"), '<option value="">Selecciona un proyecto con contrato</option>', contractOptions);
 }
 
 function periodLabel(period) {
@@ -748,12 +831,14 @@ function periodLabel(period) {
 function populatePeriodOptions() {
   const openOptions = currentPeriods.map((period) => `<option value="${period.id}" ${period.status === "cerrado" ? "disabled" : ""}>${escapeHtml(periodLabel(period))}</option>`).join("");
   const allOptions = currentPeriods.map((period) => `<option value="${period.id}">${escapeHtml(periodLabel(period))}</option>`).join("");
-  ["costFilterPeriod", "monthlyFilterPeriod"].forEach((id) => {
+  ["costFilterPeriod", "monthlyFilterPeriod", "financeFilterPeriod"].forEach((id) => {
     const select = document.querySelector(`#${id}`);
     setSelectOptions(select, '<option value="">Todos</option>', allOptions, select.value);
   });
   setSelectOptions(document.querySelector("#costPeriod"), '<option value="">Selecciona un periodo abierto</option>', openOptions);
   setSelectOptions(document.querySelector("#monthlyPeriod"), '<option value="">Selecciona un periodo abierto</option>', openOptions);
+  setSelectOptions(document.querySelector("#invoicePeriod"), '<option value="">Selecciona un periodo abierto</option>', openOptions);
+  setSelectOptions(document.querySelector("#paymentPeriod"), '<option value="">Selecciona un periodo abierto</option>', openOptions);
 
   const activePeriod = currentPeriods.find((period) => period.status === "abierto") ?? currentPeriods[0];
   const activeSelect = document.querySelector("#activePeriodSelect");
@@ -1079,6 +1164,311 @@ function exportCosts() {
   URL.revokeObjectURL(url);
 }
 
+function financeFilters() {
+  const dateFrom = document.querySelector("#financeFilterFrom").value;
+  const dateTo = document.querySelector("#financeFilterTo").value;
+  if (dateFrom && dateTo && dateFrom > dateTo) throw new Error("La fecha inicial no puede ser posterior a la fecha final.");
+  return {
+    projectId: document.querySelector("#financeFilterProject").value,
+    periodId: document.querySelector("#financeFilterPeriod").value,
+    dateFrom,
+    dateTo
+  };
+}
+
+function invoicePaidAmount(invoiceId, rows = balancePayments) {
+  return rows
+    .filter((payment) => payment.invoiceId === invoiceId && payment.status !== "anulado")
+    .reduce((sum, payment) => sum + payment.amount, 0);
+}
+
+function invoicePendingAmount(invoice, rows = balancePayments) {
+  return Math.max(invoice.amount - invoicePaidAmount(invoice.id, rows), 0);
+}
+
+function populatePaymentInvoiceOptions(selectedInvoiceId = "") {
+  const options = currentInvoices
+    .filter((invoice) => invoice.status !== "anulada" && invoicePendingAmount(invoice) > 0)
+    .map((invoice) => `<option value="${invoice.id}">${escapeHtml(invoice.invoiceNumber)} · ${escapeHtml(invoice.project?.name || "Proyecto")} · saldo ${escapeHtml(formatCop(invoicePendingAmount(invoice)))}</option>`)
+    .join("");
+  setSelectOptions(document.querySelector("#paymentInvoice"), '<option value="">Selecciona una factura con saldo</option>', options, selectedInvoiceId);
+  updatePaymentAvailable();
+}
+
+function updatePaymentAvailable() {
+  const invoice = currentInvoices.find((item) => item.id === document.querySelector("#paymentInvoice").value);
+  document.querySelector("#paymentAvailable").value = invoice ? formatCop(invoicePendingAmount(invoice)) : formatCop(0);
+  if (invoice) document.querySelector("#paymentAmount").max = String(invoicePendingAmount(invoice));
+  else document.querySelector("#paymentAmount").removeAttribute("max");
+}
+
+async function loadFinance(filters) {
+  const message = document.querySelector("#financeModuleMessage");
+  setMessage(message, "Consultando facturación y pagos…");
+  try {
+    const applied = filters ?? financeFilters();
+    renderActiveFilters("#financeActiveFilters", [
+      ["Proyecto:", applied.projectId ? selectedOptionText("#financeFilterProject") : "", "financeFilterProject"],
+      ["Periodo:", applied.periodId ? selectedOptionText("#financeFilterPeriod") : "", "financeFilterPeriod"],
+      ["Desde:", applied.dateFrom ? formatDate(applied.dateFrom) : "", "financeFilterFrom"],
+      ["Hasta:", applied.dateTo ? formatDate(applied.dateTo) : "", "financeFilterTo"]
+    ], "financeFilters");
+    const data = await ensureGateway();
+    [currentInvoices, currentPayments, balancePayments] = await Promise.all([
+      data.listInvoices(applied),
+      data.listPayments(applied),
+      data.listPayments({ projectId: applied.projectId, periodId: applied.periodId })
+    ]);
+    renderFinance();
+    populatePaymentInvoiceOptions();
+    setMessage(message, currentInvoices.length || currentPayments.length ? "Consulta actualizada." : "");
+  } catch (error) {
+    setMessage(message, error.message || "No fue posible consultar facturas y pagos.", true);
+  }
+}
+
+function renderFinance() {
+  const activeInvoices = currentInvoices.filter((invoice) => invoice.status !== "anulada");
+  const activePayments = currentPayments.filter((payment) => payment.status !== "anulado");
+  const invoiced = activeInvoices.reduce((sum, invoice) => sum + invoice.amount, 0);
+  const paid = activePayments.reduce((sum, payment) => sum + payment.amount, 0);
+  const pendingInvoices = activeInvoices.filter((invoice) => invoicePendingAmount(invoice) > 0);
+
+  document.querySelector("#financeInvoicedTotal").textContent = formatCop(invoiced);
+  document.querySelector("#financePaidTotal").textContent = formatCop(paid);
+  document.querySelector("#financePendingTotal").textContent = formatCop(pendingInvoices.reduce((sum, invoice) => sum + invoicePendingAmount(invoice), 0));
+  document.querySelector("#financePendingInvoices").textContent = pendingInvoices.length;
+
+  document.querySelector("#invoiceRows").innerHTML = currentInvoices.map((invoice) => {
+    const pending = invoice.status === "anulada" ? 0 : invoicePendingAmount(invoice);
+    const canPay = invoice.status !== "anulada" && pending > 0;
+    return `<tr>
+      <td><span class="reference-cell"><strong>${escapeHtml(invoice.invoiceNumber)}</strong><small>${escapeHtml(invoice.supportPath || "Sin soporte")}</small></span></td>
+      <td>${escapeHtml(formatDate(invoice.issueDate))}</td>
+      <td><span class="project-name-cell"><strong>${escapeHtml(invoice.project?.name || "Proyecto")}</strong><small>${escapeHtml(invoice.project?.costCenter || "")}</small></span></td>
+      <td>${escapeHtml(invoice.period ? `${monthNames[invoice.period.month - 1]} ${invoice.period.year}` : "Sin periodo")}</td>
+      <td><span class="finance-status ${escapeHtml(invoice.status)}">${escapeHtml(invoice.status)}</span></td>
+      <td><strong>${formatCop(invoice.amount)}</strong></td>
+      <td>${formatCop(pending)}</td>
+      <td><button class="table-action success" data-action="register-payment" data-invoice-id="${invoice.id}" ${canPay ? "" : "disabled"}>Registrar pago</button></td>
+    </tr>`;
+  }).join("");
+  document.querySelector("#paymentRows").innerHTML = currentPayments.map((payment) => `<tr>
+    <td><span class="reference-cell"><strong>${escapeHtml(payment.paymentReference)}</strong><small>${escapeHtml(payment.supportPath || "Sin soporte")}</small></span></td>
+    <td>${escapeHtml(formatDate(payment.paymentDate))}</td>
+    <td>${escapeHtml(payment.invoiceNumber || "Factura")}</td>
+    <td><span class="project-name-cell"><strong>${escapeHtml(payment.project?.name || "Proyecto")}</strong><small>${escapeHtml(payment.project?.costCenter || "")}</small></span></td>
+    <td>${escapeHtml(payment.period ? `${monthNames[payment.period.month - 1]} ${payment.period.year}` : "Sin periodo")}</td>
+    <td><span class="finance-status ${escapeHtml(payment.status)}">${escapeHtml(payment.status)}</span></td>
+    <td><strong>${formatCop(payment.amount)}</strong></td>
+  </tr>`).join("");
+  document.querySelector("#invoiceEmpty").hidden = currentInvoices.length > 0;
+  document.querySelector("#paymentEmpty").hidden = currentPayments.length > 0;
+}
+
+function setDefaultOpenPeriod(periodSelect, dateInput) {
+  const period = currentPeriods.find((item) => item.status === "abierto");
+  if (!period) return;
+  periodSelect.value = period.id;
+  const prefix = `${period.year}-${String(period.month).padStart(2, "0")}`;
+  const today = new Date().toISOString().slice(0, 10);
+  dateInput.value = today.startsWith(prefix) ? today : `${prefix}-01`;
+}
+
+function openNewInvoice(projectId = "") {
+  document.querySelector("#invoiceForm").reset();
+  populateProjectOptions();
+  populatePeriodOptions();
+  if (projectId && currentProjects.some((project) => project.projectId === projectId && project.contractId)) {
+    document.querySelector("#invoiceProject").value = projectId;
+  }
+  setDefaultOpenPeriod(document.querySelector("#invoicePeriod"), document.querySelector("#invoiceDate"));
+  setMessage(document.querySelector("#invoiceFormMessage"));
+  invoiceDialog.showModal();
+}
+
+function openNewPayment(invoiceId = "") {
+  document.querySelector("#paymentForm").reset();
+  populatePeriodOptions();
+  populatePaymentInvoiceOptions(invoiceId);
+  setDefaultOpenPeriod(document.querySelector("#paymentPeriod"), document.querySelector("#paymentDate"));
+  setMessage(document.querySelector("#paymentFormMessage"));
+  paymentDialog.showModal();
+}
+
+async function saveInvoice(event) {
+  event.preventDefault();
+  const button = document.querySelector("#saveInvoiceButton");
+  const message = document.querySelector("#invoiceFormMessage");
+  const project = currentProjects.find((item) => item.projectId === document.querySelector("#invoiceProject").value);
+  if (!project?.contractId) return setMessage(message, "Selecciona un proyecto con contrato vigente.", true);
+  try {
+    setBusy(button, true, "Guardando…");
+    await (await ensureGateway()).createInvoice({
+      projectId: project.projectId,
+      contractId: project.contractId,
+      periodId: document.querySelector("#invoicePeriod").value,
+      invoiceNumber: document.querySelector("#invoiceNumber").value,
+      issueDate: document.querySelector("#invoiceDate").value,
+      amount: document.querySelector("#invoiceAmount").value,
+      status: document.querySelector("#invoiceStatus").value,
+      supportPath: document.querySelector("#invoiceSupportPath").value
+    });
+    invoiceDialog.close();
+    await loadReferenceData();
+    await loadFinance();
+    setMessage(document.querySelector("#financeModuleMessage"), "Factura registrada correctamente.");
+  } catch (error) {
+    setMessage(message, error.message || "No fue posible registrar la factura.", true);
+  } finally {
+    setBusy(button, false);
+  }
+}
+
+async function savePayment(event) {
+  event.preventDefault();
+  const button = document.querySelector("#savePaymentButton");
+  const message = document.querySelector("#paymentFormMessage");
+  const invoice = currentInvoices.find((item) => item.id === document.querySelector("#paymentInvoice").value);
+  if (!invoice) return setMessage(message, "Selecciona una factura con saldo.", true);
+  try {
+    setBusy(button, true, "Guardando…");
+    await (await ensureGateway()).createPayment({
+      invoiceId: invoice.id,
+      projectId: invoice.projectId,
+      contractId: invoice.contractId,
+      periodId: document.querySelector("#paymentPeriod").value,
+      paymentReference: document.querySelector("#paymentReference").value,
+      paymentDate: document.querySelector("#paymentDate").value,
+      amount: document.querySelector("#paymentAmount").value,
+      status: document.querySelector("#paymentStatus").value,
+      supportPath: document.querySelector("#paymentSupportPath").value
+    });
+    paymentDialog.close();
+    await loadReferenceData();
+    await loadFinance();
+    setMessage(document.querySelector("#financeModuleMessage"), "Pago registrado correctamente.");
+  } catch (error) {
+    setMessage(message, error.message || "No fue posible registrar el pago.", true);
+  } finally {
+    setBusy(button, false);
+  }
+}
+
+function reportFilters() {
+  return {
+    projectId: document.querySelector("#reportFilterProject").value,
+    status: document.querySelector("#reportFilterStatus").value,
+    municipality: normalizeSearch(document.querySelector("#reportFilterMunicipality").value)
+  };
+}
+
+async function loadReports() {
+  const filters = reportFilters();
+  renderActiveFilters("#reportActiveFilters", [
+    ["Proyecto:", filters.projectId ? selectedOptionText("#reportFilterProject") : "", "reportFilterProject"],
+    ["Estado:", filters.status ? selectedOptionText("#reportFilterStatus") : "", "reportFilterStatus"],
+    ["Municipio:", document.querySelector("#reportFilterMunicipality").value, "reportFilterMunicipality"]
+  ], "reportFilters");
+  const rows = currentProjects.filter((project) =>
+    (!filters.projectId || project.projectId === filters.projectId)
+    && (!filters.status || project.status === filters.status)
+    && (!filters.municipality || normalizeSearch(project.municipality).includes(filters.municipality))
+  );
+  currentReport = buildManagementReport(rows);
+  renderReports();
+}
+
+function renderReports() {
+  const totals = currentReport.totals;
+  document.querySelector("#reportContractValue").textContent = formatCop(totals.contractValue);
+  document.querySelector("#reportInvoiced").textContent = formatCop(totals.invoiced);
+  document.querySelector("#reportPaid").textContent = formatCop(totals.paid);
+  document.querySelector("#reportCosts").textContent = formatCop(totals.costsExpenses);
+  document.querySelector("#reportBalance").textContent = formatCop(totals.contractualBalance);
+  document.querySelector("#reportPending").textContent = formatCop(totals.paymentPending);
+  document.querySelector("#reportResultCount").textContent = `${totals.projectCount} proyecto(s) · avance ${formatPercent(totals.financialProgress)} · cobro ${formatPercent(totals.collectionRate)}`;
+  document.querySelector("#reportRows").innerHTML = currentReport.rows.map((row) => `<tr>
+    <td>${escapeHtml(row.costCenter)}</td><td><strong>${escapeHtml(row.projectName)}</strong><br><small>${escapeHtml(row.municipality)}</small></td>
+    <td>${formatCop(row.contractValue)}</td><td>${formatCop(row.invoiced)}</td><td>${formatCop(row.paid)}</td>
+    <td>${formatCop(row.costsExpenses)}</td><td>${formatCop(row.contractualBalance)}</td><td>${formatCop(row.paymentPending)}</td>
+    <td><strong>${formatPercent(row.financialProgress)}</strong></td>
+  </tr>`).join("");
+  document.querySelector("#reportEmpty").hidden = currentReport.rows.length > 0;
+}
+
+function exportManagementReport() {
+  const headers = ["Centro de costo", "Proyecto", "Municipio", "Estado", "Contrato vigente", "Facturado", "Pagado", "Costos y gastos", "Saldo contractual", "Cartera", "Avance %", "Cobro %", "Costos/contrato %", "Diferencia facturación-costos"];
+  const quote = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
+  const rows = currentReport.rows.map((row) => [
+    row.costCenter, row.projectName, row.municipality, row.status, row.contractValue,
+    row.invoiced, row.paid, row.costsExpenses, row.contractualBalance, row.paymentPending,
+    row.financialProgress, row.collectionRate, row.costRate, row.billingCostDifference
+  ].map(quote).join(","));
+  const blob = new Blob(["\uFEFF", [headers.map(quote).join(","), ...rows].join("\n")], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `reporte-gerencial-${new Date().toISOString().slice(0, 10)}.csv`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+async function loadProfiles() {
+  const message = document.querySelector("#adminModuleMessage");
+  setMessage(message, "Consultando usuarios…");
+  try {
+    const data = await ensureGateway();
+    [currentUserProfile, currentProfiles] = await Promise.all([
+      data.getCurrentProfile(),
+      data.listProfiles()
+    ]);
+    renderProfiles();
+    setMessage(message, currentUserProfile.role === "administrador"
+      ? "Administración habilitada."
+      : "Consulta de perfil disponible; los cambios requieren rol administrador.");
+  } catch (error) {
+    setMessage(message, error.message || "No fue posible consultar los usuarios.", true);
+  }
+}
+
+function renderProfiles() {
+  const canAdmin = currentUserProfile?.role === "administrador";
+  document.querySelector("#profileTotalCount").textContent = currentProfiles.length;
+  document.querySelector("#profileActiveCount").textContent = currentProfiles.filter((profile) => profile.active).length;
+  document.querySelector("#profileAdminCount").textContent = currentProfiles.filter((profile) => profile.role === "administrador").length;
+  document.querySelector("#profileManagementCount").textContent = currentProfiles.filter((profile) => profile.role === "gerencia").length;
+  document.querySelector("#profileRows").innerHTML = currentProfiles.map((profile) => {
+    const ownProfile = profile.id === currentUserProfile?.id;
+    return `<tr>
+      <td><strong>${escapeHtml(profile.fullName)}</strong>${ownProfile ? "<br><small>Sesión actual</small>" : ""}</td>
+      <td><select class="form-select form-select-sm" data-profile-role="${profile.id}" ${canAdmin && !ownProfile ? "" : "disabled"}><option value="administrador" ${profile.role === "administrador" ? "selected" : ""}>Administrador</option><option value="gerencia" ${profile.role === "gerencia" ? "selected" : ""}>Gerencia</option></select></td>
+      <td><label class="profile-active-control"><input type="checkbox" data-profile-active="${profile.id}" ${profile.active ? "checked" : ""} ${canAdmin && !ownProfile ? "" : "disabled"} /> ${profile.active ? "Activo" : "Inactivo"}</label></td>
+      <td>${escapeHtml(formatDateTime(profile.updatedAt || profile.createdAt))}</td>
+      <td><button class="table-action" data-action="save-profile" data-profile-id="${profile.id}" ${canAdmin ? "" : "disabled"}>Guardar</button></td>
+    </tr>`;
+  }).join("");
+  document.querySelector("#profileEmpty").hidden = currentProfiles.length > 0;
+}
+
+async function saveProfile(profileId) {
+  const profile = currentProfiles.find((item) => item.id === profileId);
+  if (!profile) return;
+  const role = document.querySelector(`[data-profile-role="${profileId}"]`).value;
+  const activeControl = document.querySelector(`[data-profile-active="${profileId}"]`);
+  try {
+    await (await ensureGateway()).updateProfile(profileId, {
+      fullName: profile.fullName,
+      role,
+      active: activeControl.checked
+    });
+    await loadProfiles();
+    setMessage(document.querySelector("#adminModuleMessage"), "Usuario actualizado correctamente.");
+  } catch (error) {
+    setMessage(document.querySelector("#adminModuleMessage"), error.message || "No fue posible actualizar el usuario.", true);
+  }
+}
+
 function historyFilters() {
   const dateFrom = document.querySelector("#historyFilterFrom").value;
   const dateTo = document.querySelector("#historyFilterTo").value;
@@ -1221,12 +1611,26 @@ document.querySelector("#exportCostsButton").addEventListener("click", exportCos
 document.querySelector("#exportHistoryButton").addEventListener("click", exportHistory);
 document.querySelector("#exportDashboardButton").addEventListener("click", exportDashboard);
 document.querySelector("#detailEditProject").addEventListener("click", () => selectedProjectId && openEditProject(selectedProjectId));
+document.querySelector("#detailContractButton").addEventListener("click", openContractDialog);
+document.querySelector("#contractForm").addEventListener("submit", saveContract);
+["contractInitialValue", "contractAdditionsValue", "contractDeductionsValue"].forEach((id) => document.querySelector(`#${id}`).addEventListener("input", updateContractCurrentValue));
+document.querySelector("#newInvoiceButton").addEventListener("click", () => openNewInvoice());
+document.querySelector("#invoiceForm").addEventListener("submit", saveInvoice);
+document.querySelector("#newPaymentButton").addEventListener("click", () => openNewPayment());
+document.querySelector("#paymentForm").addEventListener("submit", savePayment);
+document.querySelector("#paymentInvoice").addEventListener("change", updatePaymentAvailable);
+document.querySelector("#exportReportButton").addEventListener("click", exportManagementReport);
+document.querySelector("#reloadProfilesButton").addEventListener("click", loadProfiles);
 document.querySelector("#projectFilters").addEventListener("submit", (event) => { event.preventDefault(); loadProjects(); });
 document.querySelector("#clearProjectFilters").addEventListener("click", () => { document.querySelector("#projectFilters").reset(); loadProjects(); });
 document.querySelector("#monthlyFilters").addEventListener("submit", (event) => { event.preventDefault(); loadMonthlyModule(); });
 document.querySelector("#clearMonthlyFilters").addEventListener("click", () => { document.querySelector("#monthlyFilters").reset(); loadMonthlyModule({}); });
+document.querySelector("#financeFilters").addEventListener("submit", (event) => { event.preventDefault(); loadFinance(); });
+document.querySelector("#clearFinanceFilters").addEventListener("click", () => { document.querySelector("#financeFilters").reset(); loadFinance({}); });
 document.querySelector("#costFilters").addEventListener("submit", (event) => { event.preventDefault(); loadCosts(); });
 document.querySelector("#clearCostFilters").addEventListener("click", () => { document.querySelector("#costFilters").reset(); loadCosts({}); });
+document.querySelector("#reportFilters").addEventListener("submit", (event) => { event.preventDefault(); loadReports(); });
+document.querySelector("#clearReportFilters").addEventListener("click", () => { document.querySelector("#reportFilters").reset(); loadReports(); });
 document.querySelector("#historyFilters").addEventListener("submit", (event) => { event.preventDefault(); loadHistory(); });
 document.querySelector("#clearHistoryFilters").addEventListener("click", () => { document.querySelector("#historyFilters").reset(); loadHistory({}); });
 document.querySelector("#activePeriodSelect").addEventListener("change", (event) => {
@@ -1252,7 +1656,13 @@ document.addEventListener("click", async (event) => {
   const projectTab = event.target.closest("[data-project-tab]");
   if (projectTab && selectedProjectId) {
     const targetView = projectTab.dataset.projectTab;
-    const filter = document.querySelector(targetView === "costs" ? "#costFilterProject" : targetView === "monthly" ? "#monthlyFilterProject" : "#historyFilterProject");
+    const filterIds = {
+      costs: "#costFilterProject",
+      monthly: "#monthlyFilterProject",
+      finance: "#financeFilterProject",
+      history: "#historyFilterProject"
+    };
+    const filter = document.querySelector(filterIds[targetView]);
     if (filter) filter.value = selectedProjectId;
     await showView(targetView);
     return;
@@ -1267,6 +1677,8 @@ document.addEventListener("click", async (event) => {
   }
   if (!event.target.closest(".global-search")) closeGlobalSearch();
   if (action?.dataset.action === "open-project") await openProjectDetail(action.dataset.projectId);
+  if (action?.dataset.action === "register-payment") openNewPayment(action.dataset.invoiceId);
+  if (action?.dataset.action === "save-profile") await saveProfile(action.dataset.profileId);
   if (action?.dataset.action === "edit-project") await openEditProject(action.dataset.projectId);
   if (action?.dataset.action === "delete-project") await deleteProject(action.dataset.projectId);
   if (action?.dataset.action === "close-period") await closePeriod(action.dataset.periodId);
