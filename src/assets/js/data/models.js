@@ -22,6 +22,8 @@ export const VALIDATION_STATUSES = [
 ];
 
 export const MOVEMENT_TYPES = ["costo", "gasto"];
+export const PERIOD_STATUSES = ["abierto", "cerrado"];
+export const AUDIT_ACTIONS = ["INSERT", "UPDATE", "DELETE"];
 
 export function assertDate(value, field) {
   const normalized = String(value ?? "").trim();
@@ -152,21 +154,96 @@ export function normalizeProjectSummary(record) {
 }
 
 export function normalizeMonthlySummary(record) {
+  const contractValue = assertMoney(record.contract_value ?? 0, "valor contractual");
+  const invoicedValue = assertMoney(record.invoiced_value ?? 0, "valor facturado");
+  const cumulativeInvoicedValue = assertMoney(
+    record.cumulative_invoiced_value ?? invoicedValue,
+    "facturación acumulada"
+  );
+
   return Object.freeze({
+    trackingId: record.tracking_id ? assertUuid(record.tracking_id, "seguimiento") : null,
     projectId: assertUuid(record.project_id, "proyecto"),
     costCenter: String(record.cost_center),
     projectName: String(record.project_name),
     periodId: assertUuid(record.period_id, "periodo"),
+    contractId: record.contract_id ? assertUuid(record.contract_id, "contrato") : null,
     year: Number(record.year),
     month: Number(record.month),
+    periodStatus: String(record.period_status ?? record.status ?? ""),
+    contractValue,
     recognizedValue: assertMoney(record.recognized_value ?? 0, "valor reconocido"),
-    invoicedValue: assertMoney(record.invoiced_value ?? 0, "valor facturado"),
+    invoicedValue,
     paidValue: assertMoney(record.paid_value ?? 0, "valor pagado"),
-    costsExpensesValue: assertMoney(
-      record.costs_expenses_value ?? 0,
-      "costos y gastos"
+    costsExpensesValue: assertMoney(record.costs_expenses_value ?? 0, "costos y gastos"),
+    cumulativeInvoicedValue,
+    monthlyProgressPercentage: Number(
+      record.monthly_progress_percentage ?? (contractValue > 0 ? (invoicedValue / contractValue) * 100 : 0)
     ),
-    validationStatus: record.validation_status || null
+    cumulativeProgressPercentage: Number(
+      record.cumulative_progress_percentage ?? (contractValue > 0 ? (cumulativeInvoicedValue / contractValue) * 100 : 0)
+    ),
+    validationStatus: record.validation_status || null,
+    observations: record.observations || null,
+    validatedAt: record.validated_at || null
+  });
+}
+
+export function normalizePeriod(record) {
+  const year = Number(record.year);
+  const month = Number(record.month);
+  if (!Number.isInteger(year) || year < 2020 || year > 2100) {
+    throw new ValidationError("año debe estar entre 2020 y 2100.", "año");
+  }
+  if (!Number.isInteger(month) || month < 1 || month > 12) {
+    throw new ValidationError("mes debe estar entre 1 y 12.", "mes");
+  }
+  return Object.freeze({
+    id: assertUuid(record.id, "periodo"), year, month,
+    status: assertEnum(record.status, PERIOD_STATUSES, "estado del periodo"),
+    closedAt: record.closed_at || null, closedBy: record.closed_by || null,
+    createdAt: record.created_at || null
+  });
+}
+
+export function periodInputToRecord(input) {
+  const year = Number(input.year);
+  const month = Number(input.month);
+  if (!Number.isInteger(year) || year < 2020 || year > 2100) {
+    throw new ValidationError("El año debe estar entre 2020 y 2100.", "year");
+  }
+  if (!Number.isInteger(month) || month < 1 || month > 12) {
+    throw new ValidationError("El mes debe estar entre 1 y 12.", "month");
+  }
+  return { year, month, status: "abierto" };
+}
+
+export function monthlyTrackingInputToRecord(input, userId) {
+  const user = userId ? assertUuid(userId, "usuario") : null;
+  return {
+    project_id: assertUuid(input.projectId, "proyecto"),
+    contract_id: assertUuid(input.contractId, "contrato"),
+    period_id: assertUuid(input.periodId, "periodo"),
+    recognized_value: assertMoney(input.recognizedValue, "valor reconocido"),
+    observations: input.observations?.trim() || null,
+    validation_status: assertEnum(input.validationStatus ?? "pendiente", VALIDATION_STATUSES, "estado de validación"),
+    updated_by: user
+  };
+}
+
+export function normalizeAuditEvent(record) {
+  const oldData = record.old_data ?? null;
+  const newData = record.new_data ?? null;
+  const projectId = record.table_name === "projects" ? record.record_id : (newData?.project_id ?? oldData?.project_id ?? null);
+  return Object.freeze({
+    id: String(record.id),
+    tableName: assertText(record.table_name, "tabla", { min: 2, max: 80 }),
+    recordId: assertUuid(record.record_id, "registro"),
+    action: assertEnum(record.action, AUDIT_ACTIONS, "acción"),
+    changedBy: record.changed_by || null,
+    changedAt: String(record.changed_at),
+    oldData, newData,
+    projectId: projectId ? assertUuid(projectId, "proyecto") : null
   });
 }
 
