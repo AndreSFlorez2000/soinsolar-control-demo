@@ -11,7 +11,7 @@
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="src/assets/css/styles.css?v=0.8.0" />
+    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.0.0" />
   </head>
   <body>
     <section id="loginView" class="login-shell">
@@ -44,11 +44,8 @@
           <button class="nav-item active" data-view="dashboard"><span>IN</span>Inicio</button>
           <button class="nav-item" data-view="projects"><span>PR</span>Proyectos</button>
           <button class="nav-item" data-view="monthly"><span>SM</span>Seguimiento mensual</button>
-          <button class="nav-item" data-view="finance"><span>FP</span>Facturación y pagos</button>
           <button class="nav-item" data-view="costs"><span>CG</span>Costos y gastos</button>
           <button class="nav-item" data-view="history"><span>HI</span>Historial</button>
-          <button class="nav-item" data-view="reports"><span>RE</span>Reportes</button>
-          <button class="nav-item" data-view="admin"><span>AD</span>Administración</button>
         </nav>
         <div class="period-card">
           <small>PERIODO ACTIVO</small>
@@ -72,6 +69,11 @@
               </div>
               <div id="globalSearchResults" class="global-search-results" role="list" hidden></div>
             </div>
+            <div class="system-status" aria-label="Estado del sistema">
+              <span id="systemModeBadge" class="system-mode-badge">Cargando</span>
+              <small id="lastSyncLabel">Sin actualizar</small>
+            </div>
+            <button id="refreshAppButton" class="btn btn-sm btn-outline-primary" type="button">Actualizar</button>
             <select id="activePeriodSelect" class="form-select" aria-label="Periodo activo">
               <option>Agosto 2026</option>
               <option>Julio 2026</option>
@@ -190,6 +192,40 @@
                 <button class="quick-action" type="button" data-project-tab="history"><strong>Historial</strong><span>Cambios y trazabilidad del registro</span></button>
               </div>
             </article>
+
+            <div class="project-analytics-grid">
+              <article class="panel project-chart-panel">
+                <div class="panel-heading">
+                  <div><h4>Evolución mensual del proyecto</h4><small id="projectMonthlyDescription">Sin periodos con movimientos</small></div>
+                </div>
+                <canvas id="projectMonthlyChart" aria-label="Facturación, pagos y costos mensuales del proyecto"></canvas>
+                <div id="projectChartFallback" class="chart-fallback" aria-live="polite"></div>
+              </article>
+              <article class="panel project-indicators-panel">
+                <h4>Indicadores del proyecto</h4>
+                <div class="project-indicator-list">
+                  <div><span>Cobro sobre lo facturado</span><strong id="projectPaymentCompliance">0 %</strong></div>
+                  <div><span>Costos sobre el contrato</span><strong id="projectCostExecution">0 %</strong></div>
+                  <div><span>Meses con movimiento</span><strong id="projectActiveMonths">0</strong></div>
+                  <div><span>Seguimientos por validar</span><strong id="projectPendingValidations">0</strong></div>
+                </div>
+              </article>
+            </div>
+
+            <article class="panel project-history-panel">
+              <div class="panel-heading">
+                <div><h4>Historial reciente del proyecto</h4><small>Últimos cambios registrados en los módulos relacionados.</small></div>
+                <button class="link-button" type="button" data-project-tab="history">Ver historial completo</button>
+              </div>
+              <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                  <thead><tr><th>Fecha</th><th>Módulo</th><th>Acción</th><th>Descripción</th></tr></thead>
+                  <tbody id="projectHistoryRows"></tbody>
+                </table>
+              </div>
+              <div id="projectHistoryEmpty" class="inline-empty" hidden>No existen cambios registrados para este proyecto.</div>
+            </article>
+
             <button class="btn btn-link px-0 mt-3" data-view="projects">← Volver al listado de proyectos</button>
           </section>
 
@@ -428,6 +464,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="src/assets/js/config.js"></script>
-    <script type="module" src="src/assets/js/app.js?v=0.8.0"></script>
+    <script type="module" src="src/assets/js/app.js?v=1.0.0"></script>
   </body>
 </html>
