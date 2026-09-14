@@ -1,4 +1,5 @@
 import {
+  assertDate,
   assertEnum,
   assertMoney,
   assertText,
@@ -6,14 +7,22 @@ import {
   costExpenseInputToRecord,
   monthlyTrackingInputToRecord,
   normalizeAuditEvent,
+  normalizeContract,
   normalizeCostExpense,
+  normalizeInvoice,
   normalizeMonthlySummary,
+  normalizePayment,
+  normalizeProfile,
   normalizePeriod,
   normalizeProject,
   normalizeProjectSummary,
   projectInputToRecord,
+  APP_ROLES,
+  CONTRACT_STATUSES,
+  INVOICE_STATUSES,
+  PAYMENT_STATUSES,
   VALIDATION_STATUSES
-} from "./models.js?v=0.4.0";
+} from "./models.js?v=1.1.0";
 
 export class DataAccessError extends Error {
   constructor(message, cause = null) {
@@ -47,6 +56,41 @@ function normalizeMonth(value) {
     throw new DataAccessError("El mes debe estar entre 1 y 12.");
   }
   return month;
+}
+
+export class ProfileRepository {
+  constructor(client) { this.client = client; }
+
+  async list() {
+    const rows = await unwrap(
+      this.client.from("profiles").select("*").order("full_name"),
+      "No fue posible consultar los usuarios"
+    );
+    return rows.map(normalizeProfile);
+  }
+
+  async get(userId) {
+    const id = assertUuid(userId, "usuario");
+    const row = await unwrap(
+      this.client.from("profiles").select("*").eq("id", id).single(),
+      "No fue posible consultar el perfil"
+    );
+    return normalizeProfile(row);
+  }
+
+  async update(profileId, input) {
+    const id = assertUuid(profileId, "usuario");
+    const record = {
+      full_name: assertText(input.fullName, "nombre", { min: 3, max: 180 }),
+      role: assertEnum(input.role, APP_ROLES, "rol"),
+      active: Boolean(input.active)
+    };
+    const row = await unwrap(
+      this.client.from("profiles").update(record).eq("id", id).select("*").single(),
+      "No fue posible actualizar el usuario"
+    );
+    return normalizeProfile(row);
+  }
 }
 
 export class ProjectRepository {
@@ -133,62 +177,57 @@ export class ProjectRepository {
 }
 
 export class ContractRepository {
-  constructor(client) {
-    this.client = client;
-  }
+  constructor(client) { this.client = client; }
 
   async listByProject(projectId) {
     const id = assertUuid(projectId, "proyecto");
-    return unwrap(
-      this.client
-        .from("contracts")
-        .select("*")
-        .eq("project_id", id)
-        .order("start_date", { ascending: false }),
+    const rows = await unwrap(
+      this.client.from("contracts").select("*").eq("project_id", id).order("start_date", { ascending: false }),
       "No fue posible consultar los contratos"
     );
+    return rows.map(normalizeContract);
+  }
+
+  buildRecord(input, userId, creating = false) {
+    const startDate = assertDate(input.startDate, "fecha inicial");
+    const endDate = input.endDate ? assertDate(input.endDate, "fecha final") : null;
+    if (endDate && endDate < startDate) throw new DataAccessError("La fecha final no puede ser anterior a la fecha inicial.");
+    const record = {
+      contract_number: assertText(input.contractNumber, "número de contrato", { min: 2, max: 80 }),
+      initial_value: assertMoney(input.initialValue, "valor inicial", { allowZero: false }),
+      additions_value: assertMoney(input.additionsValue ?? 0, "adiciones"),
+      deductions_value: assertMoney(input.deductionsValue ?? 0, "deducciones"),
+      start_date: startDate,
+      end_date: endDate,
+      status: assertEnum(input.status ?? "borrador", CONTRACT_STATUSES, "estado"),
+      updated_by: userId ? assertUuid(userId, "usuario") : null
+    };
+    if (creating) {
+      record.project_id = assertUuid(input.projectId, "proyecto");
+      record.created_by = record.updated_by;
+    }
+    return record;
   }
 
   async create(input, userId) {
-    const record = {
-      project_id: assertUuid(input.projectId, "proyecto"),
-      contract_number: assertText(input.contractNumber, "número de contrato", {
-        min: 2,
-        max: 80
-      }),
-      initial_value: assertMoney(input.initialValue, "valor inicial", {
-        allowZero: false
-      }),
-      additions_value: assertMoney(input.additionsValue ?? 0, "adiciones"),
-      deductions_value: assertMoney(input.deductionsValue ?? 0, "deducciones"),
-      start_date: input.startDate,
-      end_date: input.endDate || null,
-      status: input.status ?? "borrador",
-      created_by: userId ? assertUuid(userId, "usuario") : null,
-      updated_by: userId ? assertUuid(userId, "usuario") : null
-    };
-
-    return unwrap(
-      this.client.from("contracts").insert(record).select("*").single(),
+    const row = await unwrap(
+      this.client.from("contracts").insert(this.buildRecord(input, userId, true)).select("*").single(),
       "No fue posible crear el contrato"
     );
+    return normalizeContract(row);
+  }
+
+  async update(contractId, input, userId) {
+    const id = assertUuid(contractId, "contrato");
+    const row = await unwrap(
+      this.client.from("contracts").update(this.buildRecord(input, userId)).eq("id", id).select("*").single(),
+      "No fue posible actualizar el contrato"
+    );
+    return normalizeContract(row);
   }
 
   async updateValues(contractId, values, userId) {
-    const id = assertUuid(contractId, "contrato");
-    const record = {
-      initial_value: assertMoney(values.initialValue, "valor inicial", {
-        allowZero: false
-      }),
-      additions_value: assertMoney(values.additionsValue ?? 0, "adiciones"),
-      deductions_value: assertMoney(values.deductionsValue ?? 0, "deducciones"),
-      updated_by: userId ? assertUuid(userId, "usuario") : null
-    };
-
-    return unwrap(
-      this.client.from("contracts").update(record).eq("id", id).select("*").single(),
-      "No fue posible actualizar el contrato"
-    );
+    return this.update(contractId, values, userId);
   }
 }
 
@@ -372,20 +411,20 @@ export class AuditRepository {
 }
 
 export class FinanceRepository {
-  constructor(client) {
-    this.client = client;
-  }
+  constructor(client) { this.client = client; }
 
-  async listInvoices(projectId) {
-    const id = assertUuid(projectId, "proyecto");
-    return unwrap(
-      this.client
-        .from("invoices")
-        .select("*, periods(year, month)")
-        .eq("project_id", id)
-        .order("issue_date", { ascending: false }),
-      "No fue posible consultar las facturas"
-    );
+  async listInvoices(filters = {}) {
+    let query = this.client
+      .from("invoices")
+      .select("*, projects(id, cost_center, name), periods(id, year, month, status), contracts(contract_number)")
+      .order("issue_date", { ascending: false });
+    if (filters.projectId) query = query.eq("project_id", assertUuid(filters.projectId, "proyecto"));
+    if (filters.periodId) query = query.eq("period_id", assertUuid(filters.periodId, "periodo"));
+    if (filters.status) query = query.eq("status", assertEnum(filters.status, INVOICE_STATUSES, "estado de factura"));
+    if (filters.dateFrom) query = query.gte("issue_date", assertDate(filters.dateFrom, "fecha inicial"));
+    if (filters.dateTo) query = query.lte("issue_date", assertDate(filters.dateTo, "fecha final"));
+    const rows = await unwrap(query, "No fue posible consultar las facturas");
+    return rows.map(normalizeInvoice);
   }
 
   async createInvoice(input, userId) {
@@ -394,34 +433,35 @@ export class FinanceRepository {
       project_id: assertUuid(input.projectId, "proyecto"),
       contract_id: assertUuid(input.contractId, "contrato"),
       period_id: assertUuid(input.periodId, "periodo"),
-      invoice_number: assertText(input.invoiceNumber, "número de factura", {
-        min: 2,
-        max: 80
-      }),
-      issue_date: input.issueDate,
+      invoice_number: assertText(input.invoiceNumber, "número de factura", { min: 2, max: 80 }),
+      issue_date: assertDate(input.issueDate, "fecha de emisión"),
       amount: assertMoney(input.amount, "valor facturado", { allowZero: false }),
-      status: input.status ?? "registrada",
-      support_path: input.supportPath || null,
+      status: assertEnum(input.status ?? "registrada", INVOICE_STATUSES, "estado de factura"),
+      support_path: input.supportPath?.trim() || null,
       created_by: user,
       updated_by: user
     };
-
-    return unwrap(
-      this.client.from("invoices").insert(record).select("*").single(),
+    const row = await unwrap(
+      this.client.from("invoices").insert(record)
+        .select("*, projects(id, cost_center, name), periods(id, year, month, status), contracts(contract_number)").single(),
       "No fue posible registrar la factura"
     );
+    return normalizeInvoice(row);
   }
 
-  async listPayments(invoiceId) {
-    const id = assertUuid(invoiceId, "factura");
-    return unwrap(
-      this.client
-        .from("payments")
-        .select("*")
-        .eq("invoice_id", id)
-        .order("payment_date", { ascending: false }),
-      "No fue posible consultar los pagos"
-    );
+  async listPayments(filters = {}) {
+    let query = this.client
+      .from("payments")
+      .select("*, projects(id, cost_center, name), periods(id, year, month, status), invoices(invoice_number)")
+      .order("payment_date", { ascending: false });
+    if (filters.invoiceId) query = query.eq("invoice_id", assertUuid(filters.invoiceId, "factura"));
+    if (filters.projectId) query = query.eq("project_id", assertUuid(filters.projectId, "proyecto"));
+    if (filters.periodId) query = query.eq("period_id", assertUuid(filters.periodId, "periodo"));
+    if (filters.status) query = query.eq("status", assertEnum(filters.status, PAYMENT_STATUSES, "estado de pago"));
+    if (filters.dateFrom) query = query.gte("payment_date", assertDate(filters.dateFrom, "fecha inicial"));
+    if (filters.dateTo) query = query.lte("payment_date", assertDate(filters.dateTo, "fecha final"));
+    const rows = await unwrap(query, "No fue posible consultar los pagos");
+    return rows.map(normalizePayment);
   }
 
   async createPayment(input, userId) {
@@ -431,22 +471,20 @@ export class FinanceRepository {
       project_id: assertUuid(input.projectId, "proyecto"),
       contract_id: assertUuid(input.contractId, "contrato"),
       period_id: assertUuid(input.periodId, "periodo"),
-      payment_reference: assertText(input.paymentReference, "referencia de pago", {
-        min: 2,
-        max: 80
-      }),
-      payment_date: input.paymentDate,
+      payment_reference: assertText(input.paymentReference, "referencia de pago", { min: 2, max: 80 }),
+      payment_date: assertDate(input.paymentDate, "fecha de pago"),
       amount: assertMoney(input.amount, "valor pagado", { allowZero: false }),
-      status: input.status ?? "registrado",
-      support_path: input.supportPath || null,
+      status: assertEnum(input.status ?? "registrado", PAYMENT_STATUSES, "estado de pago"),
+      support_path: input.supportPath?.trim() || null,
       created_by: user,
       updated_by: user
     };
-
-    return unwrap(
-      this.client.from("payments").insert(record).select("*").single(),
+    const row = await unwrap(
+      this.client.from("payments").insert(record)
+        .select("*, projects(id, cost_center, name), periods(id, year, month, status), invoices(invoice_number)").single(),
       "No fue posible registrar el pago"
     );
+    return normalizePayment(row);
   }
 
   async listCostsExpenses(filters = {}) {
@@ -454,33 +492,21 @@ export class FinanceRepository {
       .from("costs_expenses")
       .select("*, projects(id, cost_center, name), periods(id, year, month, status)")
       .order("movement_date", { ascending: false });
-
-    if (filters.projectId) {
-      query = query.eq("project_id", assertUuid(filters.projectId, "proyecto"));
-    }
+    if (filters.projectId) query = query.eq("project_id", assertUuid(filters.projectId, "proyecto"));
     if (filters.type) query = query.eq("movement_type", filters.type);
-    if (filters.periodId) {
-      query = query.eq("period_id", assertUuid(filters.periodId, "periodo"));
-    }
-    if (filters.category) {
-      query = query.ilike("category", `%${String(filters.category).trim()}%`);
-    }
+    if (filters.periodId) query = query.eq("period_id", assertUuid(filters.periodId, "periodo"));
+    if (filters.category) query = query.ilike("category", `%${String(filters.category).trim()}%`);
     if (filters.dateFrom) query = query.gte("movement_date", filters.dateFrom);
     if (filters.dateTo) query = query.lte("movement_date", filters.dateTo);
-
     const rows = await unwrap(query, "No fue posible consultar los costos y gastos");
     return rows.map(normalizeCostExpense);
   }
 
   async createCostExpense(input, userId) {
     const record = costExpenseInputToRecord(input, userId);
-
     const row = await unwrap(
-      this.client
-        .from("costs_expenses")
-        .insert(record)
-        .select("*, projects(id, cost_center, name), periods(id, year, month, status)")
-        .single(),
+      this.client.from("costs_expenses").insert(record)
+        .select("*, projects(id, cost_center, name), periods(id, year, month, status)").single(),
       "No fue posible registrar el costo o gasto"
     );
     return normalizeCostExpense(row);
