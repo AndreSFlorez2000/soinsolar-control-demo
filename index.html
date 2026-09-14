@@ -11,7 +11,7 @@
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="src/assets/css/styles.css?v=0.5.0" />
+    <link rel="stylesheet" href="src/assets/css/styles.css?v=0.6.0" />
   </head>
   <body>
     <section id="loginView" class="login-shell">
@@ -64,6 +64,14 @@
             <h2 id="pageTitle">Resumen general</h2>
           </div>
           <div class="topbar-actions">
+            <div class="global-search">
+              <label class="visually-hidden" for="globalSearchInput">Buscar un proyecto</label>
+              <div class="global-search-control">
+                <input id="globalSearchInput" class="form-control" type="search" autocomplete="off" placeholder="Buscar proyecto o centro de costo" aria-controls="globalSearchResults" aria-expanded="false" />
+                <button id="clearGlobalSearch" class="global-search-clear" type="button" aria-label="Limpiar búsqueda" hidden>×</button>
+              </div>
+              <div id="globalSearchResults" class="global-search-results" role="list" hidden></div>
+            </div>
             <select id="activePeriodSelect" class="form-select" aria-label="Periodo activo">
               <option>Agosto 2026</option>
               <option>Julio 2026</option>
@@ -204,6 +212,7 @@
                 <div class="filter-actions"><button class="btn btn-primary" type="submit">Aplicar filtros</button><button id="clearMonthlyFilters" class="btn btn-outline-secondary" type="button">Limpiar</button></div>
               </form>
             </article>
+            <div id="monthlyActiveFilters" class="active-filter-list" aria-live="polite" hidden></div>
 
             <div id="monthlyModuleMessage" class="module-message module-message-block" role="status" aria-live="polite"></div>
             <article class="panel data-panel">
@@ -234,6 +243,7 @@
                 <div class="filter-actions"><button class="btn btn-primary" type="submit">Aplicar filtros</button><button id="clearProjectFilters" class="btn btn-outline-secondary" type="button">Limpiar</button></div>
               </form>
             </article>
+            <div id="projectActiveFilters" class="active-filter-list" aria-live="polite" hidden></div>
 
             <div class="module-summary">
               <span><strong id="projectResultCount">0</strong> proyectos encontrados</span>
@@ -268,6 +278,7 @@
                 <div class="filter-actions"><button class="btn btn-primary" type="submit">Aplicar filtros</button><button id="clearCostFilters" class="btn btn-outline-secondary" type="button">Limpiar</button></div>
               </form>
             </article>
+            <div id="costActiveFilters" class="active-filter-list" aria-live="polite" hidden></div>
 
             <div class="cost-summary-grid">
               <article class="mini-kpi"><span>Movimientos</span><strong id="costMovementCount">0</strong></article>
@@ -304,6 +315,7 @@
                 <div class="filter-actions"><button class="btn btn-primary" type="submit">Aplicar filtros</button><button id="clearHistoryFilters" class="btn btn-outline-secondary" type="button">Limpiar</button></div>
               </form>
             </article>
+            <div id="historyActiveFilters" class="active-filter-list" aria-live="polite" hidden></div>
 
             <div class="module-summary"><span><strong id="historyCount">0</strong> eventos encontrados</span><span id="historyModuleMessage" class="module-message" role="status" aria-live="polite"></span></div>
             <article class="panel data-panel">
@@ -406,6 +418,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="src/assets/js/config.js"></script>
-    <script type="module" src="src/assets/js/app.js?v=0.5.0"></script>
+    <script type="module" src="src/assets/js/app.js?v=0.6.0"></script>
   </body>
 </html>
