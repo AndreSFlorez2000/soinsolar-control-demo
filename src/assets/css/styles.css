@@ -284,3 +284,36 @@ button, input, select, textarea { font: inherit; }
   .global-search { width: 100%; }
   .global-search-results { width: 100%; max-width: none; }
 }
+
+
+/* Actividades 17 y 18: filtros avanzados e indicadores generales */
+.filter-grid-projects { grid-template-columns: repeat(4, minmax(140px, 1fr)); }
+.filter-grid-projects .filter-actions { grid-column: 1 / -1; justify-content: flex-end; }
+.active-filter-chip { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+.active-filter-chip:hover, .active-filter-chip:focus-visible { color: var(--red); background: #fff; border-color: #efcaca; }
+.active-filter-chip > span { font-size: 14px; line-height: 1; }
+.dashboard-secondary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 14px; }
+.status-panel { min-height: 410px; padding: 20px 22px; }
+.project-status-stats { display: grid; gap: 15px; margin-top: 24px; }
+.status-stat { display: grid; gap: 6px; }
+.status-stat > div:first-child { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 11px; }
+.status-stat strong { color: var(--text); }
+.status-stat-track { height: 7px; overflow: hidden; background: #e7edf2; border-radius: 999px; }
+.status-stat-track span { display: block; height: 100%; min-width: 0; background: var(--blue); border-radius: inherit; }
+.status-stat-track span.activo { background: var(--green); }
+.status-stat-track span.planeado { background: var(--blue); }
+.status-stat-track span.suspendido { background: var(--gold); }
+.status-stat-track span.finalizado { background: var(--navy-2); }
+.status-stat-track span.cancelado { background: var(--red); }
+.dashboard-alert-title { margin-top: 30px !important; padding-top: 20px; border-top: 1px solid var(--border); }
+.dashboard-ok, .chart-empty { padding: 24px 12px; color: var(--muted); text-align: center; font-size: 12px; }
+.chart-panel .panel-heading { align-items: flex-start; }
+.chart-panel .panel-heading small { display: block; margin-top: 5px; color: var(--muted); font-size: 10px; }
+
+@media (max-width: 1050px) {
+  .filter-grid-projects { grid-template-columns: 1fr 1fr; }
+  .dashboard-secondary-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 760px) {
+  .filter-grid-projects, .dashboard-secondary-grid { grid-template-columns: 1fr; }
+}
