@@ -165,12 +165,44 @@ button, input, select, textarea { font: inherit; }
 .project-name-cell small, .reference-cell small { color: var(--muted); }
 .reference-cell { display: grid; gap: 3px; }
 
+
+.period-panel { margin-top: 18px; margin-bottom: 18px; padding-top: 18px; }
+.period-panel .panel-heading { align-items: flex-start; }
+.period-panel .panel-heading small { display: block; margin-top: 5px; color: var(--muted); }
+.monthly-filter-panel { margin-top: 18px; }
+.validation-badge { display: inline-flex; padding: 4px 8px; border-radius: 999px; font-size: 10px; font-weight: 750; text-transform: capitalize; }
+.validation-badge.validado { color: var(--green); background: #e5f5eb; }
+.validation-badge.pendiente { color: #926400; background: #fff3d8; }
+.validation-badge.borrador { color: var(--blue); background: #e7f0f8; }
+.validation-badge.rechazado { color: var(--red); background: #fae8e8; }
+.period-badge { display: inline-flex; padding: 4px 9px; border-radius: 999px; font-size: 10px; font-weight: 750; }
+.period-badge.abierto { color: var(--green); background: #e5f5eb; }
+.period-badge.cerrado { color: var(--muted); background: #edf2f6; }
+.table-action.success { color: var(--green); }
+.table-action:disabled { cursor: not-allowed; opacity: .45; }
+.filter-grid-history { grid-template-columns: repeat(5, minmax(130px, 1fr)); }
+.filter-grid-history .filter-actions { grid-column: 1 / -1; justify-content: flex-end; }
+.history-action { display: inline-flex; padding: 4px 8px; border-radius: 999px; font-size: 10px; font-weight: 750; }
+.history-action.insert { color: var(--green); background: #e5f5eb; }
+.history-action.update { color: var(--blue); background: #e7f0f8; }
+.history-action.delete { color: var(--red); background: #fae8e8; }
+.app-dialog-small { width: min(520px, calc(100% - 28px)); }
+.dialog-note { margin: 16px 0 0; padding: 11px 13px; color: var(--muted); background: #f4f7fa; border-radius: 8px; font-size: 12px; }
+.history-dialog-content { padding: 25px 27px 22px; }
+.history-detail { display: grid; gap: 15px; margin-top: 20px; }
+.history-detail-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.history-detail-summary div { display: grid; gap: 4px; padding: 12px; background: #f4f7fa; border-radius: 8px; }
+.history-detail-summary span { color: var(--muted); font-size: 10px; text-transform: uppercase; }
+.history-json-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.history-json-grid h4 { font-size: 13px; }
+.history-json-grid pre { max-height: 300px; margin: 0; padding: 12px; overflow: auto; color: #dce9f5; background: #0b2d52; border-radius: 8px; font-size: 10px; white-space: pre-wrap; }
+
 @media (max-width: 1050px) {
   .kpi-grid { grid-template-columns: 1fr 1fr; }
   .dashboard-grid, .detail-grid { grid-template-columns: 1fr; }
   .alerts-panel { min-height: auto; }
-  .filter-grid, .filter-grid-costs { grid-template-columns: 1fr 1fr; }
-  .filter-grid .filter-actions, .filter-grid-costs .filter-actions { grid-column: 1 / -1; }
+  .filter-grid, .filter-grid-costs, .filter-grid-history { grid-template-columns: 1fr 1fr; }
+  .filter-grid .filter-actions, .filter-grid-costs .filter-actions, .filter-grid-history .filter-actions { grid-column: 1 / -1; }
 }
 @media (max-width: 760px) {
   .app-shell { grid-template-columns: 1fr; }
@@ -186,8 +218,8 @@ button, input, select, textarea { font: inherit; }
   .section-heading { align-items: flex-start; flex-direction: column; }
   .heading-actions { width: 100%; }
   .heading-actions .btn { flex: 1; }
-  .filter-grid, .filter-grid-costs, .cost-summary-grid, .form-grid { grid-template-columns: 1fr; }
-  .filter-grid .filter-actions, .filter-grid-costs .filter-actions, .form-grid .span-2 { grid-column: auto; }
+  .filter-grid, .filter-grid-costs, .filter-grid-history, .cost-summary-grid, .form-grid, .history-detail-summary, .history-json-grid { grid-template-columns: 1fr; }
+  .filter-grid .filter-actions, .filter-grid-costs .filter-actions, .filter-grid-history .filter-actions, .form-grid .span-2 { grid-column: auto; }
   .filter-actions { justify-content: stretch; }
   .filter-actions .btn { flex: 1; }
   .module-summary { align-items: flex-start; flex-direction: column; padding: 11px 0; }
