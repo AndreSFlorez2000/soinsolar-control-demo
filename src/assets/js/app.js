@@ -1,7 +1,7 @@
-import { dashboard as demoDashboard } from "./data/mock-data.js?v=0.6.0";
-import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=0.6.0";
-import { createApplicationDataGateway } from "./services/application-data.js?v=0.6.0";
-import { isDemoMode, signIn, signOut } from "./services/supabase.js?v=0.6.0";
+import { buildMonthlySeries, calculateDashboardIndicators } from "./domain/dashboard.js?v=0.8.0";
+import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=0.8.0";
+import { createApplicationDataGateway } from "./services/application-data.js?v=0.8.0";
+import { isDemoMode, signIn, signOut } from "./services/supabase.js?v=0.8.0";
 
 const loginView = document.querySelector("#loginView");
 const appView = document.querySelector("#appView");
@@ -64,6 +64,7 @@ let currentPeriods = [];
 let currentCosts = [];
 let currentMonthly = [];
 let currentAudit = [];
+let dashboardChart = null;
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -120,7 +121,11 @@ async function ensureGateway() {
 
 async function loadReferenceData() {
   const data = await ensureGateway();
-  [currentProjects, currentPeriods] = await Promise.all([data.listProjects(), data.listPeriods()]);
+  [currentProjects, currentPeriods, currentMonthly] = await Promise.all([
+    data.listProjects(),
+    data.listPeriods(),
+    data.listMonthlyTracking({})
+  ]);
   populateProjectOptions();
   populatePeriodOptions();
 }
@@ -164,6 +169,7 @@ async function showView(view) {
   if (!placeholderView.hidden) document.querySelector("#placeholderTitle").textContent = `${viewLabels[view]} preparado`;
   history.replaceState({}, "", `#${view}`);
 
+  if (view === "dashboard") renderDashboard();
   if (view === "projects") await loadProjects();
   if (view === "monthly") await loadMonthlyModule();
   if (view === "costs") await loadCosts();
@@ -171,50 +177,158 @@ async function showView(view) {
 }
 
 function renderDashboard() {
-  const totals = currentProjects.reduce((result, project) => ({
-    contractValue: result.contractValue + project.contractValue,
-    invoiced: result.invoiced + project.totalInvoiced,
-    paid: result.paid + project.totalPaid,
-    costs: result.costs + project.totalCostsExpenses
-  }), { contractValue: 0, invoiced: 0, paid: 0, costs: 0 });
+  const indicators = calculateDashboardIndicators(currentProjects);
 
-  document.querySelector("#contractValue").textContent = formatCop(totals.contractValue);
-  document.querySelector("#invoicedValue").textContent = formatCop(totals.invoiced);
-  document.querySelector("#paidValue").textContent = formatCop(totals.paid);
-  document.querySelector("#costValue").textContent = formatCop(totals.costs);
-  document.querySelector("#receivableValue").textContent = `${formatCop(paymentPending(totals.invoiced, totals.paid))} por cobrar`;
-  document.querySelector("#costRatio").textContent = `${safePercent(totals.costs, totals.contractValue).toFixed(1).replace(".", ",")} % del contrato`;
+  document.querySelector("#contractValue").textContent = formatCop(indicators.contractValue);
+  document.querySelector("#invoicedValue").textContent = formatCop(indicators.invoiced);
+  document.querySelector("#paidValue").textContent = formatCop(indicators.paid);
+  document.querySelector("#costValue").textContent = formatCop(indicators.costsExpenses);
+  document.querySelector("#activeProjectKpi").textContent = `${indicators.activeProjects} proyecto(s) activo(s)`;
+  document.querySelector("#invoicedRatioText").textContent = `${formatPercent(indicators.financialProgress)} del valor contractual`;
+  document.querySelector("#receivableValue").textContent = `${formatCop(indicators.paymentPending)} por cobrar`;
+  document.querySelector("#costRatio").textContent = `${formatPercent(indicators.costRatio)} del contrato`;
+  document.querySelector("#contractualBalanceValue").textContent = formatCop(indicators.contractualBalance);
+  document.querySelector("#paymentPendingValue").textContent = formatCop(indicators.paymentPending);
+  document.querySelector("#globalProgressValue").textContent = formatPercent(indicators.financialProgress);
+  document.querySelector("#projectCountValue").textContent = indicators.projectCount;
 
-  document.querySelector("#projectRows").innerHTML = currentProjects.slice(0, 5).map((project) => `
-    <tr>
-      <td>${escapeHtml(project.costCenter)}</td><td><strong>${escapeHtml(project.projectName)}</strong></td><td>${escapeHtml(project.municipality)}</td>
-      <td>${formatPercent(project.financialProgressPercentage)}</td><td>${formatCop(project.contractualBalance)}</td>
-      <td><button class="open-project" data-action="open-project" data-project-id="${project.projectId}">Abrir</button></td>
-    </tr>`).join("");
+  renderProjectStatusStats(indicators);
+  renderDashboardAlerts(indicators);
+
+  document.querySelector("#projectRows").innerHTML = [...currentProjects]
+    .sort((left, right) => right.financialProgressPercentage - left.financialProgressPercentage)
+    .slice(0, 5)
+    .map((project) => `
+      <tr>
+        <td>${escapeHtml(project.costCenter)}</td><td><strong>${escapeHtml(project.projectName)}</strong></td><td>${escapeHtml(project.municipality)}</td>
+        <td>${formatPercent(project.financialProgressPercentage)}</td><td>${formatCop(project.contractualBalance)}</td>
+        <td><button class="open-project" type="button" data-action="open-project" data-project-id="${project.projectId}">Abrir</button></td>
+      </tr>`).join("");
   renderChart();
+}
+
+
+function renderProjectStatusStats(indicators) {
+  const order = [
+    ["activo", "Activos"], ["planeado", "Planeados"], ["suspendido", "Suspendidos"],
+    ["finalizado", "Finalizados"], ["cancelado", "Cancelados"]
+  ];
+  const total = Math.max(indicators.projectCount, 1);
+  document.querySelector("#projectStatusStats").innerHTML = order.map(([status, label]) => {
+    const count = indicators.statusCounts[status];
+    const percentage = (count / total) * 100;
+    return `<div class="status-stat"><div><span>${label}</span><strong>${count}</strong></div><div class="status-stat-track"><span class="${status}" style="width:${percentage}%"></span></div></div>`;
+  }).join("");
+}
+
+function renderDashboardAlerts(indicators) {
+  const openPeriod = currentPeriods.find((period) => period.status === "abierto");
+  const pendingValidation = currentMonthly.filter((row) => row.validationStatus && row.validationStatus !== "validado").length;
+  const alerts = [];
+
+  if (indicators.paymentPending > 0) {
+    alerts.push(["red", "Pagos pendientes", `${formatCop(indicators.paymentPending)} facturados sin pago registrado`]);
+  }
+  if (openPeriod) {
+    alerts.push(["gold", `${periodLabel(openPeriod)} está abierto`, "Los movimientos del periodo todavía pueden actualizarse"]);
+  }
+  if (pendingValidation > 0) {
+    alerts.push(["blue", `${pendingValidation} seguimiento(s) por validar`, "Revisar antes de cerrar el periodo"]);
+  }
+
+  document.querySelector("#dashboardAlerts").innerHTML = alerts.length
+    ? alerts.slice(0, 3).map(([color, titleText, detail]) =>
+        `<div class="alert-row"><span class="alert-dot ${color}"></span><div><strong>${escapeHtml(titleText)}</strong><small>${escapeHtml(detail)}</small></div></div>`
+      ).join("")
+    : '<div class="dashboard-ok">No hay alertas generales con la información disponible.</div>';
 }
 
 function renderChart() {
   const canvas = document.querySelector("#monthlyChart");
   const fallback = document.querySelector("#chartFallback");
+  const series = buildMonthlySeries(currentMonthly, 6);
+  document.querySelector("#monthlySeriesDescription").textContent = series.length
+    ? `Últimos ${series.length} periodo(s) con movimientos`
+    : "Sin periodos con movimientos";
+
+  if (dashboardChart) {
+    dashboardChart.destroy();
+    dashboardChart = null;
+  }
+
+  if (!series.length) {
+    canvas.hidden = true;
+    fallback.style.display = "grid";
+    fallback.innerHTML = '<div class="chart-empty">No existen movimientos mensuales para representar.</div>';
+    return;
+  }
+
+  const labels = series.map((row) => `${monthNames[row.month - 1].slice(0, 3)} ${row.year}`);
+  const invoiced = series.map((row) => row.invoiced / 1000000);
+  const paid = series.map((row) => row.paid / 1000000);
+  const costs = series.map((row) => row.costsExpenses / 1000000);
+
   if (!window.Chart) {
     canvas.hidden = true;
     fallback.style.display = "flex";
-    fallback.innerHTML = demoDashboard.months.map((month, index) => `
-      <div class="month"><span style="height:${demoDashboard.monthlyInvoiced[index] / 18}%;background:#337fbc"></span><span style="height:${demoDashboard.monthlyPaid[index] / 18}%;background:#2f8f59"></span><span style="height:${demoDashboard.monthlyCosts[index] / 18}%;background:#edaf25"></span><label>${month}</label></div>`).join("");
+    const maximum = Math.max(...invoiced, ...paid, ...costs, 1);
+    fallback.innerHTML = labels.map((label, index) => `
+      <div class="month">
+        <span style="height:${Math.max(3, invoiced[index] / maximum * 100)}%;background:#337fbc"></span>
+        <span style="height:${Math.max(3, paid[index] / maximum * 100)}%;background:#2f8f59"></span>
+        <span style="height:${Math.max(3, costs[index] / maximum * 100)}%;background:#edaf25"></span>
+        <label>${escapeHtml(label)}</label>
+      </div>`).join("");
     return;
   }
-  if (canvas.dataset.ready === "true") return;
-  new window.Chart(canvas, {
+
+  fallback.style.display = "none";
+  fallback.innerHTML = "";
+  canvas.hidden = false;
+  dashboardChart = new window.Chart(canvas, {
     type: "bar",
-    data: { labels: demoDashboard.months, datasets: [
-      { label: "Facturación", data: demoDashboard.monthlyInvoiced, backgroundColor: "#337fbc", borderRadius: 4 },
-      { label: "Pagos", data: demoDashboard.monthlyPaid, backgroundColor: "#2f8f59", borderRadius: 4 },
-      { label: "Costos", data: demoDashboard.monthlyCosts, backgroundColor: "#edaf25", borderRadius: 4 }
+    data: { labels, datasets: [
+      { label: "Facturación", data: invoiced, backgroundColor: "#337fbc", borderRadius: 4 },
+      { label: "Pagos", data: paid, backgroundColor: "#2f8f59", borderRadius: 4 },
+      { label: "Costos y gastos", data: costs, backgroundColor: "#edaf25", borderRadius: 4 }
     ] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "bottom", labels: { usePointStyle: true, boxWidth: 7 } } }, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, ticks: { callback: (value) => `$${value} M` }, grid: { color: "#edf2f6" } } } }
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: "bottom", labels: { usePointStyle: true, boxWidth: 7 } } },
+      scales: {
+        x: { grid: { display: false } },
+        y: { beginAtZero: true, ticks: { callback: (value) => `$${value} M` }, grid: { color: "#edf2f6" } }
+      }
+    }
   });
-  canvas.dataset.ready = "true";
+}
+
+
+
+function exportDashboard() {
+  const indicators = calculateDashboardIndicators(currentProjects);
+  const rows = [
+    ["Indicador", "Valor"],
+    ["Proyectos registrados", indicators.projectCount],
+    ["Proyectos activos", indicators.activeProjects],
+    ["Valor contractual vigente", indicators.contractValue],
+    ["Total facturado", indicators.invoiced],
+    ["Total pagado", indicators.paid],
+    ["Costos y gastos", indicators.costsExpenses],
+    ["Saldo contractual", indicators.contractualBalance],
+    ["Pago pendiente", indicators.paymentPending],
+    ["Avance financiero global (%)", indicators.financialProgress],
+    ["Relación costos / contrato (%)", indicators.costRatio]
+  ];
+  const quote = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
+  const blob = new Blob(["\uFEFF", rows.map((row) => row.map(quote).join(",")).join("\n")], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `indicadores-generales-${new Date().toISOString().slice(0, 10)}.csv`;
+  anchor.click();
+  URL.revokeObjectURL(url);
 }
 
 function normalizeSearch(value) {
@@ -251,7 +365,7 @@ function renderGlobalSearch() {
 
   const matches = currentProjects.filter((project) => normalizeSearch([
     project.costCenter, project.projectName, project.municipality,
-    project.serviceType, project.contractNumber, project.status
+    project.serviceType, project.contractNumber, project.clientName, project.status
   ].join(" ")).includes(term)).slice(0, 8);
 
   results.hidden = false;
@@ -269,23 +383,41 @@ function selectedOptionText(selector) {
   return element.selectedOptions?.[0]?.textContent?.trim() ?? "";
 }
 
-function renderActiveFilters(selector, entries) {
+function renderActiveFilters(selector, entries, formId) {
   const container = document.querySelector(selector);
-  const active = entries.filter(([, value]) => String(value ?? "").trim());
+  const active = entries.filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== "");
   container.hidden = active.length === 0;
   container.innerHTML = active.length
-    ? `<span class="active-filter-label">Filtros activos:</span>${active.map(([label, value]) =>
-        `<span class="active-filter-chip"><strong>${escapeHtml(label)}</strong> ${escapeHtml(value)}</span>`
+    ? `<span class="active-filter-label">Filtros activos:</span>${active.map(([label, value, targetId]) =>
+        `<button class="active-filter-chip" type="button" data-filter-target="${escapeHtml(targetId)}" data-filter-form="${escapeHtml(formId)}" aria-label="Quitar filtro ${escapeHtml(label)}"><strong>${escapeHtml(label)}</strong> ${escapeHtml(value)} <span aria-hidden="true">×</span></button>`
       ).join("")}`
     : "";
 }
 
 function projectFilters() {
+  const progressMinText = document.querySelector("#projectFilterProgressMin").value;
+  const progressMaxText = document.querySelector("#projectFilterProgressMax").value;
+  const progressMin = progressMinText === "" ? null : Number(progressMinText);
+  const progressMax = progressMaxText === "" ? null : Number(progressMaxText);
+
+  if (progressMin !== null && (!Number.isFinite(progressMin) || progressMin < 0 || progressMin > 100)) {
+    throw new Error("El avance mínimo debe estar entre 0 y 100.");
+  }
+  if (progressMax !== null && (!Number.isFinite(progressMax) || progressMax < 0 || progressMax > 100)) {
+    throw new Error("El avance máximo debe estar entre 0 y 100.");
+  }
+  if (progressMin !== null && progressMax !== null && progressMin > progressMax) {
+    throw new Error("El avance mínimo no puede ser mayor que el avance máximo.");
+  }
+
   return {
     name: document.querySelector("#projectFilterName").value,
     costCenter: document.querySelector("#projectFilterCenter").value,
     municipality: document.querySelector("#projectFilterMunicipality").value,
-    status: document.querySelector("#projectFilterStatus").value
+    status: document.querySelector("#projectFilterStatus").value,
+    serviceType: document.querySelector("#projectFilterService").value,
+    progressMin,
+    progressMax
   };
 }
 
@@ -304,24 +436,32 @@ function renderProjectOverview() {
   document.querySelector("#projectFinishedCount").textContent = counts.finished;
 }
 
-async function loadProjects(filters = projectFilters()) {
+async function loadProjects(filters) {
   const message = document.querySelector("#projectModuleMessage");
   renderProjectOverview();
-  renderActiveFilters("#projectActiveFilters", [
-    ["Proyecto o cliente:", filters.name],
-    ["Centro de costo:", filters.costCenter],
-    ["Municipio:", filters.municipality],
-    ["Estado:", filters.status ? capitalize(filters.status) : ""]
-  ]);
   setMessage(message, "Consultando proyectos…");
   try {
-    const rows = await (await ensureGateway()).listProjects(filters);
+    const appliedFilters = filters ?? projectFilters();
+    renderActiveFilters("#projectActiveFilters", [
+      ["Proyecto o cliente:", appliedFilters.name, "projectFilterName"],
+      ["Centro de costo:", appliedFilters.costCenter, "projectFilterCenter"],
+      ["Municipio:", appliedFilters.municipality, "projectFilterMunicipality"],
+      ["Estado:", appliedFilters.status ? capitalize(appliedFilters.status) : "", "projectFilterStatus"],
+      ["Tipo de servicio:", appliedFilters.serviceType, "projectFilterService"],
+      ["Avance mínimo:", appliedFilters.progressMin === null ? "" : formatPercent(appliedFilters.progressMin), "projectFilterProgressMin"],
+      ["Avance máximo:", appliedFilters.progressMax === null ? "" : formatPercent(appliedFilters.progressMax), "projectFilterProgressMax"]
+    ], "projectFilters");
+
+    const rows = await (await ensureGateway()).listProjects(appliedFilters);
     document.querySelector("#projectResultCount").textContent = rows.length;
     document.querySelector("#projectsManagementRows").innerHTML = rows.map((project) => `
       <tr><td><strong>${escapeHtml(project.costCenter)}</strong></td><td><span class="project-name-cell"><strong>${escapeHtml(project.projectName)}</strong><small>${escapeHtml(project.contractNumber || "Sin contrato registrado")}</small></span></td><td>${escapeHtml(project.municipality)}</td><td>${escapeHtml(project.serviceType)}</td><td><span class="status-badge ${escapeHtml(project.status)}">${escapeHtml(capitalize(project.status))}</span></td><td>${formatPercent(project.financialProgressPercentage)}</td><td><span class="table-actions"><button class="table-action" type="button" data-action="open-project" data-project-id="${project.projectId}">Abrir</button><button class="table-action" type="button" data-action="edit-project" data-project-id="${project.projectId}">Editar</button><button class="table-action danger" type="button" data-action="delete-project" data-project-id="${project.projectId}">Eliminar</button></span></td></tr>`).join("");
     document.querySelector("#projectsEmpty").hidden = rows.length > 0;
     setMessage(message, rows.length ? "Consulta actualizada." : "");
   } catch (error) {
+    document.querySelector("#projectResultCount").textContent = "0";
+    document.querySelector("#projectsManagementRows").innerHTML = "";
+    document.querySelector("#projectsEmpty").hidden = false;
     setMessage(message, error.message || "No fue posible consultar los proyectos.", true);
   }
 }
@@ -528,10 +668,10 @@ async function loadMonthlyModule(filters) {
   try {
     const appliedFilters = filters ?? monthlyFilters();
     renderActiveFilters("#monthlyActiveFilters", [
-      ["Proyecto:", appliedFilters.projectId ? selectedOptionText("#monthlyFilterProject") : ""],
-      ["Periodo:", appliedFilters.periodId ? selectedOptionText("#monthlyFilterPeriod") : ""],
-      ["Validación:", appliedFilters.validationStatus ? selectedOptionText("#monthlyFilterStatus") : ""]
-    ]);
+      ["Proyecto:", appliedFilters.projectId ? selectedOptionText("#monthlyFilterProject") : "", "monthlyFilterProject"],
+      ["Periodo:", appliedFilters.periodId ? selectedOptionText("#monthlyFilterPeriod") : "", "monthlyFilterPeriod"],
+      ["Validación:", appliedFilters.validationStatus ? selectedOptionText("#monthlyFilterStatus") : "", "monthlyFilterStatus"]
+    ], "monthlyFilters");
     const data = await ensureGateway();
     const filtered = Object.values(appliedFilters).some(Boolean);
     const [allRows, shownRows] = await Promise.all([
@@ -704,13 +844,13 @@ async function loadCosts(filters) {
   try {
     const appliedFilters = filters ?? costFilters();
     renderActiveFilters("#costActiveFilters", [
-      ["Proyecto:", appliedFilters.projectId ? selectedOptionText("#costFilterProject") : ""],
-      ["Periodo:", appliedFilters.periodId ? selectedOptionText("#costFilterPeriod") : ""],
-      ["Tipo:", appliedFilters.type ? capitalize(appliedFilters.type) : ""],
-      ["Categoría:", appliedFilters.category],
-      ["Desde:", appliedFilters.dateFrom ? formatDate(appliedFilters.dateFrom) : ""],
-      ["Hasta:", appliedFilters.dateTo ? formatDate(appliedFilters.dateTo) : ""]
-    ]);
+      ["Proyecto:", appliedFilters.projectId ? selectedOptionText("#costFilterProject") : "", "costFilterProject"],
+      ["Periodo:", appliedFilters.periodId ? selectedOptionText("#costFilterPeriod") : "", "costFilterPeriod"],
+      ["Tipo:", appliedFilters.type ? capitalize(appliedFilters.type) : "", "costFilterType"],
+      ["Categoría:", appliedFilters.category, "costFilterCategory"],
+      ["Desde:", appliedFilters.dateFrom ? formatDate(appliedFilters.dateFrom) : "", "costFilterFrom"],
+      ["Hasta:", appliedFilters.dateTo ? formatDate(appliedFilters.dateTo) : "", "costFilterTo"]
+    ], "costFilters");
     currentCosts = await (await ensureGateway()).listCostsExpenses(appliedFilters);
     renderCosts();
     setMessage(message, currentCosts.length ? "Consulta actualizada." : "");
@@ -839,12 +979,12 @@ async function loadHistory(filters) {
   try {
     const appliedFilters = filters ?? historyFilters();
     renderActiveFilters("#historyActiveFilters", [
-      ["Proyecto:", appliedFilters.projectId ? selectedOptionText("#historyFilterProject") : ""],
-      ["Módulo:", appliedFilters.tableName ? selectedOptionText("#historyFilterTable") : ""],
-      ["Acción:", appliedFilters.action ? selectedOptionText("#historyFilterAction") : ""],
-      ["Desde:", appliedFilters.dateFrom ? formatDate(appliedFilters.dateFrom) : ""],
-      ["Hasta:", appliedFilters.dateTo ? formatDate(appliedFilters.dateTo) : ""]
-    ]);
+      ["Proyecto:", appliedFilters.projectId ? selectedOptionText("#historyFilterProject") : "", "historyFilterProject"],
+      ["Módulo:", appliedFilters.tableName ? selectedOptionText("#historyFilterTable") : "", "historyFilterTable"],
+      ["Acción:", appliedFilters.action ? selectedOptionText("#historyFilterAction") : "", "historyFilterAction"],
+      ["Desde:", appliedFilters.dateFrom ? formatDate(appliedFilters.dateFrom) : "", "historyFilterFrom"],
+      ["Hasta:", appliedFilters.dateTo ? formatDate(appliedFilters.dateTo) : "", "historyFilterTo"]
+    ], "historyFilters");
     currentAudit = await (await ensureGateway()).listAudit(appliedFilters);
     renderHistory();
     setMessage(message, currentAudit.length ? "Consulta actualizada." : "");
@@ -933,6 +1073,7 @@ document.querySelector("#newCostButton").addEventListener("click", openNewCost);
 document.querySelector("#costForm").addEventListener("submit", saveCost);
 document.querySelector("#exportCostsButton").addEventListener("click", exportCosts);
 document.querySelector("#exportHistoryButton").addEventListener("click", exportHistory);
+document.querySelector("#exportDashboardButton").addEventListener("click", exportDashboard);
 document.querySelector("#detailEditProject").addEventListener("click", () => selectedProjectId && openEditProject(selectedProjectId));
 document.querySelector("#projectFilters").addEventListener("submit", (event) => { event.preventDefault(); loadProjects(); });
 document.querySelector("#clearProjectFilters").addEventListener("click", () => { document.querySelector("#projectFilters").reset(); loadProjects(); });
@@ -948,6 +1089,17 @@ document.querySelector("#activePeriodSelect").addEventListener("change", (event)
 });
 
 document.addEventListener("click", async (event) => {
+  const filterRemoval = event.target.closest("[data-filter-target]");
+  if (filterRemoval) {
+    const field = document.querySelector(`#${filterRemoval.dataset.filterTarget}`);
+    const form = document.querySelector(`#${filterRemoval.dataset.filterForm}`);
+    if (field && form) {
+      field.value = "";
+      form.requestSubmit();
+    }
+    return;
+  }
+
   const closeButton = event.target.closest("[data-close-dialog]");
   if (closeButton) document.querySelector(`#${closeButton.dataset.closeDialog}`).close();
 
