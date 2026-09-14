@@ -60,12 +60,20 @@ export class ProjectRepository {
       .select("*")
       .order("name");
 
-    if (filters.name) query = query.ilike("name", `%${String(filters.name).trim()}%`);
-    if (filters.costCenter) query = query.eq("cost_center", String(filters.costCenter).trim());
-    if (filters.municipality) {
-      query = query.eq("municipality", String(filters.municipality).trim());
+    if (filters.name) {
+      const term = String(filters.name).trim().replace(/[,%()]/g, "");
+      if (term) query = query.or(`name.ilike.%${term}%,client_name.ilike.%${term}%`);
     }
+    if (filters.costCenter) query = query.ilike("cost_center", `%${String(filters.costCenter).trim()}%`);
+    if (filters.municipality) query = query.ilike("municipality", `%${String(filters.municipality).trim()}%`);
     if (filters.status) query = query.eq("status", filters.status);
+    if (filters.serviceType) query = query.ilike("service_type", `%${String(filters.serviceType).trim()}%`);
+    if (filters.progressMin !== null && filters.progressMin !== undefined && filters.progressMin !== "") {
+      query = query.gte("financial_progress_percentage", Number(filters.progressMin));
+    }
+    if (filters.progressMax !== null && filters.progressMax !== undefined && filters.progressMax !== "") {
+      query = query.lte("financial_progress_percentage", Number(filters.progressMax));
+    }
 
     const rows = await unwrap(query, "No fue posible consultar los proyectos");
     return rows.map(normalizeProjectSummary);
