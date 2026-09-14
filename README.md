@@ -1,11 +1,27 @@
 # Control Solar Demo
 
-Demo pública anonimizada de una aplicación web para el seguimiento financiero de proyectos solares.
+Demostración pública y anonimizada de la versión 1.1.0 de una aplicación web para controlar proyectos, contratos, periodos, facturación, pagos, costos, gastos, seguimiento e informes gerenciales.
 
 ## Acceso
 
-Utiliza el botón **Entrar al prototipo**. Los nombres, municipios, proyectos y valores que aparecen son completamente demostrativos y no corresponden a información productiva.
+Utiliza el botón **Entrar al prototipo**. No se solicitan credenciales reales. Los nombres, municipios, proyectos, documentos y valores son completamente ficticios y no corresponden a información productiva.
 
-## Alcance
+## Módulos disponibles
 
-La demo permite visualizar el inicio de sesión, el tablero financiero, el listado de proyectos y la navegación principal. No está conectada a una base de datos productiva y no almacena credenciales.
+- Inicio e indicadores generales.
+- Proyectos y detalle financiero.
+- Gestión contractual.
+- Seguimiento mensual y periodos.
+- Facturación y pagos.
+- Costos y gastos.
+- Reportes gerenciales y exportación CSV.
+- Historial de cambios.
+- Administración demostrativa de perfiles.
+
+## Funcionamiento
+
+La demo conserva temporalmente los cambios en el almacenamiento del navegador y no se conecta a la base de datos productiva. Las validaciones financieras reproducen las reglas previstas: límites de contrato y factura, fechas coherentes con el periodo, identificadores únicos y protección de periodos cerrados.
+
+## Seguridad
+
+Este repositorio no contiene contraseñas, llaves privadas, credenciales de Supabase, archivos reales ni datos identificables. El código productivo y la configuración del entorno conectado permanecen privados.
