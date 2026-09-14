@@ -4,13 +4,16 @@ import {
   assertText,
   assertUuid,
   costExpenseInputToRecord,
+  monthlyTrackingInputToRecord,
+  normalizeAuditEvent,
   normalizeCostExpense,
   normalizeMonthlySummary,
+  normalizePeriod,
   normalizeProject,
   normalizeProjectSummary,
   projectInputToRecord,
   VALIDATION_STATUSES
-} from "./models.js?v=0.3.1";
+} from "./models.js?v=0.4.0";
 
 export class DataAccessError extends Error {
   constructor(message, cause = null) {
@@ -187,7 +190,7 @@ export class PeriodRepository {
   }
 
   async list() {
-    return unwrap(
+    const rows = await unwrap(
       this.client
         .from("periods")
         .select("*")
@@ -195,6 +198,7 @@ export class PeriodRepository {
         .order("month", { ascending: false }),
       "No fue posible consultar los periodos"
     );
+    return rows.map(normalizePeriod);
   }
 
   async find(year, month) {
@@ -207,11 +211,11 @@ export class PeriodRepository {
         .single(),
       "No fue posible consultar el periodo"
     );
-    return row;
+    return normalizePeriod(row);
   }
 
   async create(year, month) {
-    return unwrap(
+    const row = await unwrap(
       this.client
         .from("periods")
         .insert({ year: normalizeYear(year), month: normalizeMonth(month) })
@@ -219,13 +223,14 @@ export class PeriodRepository {
         .single(),
       "No fue posible crear el periodo"
     );
+    return normalizePeriod(row);
   }
 
   async close(periodId, userId) {
     const id = assertUuid(periodId, "periodo");
     const user = assertUuid(userId, "usuario");
 
-    return unwrap(
+    const row = await unwrap(
       this.client
         .from("periods")
         .update({ status: "cerrado", closed_at: new Date().toISOString(), closed_by: user })
@@ -234,12 +239,32 @@ export class PeriodRepository {
         .single(),
       "No fue posible cerrar el periodo"
     );
+    return normalizePeriod(row);
+  }
+
+  async reopen(periodId) {
+    const id = assertUuid(periodId, "periodo");
+    const row = await unwrap(
+      this.client.from("periods").update({ status: "abierto", closed_at: null, closed_by: null }).eq("id", id).select("*").single(),
+      "No fue posible reabrir el periodo"
+    );
+    return normalizePeriod(row);
   }
 }
 
 export class MonthlyTrackingRepository {
   constructor(client) {
     this.client = client;
+  }
+
+  async list(filters = {}) {
+    let query = this.client.from("monthly_project_summary").select("*")
+      .order("year", { ascending: false }).order("month", { ascending: false }).order("project_name");
+    if (filters.projectId) query = query.eq("project_id", assertUuid(filters.projectId, "proyecto"));
+    if (filters.periodId) query = query.eq("period_id", assertUuid(filters.periodId, "periodo"));
+    if (filters.validationStatus) query = query.eq("validation_status", assertEnum(filters.validationStatus, VALIDATION_STATUSES, "estado de validación"));
+    const rows = await unwrap(query, "No fue posible consultar los registros mensuales");
+    return rows.map(normalizeMonthlySummary);
   }
 
   async listByProject(projectId, filters = {}) {
@@ -260,21 +285,9 @@ export class MonthlyTrackingRepository {
 
   async save(input, userId) {
     const user = userId ? assertUuid(userId, "usuario") : null;
-    const projectId = assertUuid(input.projectId, "proyecto");
-    const periodId = assertUuid(input.periodId, "periodo");
-    const record = {
-      project_id: projectId,
-      contract_id: assertUuid(input.contractId, "contrato"),
-      period_id: periodId,
-      recognized_value: assertMoney(input.recognizedValue, "valor reconocido"),
-      observations: input.observations?.trim() || null,
-      validation_status: assertEnum(
-        input.validationStatus ?? "borrador",
-        VALIDATION_STATUSES,
-        "estado de validación"
-      ),
-      updated_by: user
-    };
+    const record = monthlyTrackingInputToRecord(input, user);
+    const projectId = record.project_id;
+    const periodId = record.period_id;
 
     const existing = await unwrap(
       this.client
@@ -326,6 +339,27 @@ export class MonthlyTrackingRepository {
         .single(),
       "No fue posible validar el seguimiento mensual"
     );
+  }
+}
+
+export class AuditRepository {
+  constructor(client) {
+    this.client = client;
+  }
+
+  async list(filters = {}) {
+    let query = this.client
+      .from("audit_log")
+      .select("id, table_name, record_id, action, changed_by, changed_at, old_data, new_data")
+      .order("changed_at", { ascending: false })
+      .limit(500);
+    if (filters.tableName) query = query.eq("table_name", assertText(filters.tableName, "tabla", { min: 2, max: 80 }));
+    if (filters.recordId) query = query.eq("record_id", assertUuid(filters.recordId, "registro"));
+    if (filters.action) query = query.eq("action", assertEnum(filters.action, ["INSERT", "UPDATE", "DELETE"], "acción"));
+    if (filters.dateFrom) query = query.gte("changed_at", `${filters.dateFrom}T00:00:00.000Z`);
+    if (filters.dateTo) query = query.lte("changed_at", `${filters.dateTo}T23:59:59.999Z`);
+    const rows = await unwrap(query, "No fue posible consultar el historial");
+    return rows.map(normalizeAuditEvent).filter((event) => !filters.projectId || event.projectId === filters.projectId);
   }
 }
 
