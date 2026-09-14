@@ -1,7 +1,7 @@
-import { dashboard as demoDashboard } from "./data/mock-data.js?v=0.5.0";
-import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=0.5.0";
-import { createApplicationDataGateway } from "./services/application-data.js?v=0.5.0";
-import { isDemoMode, signIn, signOut } from "./services/supabase.js?v=0.5.0";
+import { dashboard as demoDashboard } from "./data/mock-data.js?v=0.6.0";
+import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=0.6.0";
+import { createApplicationDataGateway } from "./services/application-data.js?v=0.6.0";
+import { isDemoMode, signIn, signOut } from "./services/supabase.js?v=0.6.0";
 
 const loginView = document.querySelector("#loginView");
 const appView = document.querySelector("#appView");
@@ -217,6 +217,69 @@ function renderChart() {
   canvas.dataset.ready = "true";
 }
 
+function normalizeSearch(value) {
+  return String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es").trim();
+}
+
+function closeGlobalSearch() {
+  const input = document.querySelector("#globalSearchInput");
+  const results = document.querySelector("#globalSearchResults");
+  results.hidden = true;
+  input.setAttribute("aria-expanded", "false");
+}
+
+function resetGlobalSearch() {
+  const input = document.querySelector("#globalSearchInput");
+  input.value = "";
+  document.querySelector("#clearGlobalSearch").hidden = true;
+  document.querySelector("#globalSearchResults").innerHTML = "";
+  closeGlobalSearch();
+}
+
+function renderGlobalSearch() {
+  const input = document.querySelector("#globalSearchInput");
+  const clearButton = document.querySelector("#clearGlobalSearch");
+  const results = document.querySelector("#globalSearchResults");
+  const term = normalizeSearch(input.value);
+  clearButton.hidden = !term;
+
+  if (!term) {
+    results.innerHTML = "";
+    closeGlobalSearch();
+    return;
+  }
+
+  const matches = currentProjects.filter((project) => normalizeSearch([
+    project.costCenter, project.projectName, project.municipality,
+    project.serviceType, project.contractNumber, project.status
+  ].join(" ")).includes(term)).slice(0, 8);
+
+  results.hidden = false;
+  input.setAttribute("aria-expanded", "true");
+  results.innerHTML = matches.length ? matches.map((project) => `
+    <button class="global-search-result" type="button" data-action="open-global-project" data-project-id="${project.projectId}">
+      <span><strong>${escapeHtml(project.projectName)}</strong><small>${escapeHtml(project.costCenter)} · ${escapeHtml(project.municipality)}</small></span>
+      <span class="status-badge ${escapeHtml(project.status)}">${escapeHtml(capitalize(project.status))}</span>
+    </button>`).join("") : `<div class="global-search-empty">No se encontraron proyectos para “${escapeHtml(input.value.trim())}”.</div>`;
+}
+
+function selectedOptionText(selector) {
+  const element = document.querySelector(selector);
+  if (!element?.value) return "";
+  return element.selectedOptions?.[0]?.textContent?.trim() ?? "";
+}
+
+function renderActiveFilters(selector, entries) {
+  const container = document.querySelector(selector);
+  const active = entries.filter(([, value]) => String(value ?? "").trim());
+  container.hidden = active.length === 0;
+  container.innerHTML = active.length
+    ? `<span class="active-filter-label">Filtros activos:</span>${active.map(([label, value]) =>
+        `<span class="active-filter-chip"><strong>${escapeHtml(label)}</strong> ${escapeHtml(value)}</span>`
+      ).join("")}`
+    : "";
+}
+
 function projectFilters() {
   return {
     name: document.querySelector("#projectFilterName").value,
@@ -244,6 +307,12 @@ function renderProjectOverview() {
 async function loadProjects(filters = projectFilters()) {
   const message = document.querySelector("#projectModuleMessage");
   renderProjectOverview();
+  renderActiveFilters("#projectActiveFilters", [
+    ["Proyecto o cliente:", filters.name],
+    ["Centro de costo:", filters.costCenter],
+    ["Municipio:", filters.municipality],
+    ["Estado:", filters.status ? capitalize(filters.status) : ""]
+  ]);
   setMessage(message, "Consultando proyectos…");
   try {
     const rows = await (await ensureGateway()).listProjects(filters);
@@ -453,15 +522,21 @@ function renderMonthly() {
   document.querySelector("#monthlyEmpty").hidden = currentMonthly.length > 0;
 }
 
-async function loadMonthlyModule(filters = monthlyFilters()) {
+async function loadMonthlyModule(filters) {
   const message = document.querySelector("#monthlyModuleMessage");
   setMessage(message, "Consultando seguimiento mensual…");
   try {
+    const appliedFilters = filters ?? monthlyFilters();
+    renderActiveFilters("#monthlyActiveFilters", [
+      ["Proyecto:", appliedFilters.projectId ? selectedOptionText("#monthlyFilterProject") : ""],
+      ["Periodo:", appliedFilters.periodId ? selectedOptionText("#monthlyFilterPeriod") : ""],
+      ["Validación:", appliedFilters.validationStatus ? selectedOptionText("#monthlyFilterStatus") : ""]
+    ]);
     const data = await ensureGateway();
-    const filtered = Object.values(filters).some(Boolean);
+    const filtered = Object.values(appliedFilters).some(Boolean);
     const [allRows, shownRows] = await Promise.all([
       data.listMonthlyTracking({}),
-      filtered ? data.listMonthlyTracking(filters) : data.listMonthlyTracking({})
+      filtered ? data.listMonthlyTracking(appliedFilters) : data.listMonthlyTracking({})
     ]);
     currentMonthly = shownRows;
     document.querySelector("#monthlyCount").textContent = allRows.length;
@@ -627,7 +702,16 @@ async function loadCosts(filters) {
   const message = document.querySelector("#costModuleMessage");
   setMessage(message, "Consultando movimientos…");
   try {
-    currentCosts = await (await ensureGateway()).listCostsExpenses(filters ?? costFilters());
+    const appliedFilters = filters ?? costFilters();
+    renderActiveFilters("#costActiveFilters", [
+      ["Proyecto:", appliedFilters.projectId ? selectedOptionText("#costFilterProject") : ""],
+      ["Periodo:", appliedFilters.periodId ? selectedOptionText("#costFilterPeriod") : ""],
+      ["Tipo:", appliedFilters.type ? capitalize(appliedFilters.type) : ""],
+      ["Categoría:", appliedFilters.category],
+      ["Desde:", appliedFilters.dateFrom ? formatDate(appliedFilters.dateFrom) : ""],
+      ["Hasta:", appliedFilters.dateTo ? formatDate(appliedFilters.dateTo) : ""]
+    ]);
+    currentCosts = await (await ensureGateway()).listCostsExpenses(appliedFilters);
     renderCosts();
     setMessage(message, currentCosts.length ? "Consulta actualizada." : "");
   } catch (error) {
@@ -749,11 +833,19 @@ function renderHistory() {
   document.querySelector("#historyEmpty").hidden = currentAudit.length > 0;
 }
 
-async function loadHistory(filters = historyFilters()) {
+async function loadHistory(filters) {
   const message = document.querySelector("#historyModuleMessage");
   setMessage(message, "Consultando historial…");
   try {
-    currentAudit = await (await ensureGateway()).listAudit(filters);
+    const appliedFilters = filters ?? historyFilters();
+    renderActiveFilters("#historyActiveFilters", [
+      ["Proyecto:", appliedFilters.projectId ? selectedOptionText("#historyFilterProject") : ""],
+      ["Módulo:", appliedFilters.tableName ? selectedOptionText("#historyFilterTable") : ""],
+      ["Acción:", appliedFilters.action ? selectedOptionText("#historyFilterAction") : ""],
+      ["Desde:", appliedFilters.dateFrom ? formatDate(appliedFilters.dateFrom) : ""],
+      ["Hasta:", appliedFilters.dateTo ? formatDate(appliedFilters.dateTo) : ""]
+    ]);
+    currentAudit = await (await ensureGateway()).listAudit(appliedFilters);
     renderHistory();
     setMessage(message, currentAudit.length ? "Consulta actualizada." : "");
   } catch (error) {
@@ -810,6 +902,24 @@ document.querySelector("#loginForm").addEventListener("submit", async (event) =>
   }
 });
 
+const globalSearchInput = document.querySelector("#globalSearchInput");
+globalSearchInput.addEventListener("input", renderGlobalSearch);
+globalSearchInput.addEventListener("focus", renderGlobalSearch);
+globalSearchInput.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    resetGlobalSearch();
+    return;
+  }
+  if (event.key === "Enter") {
+    event.preventDefault();
+    document.querySelector("#globalSearchResults [data-action='open-global-project']")?.click();
+  }
+});
+document.querySelector("#clearGlobalSearch").addEventListener("click", () => {
+  resetGlobalSearch();
+  globalSearchInput.focus();
+});
+
 document.querySelector("#demoAccess").hidden = !isDemoMode();
 document.querySelector("#demoAccess").addEventListener("click", openApp);
 document.querySelector("#logoutButton").addEventListener("click", async () => { await signOut(); closeApp(); });
@@ -851,6 +961,13 @@ document.addEventListener("click", async (event) => {
   }
 
   const action = event.target.closest("[data-action]");
+  if (action?.dataset.action === "open-global-project") {
+    const projectId = action.dataset.projectId;
+    resetGlobalSearch();
+    await openProjectDetail(projectId);
+    return;
+  }
+  if (!event.target.closest(".global-search")) closeGlobalSearch();
   if (action?.dataset.action === "open-project") await openProjectDetail(action.dataset.projectId);
   if (action?.dataset.action === "edit-project") await openEditProject(action.dataset.projectId);
   if (action?.dataset.action === "delete-project") await deleteProject(action.dataset.projectId);
