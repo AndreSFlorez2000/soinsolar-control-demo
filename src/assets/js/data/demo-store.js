@@ -1,13 +1,18 @@
 import {
   assertUuid,
   costExpenseInputToRecord,
+  monthlyTrackingInputToRecord,
+  normalizeAuditEvent,
   normalizeCostExpense,
+  normalizeMonthlySummary,
+  normalizePeriod,
   normalizeProject,
   normalizeProjectSummary,
+  periodInputToRecord,
   projectInputToRecord
-} from "./models.js?v=0.3.1";
+} from "./models.js?v=0.4.0";
 
-const STORAGE_KEY = "soinsolar-control-demo-v2";
+const STORAGE_KEY = "soinsolar-control-demo-v3";
 
 const initialState = Object.freeze({
   projects: [
@@ -67,8 +72,50 @@ const initialState = Object.freeze({
     }
   ],
   periods: [
-    { id: "30000000-0000-4000-8000-000000000001", year: 2026, month: 8, status: "cerrado" },
-    { id: "30000000-0000-4000-8000-000000000002", year: 2026, month: 9, status: "abierto" }
+    { id: "30000000-0000-4000-8000-000000000001", year: 2026, month: 8, status: "cerrado", closed_at: "2026-09-03T14:00:00Z", closed_by: "80000000-0000-4000-8000-000000000001", created_at: "2026-08-01T12:00:00Z" },
+    { id: "30000000-0000-4000-8000-000000000002", year: 2026, month: 9, status: "abierto", closed_at: null, closed_by: null, created_at: "2026-09-01T12:00:00Z" }
+  ],
+  monthlyTracking: [
+    {
+      id: "50000000-0000-4000-8000-000000000001",
+      project_id: "10000000-0000-4000-8000-000000000001",
+      contract_id: "20000000-0000-4000-8000-000000000001",
+      period_id: "30000000-0000-4000-8000-000000000001",
+      recognized_value: 1800000000, invoiced_value: 1800000000, paid_value: 1600000000,
+      costs_expenses_value: 1200000000, observations: "Cierre demostrativo de agosto.",
+      validation_status: "validado", validated_at: "2026-09-03T13:30:00Z",
+      created_at: "2026-08-31T18:00:00Z", updated_at: "2026-09-03T13:30:00Z"
+    },
+    {
+      id: "50000000-0000-4000-8000-000000000002",
+      project_id: "10000000-0000-4000-8000-000000000001",
+      contract_id: "20000000-0000-4000-8000-000000000001",
+      period_id: "30000000-0000-4000-8000-000000000002",
+      recognized_value: 337500000, invoiced_value: 337500000, paid_value: 240000000,
+      costs_expenses_value: 363000000, observations: "Seguimiento de septiembre listo para validación.",
+      validation_status: "pendiente", validated_at: null,
+      created_at: "2026-09-12T16:00:00Z", updated_at: "2026-09-12T16:00:00Z"
+    },
+    {
+      id: "50000000-0000-4000-8000-000000000003",
+      project_id: "10000000-0000-4000-8000-000000000002",
+      contract_id: "20000000-0000-4000-8000-000000000002",
+      period_id: "30000000-0000-4000-8000-000000000002",
+      recognized_value: 840000000, invoiced_value: 840000000, paid_value: 740000000,
+      costs_expenses_value: 1100000000, observations: "Seguimiento en revisión.",
+      validation_status: "pendiente", validated_at: null,
+      created_at: "2026-09-12T17:00:00Z", updated_at: "2026-09-12T17:00:00Z"
+    },
+    {
+      id: "50000000-0000-4000-8000-000000000004",
+      project_id: "10000000-0000-4000-8000-000000000003",
+      contract_id: "20000000-0000-4000-8000-000000000003",
+      period_id: "30000000-0000-4000-8000-000000000002",
+      recognized_value: 1660000000, invoiced_value: 1660000000, paid_value: 1440000000,
+      costs_expenses_value: 1183000000, observations: "Datos mensuales registrados.",
+      validation_status: "borrador", validated_at: null,
+      created_at: "2026-09-13T14:00:00Z", updated_at: "2026-09-13T14:00:00Z"
+    }
   ],
   costsExpenses: [
     {
@@ -127,6 +174,29 @@ const initialState = Object.freeze({
       support_path: null,
       created_at: "2026-09-18T14:00:00Z"
     }
+  ],
+  auditLog: [
+    {
+      id: "1", table_name: "periods",
+      record_id: "30000000-0000-4000-8000-000000000001", action: "UPDATE",
+      changed_by: "80000000-0000-4000-8000-000000000001", changed_at: "2026-09-03T14:00:00Z",
+      old_data: { id: "30000000-0000-4000-8000-000000000001", year: 2026, month: 8, status: "abierto" },
+      new_data: { id: "30000000-0000-4000-8000-000000000001", year: 2026, month: 8, status: "cerrado" }
+    },
+    {
+      id: "2", table_name: "monthly_tracking",
+      record_id: "50000000-0000-4000-8000-000000000001", action: "UPDATE",
+      changed_by: "80000000-0000-4000-8000-000000000001", changed_at: "2026-09-03T13:30:00Z",
+      old_data: { id: "50000000-0000-4000-8000-000000000001", project_id: "10000000-0000-4000-8000-000000000001", validation_status: "pendiente" },
+      new_data: { id: "50000000-0000-4000-8000-000000000001", project_id: "10000000-0000-4000-8000-000000000001", validation_status: "validado" }
+    },
+    {
+      id: "3", table_name: "costs_expenses",
+      record_id: "70000000-0000-4000-8000-000000000004", action: "INSERT",
+      changed_by: "80000000-0000-4000-8000-000000000001", changed_at: "2026-09-18T14:00:00Z",
+      old_data: null,
+      new_data: { id: "70000000-0000-4000-8000-000000000004", project_id: "10000000-0000-4000-8000-000000000003", movement_type: "costo", amount: 1183000000 }
+    }
   ]
 });
 
@@ -155,7 +225,7 @@ function readState(storage) {
   if (!storage) return clone(initialState);
   try {
     const stored = JSON.parse(storage.getItem(STORAGE_KEY));
-    if (stored?.projects && stored?.periods && stored?.costsExpenses) return stored;
+    if (stored?.projects && stored?.periods && stored?.costsExpenses && stored?.monthlyTracking && stored?.auditLog) return stored;
   } catch {
     // Si el almacenamiento fue alterado, se recupera la demostración inicial.
   }
@@ -176,6 +246,31 @@ function decorateCost(record, state) {
   };
 }
 
+function decorateMonthly(record, state) {
+  const project = state.projects.find((item) => item.id === record.project_id);
+  const period = state.periods.find((item) => item.id === record.period_id);
+  const previous = state.monthlyTracking
+    .filter((item) => item.project_id === record.project_id)
+    .filter((item) => {
+      const itemPeriod = state.periods.find((candidate) => candidate.id === item.period_id);
+      if (!itemPeriod || !period) return false;
+      return itemPeriod.year < period.year || (itemPeriod.year === period.year && itemPeriod.month <= period.month);
+    });
+  const cumulativeInvoiced = previous.reduce((sum, item) => sum + Number(item.invoiced_value ?? 0), 0);
+  return {
+    ...record,
+    tracking_id: record.id,
+    cost_center: project?.cost_center ?? "",
+    project_name: project?.name ?? "",
+    year: period?.year, month: period?.month, period_status: period?.status,
+    contract_value: Number(project?.contract_value ?? 0),
+    costs_expenses_value: state.costsExpenses
+      .filter((item) => item.project_id === record.project_id && item.period_id === record.period_id)
+      .reduce((sum, item) => sum + Number(item.amount), 0),
+    cumulative_invoiced_value: cumulativeInvoiced
+  };
+}
+
 function projectSummary(record, state) {
   const totalCostsExpenses = state.costsExpenses
     .filter((item) => item.project_id === record.id)
@@ -192,6 +287,17 @@ export function createDemoStore({ storage = defaultStorage() } = {}) {
 
   function persist() {
     if (storage) storage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  function recordAudit(tableName, recordId, action, oldData, newData) {
+    const nextId = state.auditLog.reduce((max, item) => Math.max(max, Number(item.id) || 0), 0) + 1;
+    state.auditLog.push({
+      id: String(nextId), table_name: tableName, record_id: recordId, action,
+      changed_by: "80000000-0000-4000-8000-000000000001",
+      changed_at: new Date().toISOString(),
+      old_data: oldData ? clone(oldData) : null,
+      new_data: newData ? clone(newData) : null
+    });
   }
 
   return Object.freeze({
@@ -247,6 +353,7 @@ export function createDemoStore({ storage = defaultStorage() } = {}) {
         created_at: new Date().toISOString()
       };
       state.projects.push(created);
+      recordAudit("projects", created.id, "INSERT", null, created);
       persist();
       return normalizeProject(created);
     },
@@ -261,7 +368,9 @@ export function createDemoStore({ storage = defaultStorage() } = {}) {
       );
       if (duplicate) throw new Error("Ya existe otro proyecto con ese centro de costo.");
 
+      const previous = clone(state.projects[index]);
       state.projects[index] = { ...state.projects[index], ...record, updated_at: new Date().toISOString() };
+      recordAudit("projects", id, "UPDATE", previous, state.projects[index]);
       persist();
       return normalizeProject(state.projects[index]);
     },
@@ -277,11 +386,105 @@ export function createDemoStore({ storage = defaultStorage() } = {}) {
         throw new Error("No se puede eliminar un proyecto con movimientos. Cambia su estado para conservar el histórico.");
       }
       state.projects = state.projects.filter((item) => item.id !== id);
+      recordAudit("projects", id, "DELETE", project, null);
       persist();
     },
 
     async listPeriods() {
-      return clone(state.periods).sort((left, right) => right.year - left.year || right.month - left.month);
+      return clone(state.periods)
+        .sort((left, right) => right.year - left.year || right.month - left.month)
+        .map(normalizePeriod);
+    },
+
+    async createPeriod(input) {
+      const record = periodInputToRecord(input);
+      if (state.periods.some((item) => item.year === record.year && item.month === record.month)) throw new Error("El periodo seleccionado ya existe.");
+      if (state.periods.some((item) => item.status === "abierto")) throw new Error("Cierra el periodo activo antes de abrir uno nuevo.");
+      const created = { id: createUuid(), ...record, closed_at: null, closed_by: null, created_at: new Date().toISOString() };
+      state.periods.push(created); recordAudit("periods", created.id, "INSERT", null, created); persist();
+      return normalizePeriod(created);
+    },
+
+    async closePeriod(periodId) {
+      const id = assertUuid(periodId, "periodo");
+      const period = state.periods.find((item) => item.id === id);
+      if (!period) throw new Error("El periodo solicitado no existe.");
+      if (period.status === "cerrado") throw new Error("El periodo ya está cerrado.");
+      const projectsWithActivity = new Set([
+        ...state.monthlyTracking.filter((item) => item.period_id === id).map((item) => item.project_id),
+        ...state.costsExpenses.filter((item) => item.period_id === id).map((item) => item.project_id)
+      ]);
+      const incomplete = [...projectsWithActivity].filter((projectId) => !state.monthlyTracking.some(
+        (item) => item.period_id === id && item.project_id === projectId && item.validation_status === "validado"
+      ));
+      if (incomplete.length) throw new Error(`No se puede cerrar: ${incomplete.length} proyecto(s) con actividad no tienen seguimiento validado.`);
+      const previous = clone(period);
+      period.status = "cerrado"; period.closed_at = new Date().toISOString();
+      period.closed_by = "80000000-0000-4000-8000-000000000001";
+      recordAudit("periods", id, "UPDATE", previous, period); persist();
+      return normalizePeriod(period);
+    },
+
+    async reopenPeriod(periodId) {
+      const id = assertUuid(periodId, "periodo");
+      const period = state.periods.find((item) => item.id === id);
+      if (!period) throw new Error("El periodo solicitado no existe.");
+      if (period.status === "abierto") throw new Error("El periodo ya está abierto.");
+      if (state.periods.some((item) => item.id !== id && item.status === "abierto")) throw new Error("Cierra el periodo activo antes de reabrir otro.");
+      const previous = clone(period);
+      period.status = "abierto"; period.closed_at = null; period.closed_by = null;
+      recordAudit("periods", id, "UPDATE", previous, period); persist();
+      return normalizePeriod(period);
+    },
+
+    async listMonthlyTracking(filters = {}) {
+      return state.monthlyTracking
+        .map((item) => normalizeMonthlySummary(decorateMonthly(item, state)))
+        .filter((item) => !filters.projectId || item.projectId === filters.projectId)
+        .filter((item) => !filters.periodId || item.periodId === filters.periodId)
+        .filter((item) => !filters.validationStatus || item.validationStatus === filters.validationStatus)
+        .sort((left, right) => right.year - left.year || right.month - left.month || left.projectName.localeCompare(right.projectName, "es"));
+    },
+
+    async saveMonthlyTracking(input) {
+      const record = monthlyTrackingInputToRecord(input, null);
+      if (record.validation_status === "validado") throw new Error("Guarda el registro como borrador o pendiente y utiliza la acción Validar.");
+      const project = state.projects.find((item) => item.id === record.project_id);
+      const period = state.periods.find((item) => item.id === record.period_id);
+      if (!project) throw new Error("Selecciona un proyecto existente.");
+      if (!project.contract_id || project.contract_id !== record.contract_id) throw new Error("El proyecto no tiene un contrato vigente asociado.");
+      if (!period) throw new Error("Selecciona un periodo existente.");
+      if (period.status !== "abierto") throw new Error("El periodo está cerrado y no admite registros mensuales.");
+      const existingIndex = state.monthlyTracking.findIndex((item) => item.project_id === record.project_id && item.period_id === record.period_id);
+      const accumulatedOther = state.monthlyTracking
+        .filter((item, index) => index !== existingIndex && item.contract_id === record.contract_id)
+        .reduce((sum, item) => sum + Number(item.recognized_value), 0);
+      if (accumulatedOther + record.recognized_value > Number(project.contract_value)) throw new Error("El avance reconocido acumulado supera el valor contractual vigente.");
+      if (existingIndex >= 0) {
+        const previous = clone(state.monthlyTracking[existingIndex]);
+        state.monthlyTracking[existingIndex] = { ...state.monthlyTracking[existingIndex], ...record, validated_at: null, updated_at: new Date().toISOString() };
+        recordAudit("monthly_tracking", previous.id, "UPDATE", previous, state.monthlyTracking[existingIndex]); persist();
+        return normalizeMonthlySummary(decorateMonthly(state.monthlyTracking[existingIndex], state));
+      }
+      const created = {
+        id: createUuid(), ...record, invoiced_value: 0, paid_value: 0,
+        costs_expenses_value: state.costsExpenses.filter((item) => item.project_id === record.project_id && item.period_id === record.period_id).reduce((sum, item) => sum + Number(item.amount), 0),
+        validated_at: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString()
+      };
+      state.monthlyTracking.push(created); recordAudit("monthly_tracking", created.id, "INSERT", null, created); persist();
+      return normalizeMonthlySummary(decorateMonthly(created, state));
+    },
+
+    async validateMonthlyTracking(trackingId) {
+      const id = assertUuid(trackingId, "seguimiento");
+      const record = state.monthlyTracking.find((item) => item.id === id);
+      if (!record) throw new Error("El seguimiento solicitado no existe.");
+      const period = state.periods.find((item) => item.id === record.period_id);
+      if (period?.status !== "abierto") throw new Error("Un periodo cerrado no admite nuevas validaciones.");
+      const previous = clone(record);
+      record.validation_status = "validado"; record.validated_at = new Date().toISOString(); record.updated_at = record.validated_at;
+      recordAudit("monthly_tracking", id, "UPDATE", previous, record); persist();
+      return normalizeMonthlySummary(decorateMonthly(record, state));
     },
 
     async listCostsExpenses(filters = {}) {
@@ -313,8 +516,21 @@ export function createDemoStore({ storage = defaultStorage() } = {}) {
 
       const created = { id: createUuid(), ...record, created_at: new Date().toISOString() };
       state.costsExpenses.push(created);
+      recordAudit("costs_expenses", created.id, "INSERT", null, created);
       persist();
       return normalizeCostExpense(decorateCost(created, state));
+    },
+
+    async listAudit(filters = {}) {
+      const dateFrom = filters.dateFrom ? `${filters.dateFrom}T00:00:00.000Z` : null;
+      const dateTo = filters.dateTo ? `${filters.dateTo}T23:59:59.999Z` : null;
+      return state.auditLog.map(normalizeAuditEvent)
+        .filter((event) => !filters.projectId || event.projectId === filters.projectId)
+        .filter((event) => !filters.tableName || event.tableName === filters.tableName)
+        .filter((event) => !filters.action || event.action === filters.action)
+        .filter((event) => !dateFrom || event.changedAt >= dateFrom)
+        .filter((event) => !dateTo || event.changedAt <= dateTo)
+        .sort((left, right) => right.changedAt.localeCompare(left.changedAt));
     },
 
     reset() {
