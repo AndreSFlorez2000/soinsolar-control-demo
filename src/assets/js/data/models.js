@@ -129,6 +129,7 @@ export function normalizeProjectSummary(record) {
     projectId: assertUuid(record.id),
     costCenter: String(record.cost_center),
     projectName: String(record.name),
+    clientName: record.client_name || null,
     municipality: String(record.municipality),
     serviceType: String(record.service_type),
     status: String(record.status),
