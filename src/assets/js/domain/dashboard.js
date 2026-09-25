@@ -17,7 +17,6 @@ export function calculateDashboardIndicators(projects = []) {
     paymentPending: 0,
     financialProgress: 0,
     executionProgress: 0,
-    executedValue: 0,
     profitability: 0,
     profitabilityPercentage: 0,
     costRatio: 0,
@@ -42,7 +41,6 @@ export function calculateDashboardIndicators(projects = []) {
     indicators.invoiced += amount(project.totalInvoiced);
     indicators.paid += amount(project.totalPaid);
     indicators.costsExpenses += amount(project.totalCostsExpenses);
-    indicators.executedValue += amount(project.executedValue);
     indicators.contractualBalance += amount(project.contractualBalance);
     indicators.paymentPending += amount(project.paymentPending);
   }
@@ -50,10 +48,11 @@ export function calculateDashboardIndicators(projects = []) {
   indicators.financialProgress = indicators.contractValue > 0
     ? (indicators.invoiced / indicators.contractValue) * 100
     : 0;
-  indicators.executionProgress = topLevelFinancialRows(projects)
-    .some((project) => amount(project.contractValue) > 0 && project.executedValue === null)
-    ? null : indicators.contractValue > 0
-      ? (indicators.executedValue / indicators.contractValue) * 100 : 0;
+  const recorded = projects
+    .map((project) => project.executedProgressPercentage)
+    .filter((value) => value !== null && value !== undefined && Number.isFinite(Number(value)));
+  indicators.executionProgress = recorded.length
+    ? recorded.reduce((sum, value) => sum + Number(value), 0) / recorded.length : null;
   indicators.profitability = indicators.contractValue - indicators.costsExpenses;
   indicators.profitabilityPercentage = indicators.contractValue > 0
     ? (indicators.profitability / indicators.contractValue) * 100

@@ -26,24 +26,13 @@ export function consolidateCostCenters(projects = []) {
     const invoiced = amount(project.totalInvoiced) + descendants.reduce((sum, row) => sum + row.totalInvoiced, 0);
     const paid = amount(project.totalPaid) + descendants.reduce((sum, row) => sum + row.totalPaid, 0);
     const costs = amount(project.totalCostsExpenses) + descendants.reduce((sum, row) => sum + row.totalCostsExpenses, 0);
-    // Si el centro tiene contrato propio, su porcentaje manual ya cubre ese
-    // contrato. Sumar la ejecución de los hijos duplicaría el avance.
-    const executed = amount(project.contractValue) > 0
-      ? project.executedValue ?? null
-      : descendants.some((row) => row.contractValue > 0 && row.executedValue === null)
-        ? null
-        : descendants.length
-          ? descendants.reduce((sum, row) => sum + amount(row.executedValue), 0)
-          : null;
     const result = Object.freeze({
       ...project,
       contractValue,
       totalInvoiced: invoiced,
       totalPaid: paid,
       totalCostsExpenses: costs,
-      executedValue: executed,
-      executedProgressPercentage: contractValue > 0 && executed !== null
-        ? executed / contractValue * 100 : null,
+      executedProgressPercentage: project.executedProgressPercentage ?? null,
       financialProgressPercentage: contractValue > 0 ? invoiced / contractValue * 100 : 0,
       contractualBalance: Math.max(contractValue - invoiced, 0),
       paymentPending: Math.max(invoiced - paid, 0),

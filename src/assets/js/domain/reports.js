@@ -15,10 +15,8 @@ export function buildManagementReport(projects = []) {
     const invoiced = amount(project.totalInvoiced);
     const paid = amount(project.totalPaid);
     const costsExpenses = amount(project.totalCostsExpenses);
-    const executionProgress = project.executedProgressPercentage === null
+    const executionProgress = project.executedProgressPercentage === null || project.executedProgressPercentage === undefined
       ? null : Number(project.executedProgressPercentage ?? 0);
-    const executedValue = project.executedValue === null
-      ? null : amount(project.executedValue ?? (contractValue * executionProgress / 100));
     const profitability = contractValue - costsExpenses;
     return Object.freeze({
       projectId: String(project.projectId ?? ""),
@@ -36,7 +34,6 @@ export function buildManagementReport(projects = []) {
       paymentPending: Math.max(invoiced - paid, 0),
       financialProgress: percentage(invoiced, contractValue),
       executionProgress,
-      executedValue,
       profitability,
       profitabilityPercentage: percentage(profitability, contractValue),
       collectionRate: percentage(paid, invoiced),
@@ -54,7 +51,6 @@ export function buildManagementReport(projects = []) {
     result.contractualBalance += row.contractualBalance;
     result.paymentPending += row.paymentPending;
     result.billingCostDifference += row.billingCostDifference;
-    result.executedValue += amount(row.executedValue);
     result.profitability += row.profitability;
     return result;
   }, {
@@ -66,13 +62,13 @@ export function buildManagementReport(projects = []) {
     contractualBalance: 0,
     paymentPending: 0,
     billingCostDifference: 0,
-    executedValue: 0,
     profitability: 0
   });
 
   totals.financialProgress = percentage(totals.invoiced, totals.contractValue);
-  totals.executionProgress = totalRows.some((row) => row.contractValue > 0 && row.executionProgress === null)
-    ? null : percentage(totals.executedValue, totals.contractValue);
+  const recorded = rows.filter((row) => row.executionProgress !== null && Number.isFinite(row.executionProgress));
+  totals.executionProgress = recorded.length
+    ? recorded.reduce((sum, row) => sum + row.executionProgress, 0) / recorded.length : null;
   totals.profitabilityPercentage = percentage(totals.profitability, totals.contractValue);
   totals.collectionRate = percentage(totals.paid, totals.invoiced);
   totals.costRate = percentage(totals.costsExpenses, totals.contractValue);

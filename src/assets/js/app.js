@@ -1,9 +1,9 @@
-import { buildMonthlySeries, calculateDashboardIndicators } from "./domain/dashboard.js?v=1.3.1";
-import { calculateProjectIndicators } from "./domain/project-analytics.js?v=1.1.0";
-import { buildManagementReport } from "./domain/reports.js?v=1.3.1";
+import { buildMonthlySeries, calculateDashboardIndicators } from "./domain/dashboard.js?v=1.4.1";
+import { calculateProjectIndicators } from "./domain/project-analytics.js?v=1.4.1";
+import { buildManagementReport } from "./domain/reports.js?v=1.4.1";
 import { canEditExecution } from "./domain/execution.js?v=1.3.0";
 import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=1.1.0";
-import { createApplicationDataGateway } from "./services/application-data.js?v=1.4.0";
+import { createApplicationDataGateway } from "./services/application-data.js?v=1.4.1";
 import { getCurrentSession, isDemoMode, registerAccount, signIn, signOut } from "./services/supabase.js?v=1.4.0";
 
 const loginView = document.querySelector("#loginView");
@@ -56,7 +56,7 @@ const tableLabels = {
 const actionLabels = { INSERT: "Creación", UPDATE: "Modificación", DELETE: "Eliminación" };
 const fieldLabels = {
   cost_center: "centro de costo", name: "nombre", status: "estado",
-  contract_value: "valor contractual", recognized_value: "valor reconocido",
+  contract_value: "valor contractual",
   executed_cumulative_percentage: "avance de ejecución",
   invoiced_value: "valor facturado", paid_value: "valor pagado",
   validation_status: "estado de validación", amount: "valor",
@@ -208,7 +208,7 @@ async function loadReferenceData() {
   const mayEdit = canEditExecution(currentUserProfile);
   document.querySelector("#newMonthlyButton").disabled = !mayEdit;
   document.querySelector("#newMonthlyButton").title = mayEdit ? "" : "Solo el administrador puede registrar el avance de ejecución.";
-  document.querySelector("#monthlyRecognizedValue").disabled = !mayEdit;
+  document.querySelector("#monthlyExecutionPercentage").disabled = !mayEdit;
   document.querySelector("#reportProgressValue").disabled = !mayEdit;
 }
 
@@ -484,7 +484,7 @@ function exportDashboard() {
     ["Costos y gastos", indicators.costsExpenses],
     ["Saldo contractual", indicators.contractualBalance],
     ["Pago pendiente", indicators.paymentPending],
-    ["Avance de ejecución global (%)", indicators.executionProgress ?? ""],
+    ["Promedio de avance de proyectos (%)", indicators.executionProgress ?? ""],
     ["Avance financiero global (%)", indicators.financialProgress],
     ["Relación costos / contrato (%)", indicators.costRatio]
   ];
@@ -925,7 +925,7 @@ function populateProjectOptions() {
     setSelectOptions(select, '<option value="">Todos</option>', options, select.value);
   });
   setSelectOptions(document.querySelector("#costProject"), '<option value="">Selecciona un proyecto</option>', options);
-  setSelectOptions(document.querySelector("#monthlyProject"), '<option value="">Selecciona un proyecto con contrato</option>', contractOptions);
+  setSelectOptions(document.querySelector("#monthlyProject"), '<option value="">Selecciona un proyecto</option>', options);
   setSelectOptions(document.querySelector("#invoiceProject"), '<option value="">Selecciona un proyecto con contrato</option>', contractOptions);
 }
 
@@ -947,7 +947,8 @@ function populatePeriodOptions() {
 
   const activePeriod = currentPeriods.find((period) => period.status === "abierto") ?? currentPeriods[0];
   const activeSelect = document.querySelector("#activePeriodSelect");
-  setSelectOptions(activeSelect, "", allOptions, activePeriod?.id ?? "");
+  setSelectOptions(activeSelect, '<option value="" disabled>Sin periodos registrados</option>', allOptions, activePeriod?.id ?? "");
+  activeSelect.disabled = currentPeriods.length === 0;
   if (activePeriod) {
     document.querySelector(".period-card strong").textContent = periodLabel(activePeriod).replace(" · Cerrado", "");
     document.querySelector(".period-card span").innerHTML = activePeriod.status === "abierto"
@@ -1113,7 +1114,7 @@ function openEditMonthly(trackingId) {
   document.querySelector("#monthlyProject").value = tracking.projectId;
   document.querySelector("#monthlyPeriod").value = tracking.periodId;
   document.querySelector("#monthlyValidationStatus").value = tracking.validationStatus === "validado" ? "pendiente" : tracking.validationStatus;
-  document.querySelector("#monthlyRecognizedValue").value = tracking.executedCumulativePercentage;
+  document.querySelector("#monthlyExecutionPercentage").value = tracking.executedCumulativePercentage;
   document.querySelector("#monthlyObservations").value = tracking.observations || "";
   document.querySelector("#monthlyDialogTitle").textContent = "Editar seguimiento";
   setMessage(document.querySelector("#monthlyFormMessage"));
@@ -1127,7 +1128,7 @@ function readMonthlyForm() {
     projectId,
     contractId: project?.contractId ?? "",
     periodId: document.querySelector("#monthlyPeriod").value,
-    executedCumulativePercentage: document.querySelector("#monthlyRecognizedValue").value,
+    executedCumulativePercentage: document.querySelector("#monthlyExecutionPercentage").value,
     validationStatus: document.querySelector("#monthlyValidationStatus").value,
     observations: document.querySelector("#monthlyObservations").value
   };
@@ -1506,7 +1507,7 @@ function renderReports() {
   document.querySelector("#reportPending").textContent = formatCop(totals.paymentPending);
   document.querySelector("#reportProfitability").textContent = formatCop(totals.profitability);
   document.querySelector("#reportExecution").textContent = formatExecutionPercent(totals.executionProgress);
-  document.querySelector("#reportResultCount").textContent = `${totals.projectCount} proyecto(s) · avance de ejecución ${formatExecutionPercent(totals.executionProgress)} · avance financiero ${formatPercent(totals.financialProgress)}`;
+  document.querySelector("#reportResultCount").textContent = `${totals.projectCount} proyecto(s) · promedio avance físico ${formatExecutionPercent(totals.executionProgress)} · avance financiero ${formatPercent(totals.financialProgress)}`;
   document.querySelector("#reportRows").innerHTML = currentReport.rows.map((row) => `<tr>
     <td>${escapeHtml(row.costCenter)}</td><td>${escapeHtml(row.parentCostCenter || "—")}</td><td><strong>${escapeHtml(row.projectName)}</strong><br><small>${escapeHtml(row.municipality)}</small></td>
     <td>${formatCop(row.contractValue)}</td><td>${formatExecutionPercent(row.executionProgress)}</td><td>${formatCop(row.invoiced)}</td><td>${formatCop(row.paid)}</td>
@@ -1530,7 +1531,6 @@ function openReportProgressEditor(projectId) {
   const project = currentProjects.find((item) => item.projectId === projectId);
   const period = currentPeriods.find((item) => item.status === "abierto");
   if (!project) return setMessage(message, "No se encontró el proyecto seleccionado.", true);
-  if (!project.contractId) return setMessage(message, "Asocia primero un contrato a este proyecto para registrar su avance de ejecución.", true);
   if (!period) return setMessage(message, "Abre un periodo en Seguimiento mensual para actualizar el avance de ejecución.", true);
 
   const existing = reportTracking(projectId, period.id);
@@ -1544,10 +1544,7 @@ function openReportProgressEditor(projectId) {
   document.querySelector("#reportProgressContext").textContent = `${project.projectName} · ${periodLabel(period)}`;
   document.querySelector("#reportProgressValue").value = existing?.executedCumulativePercentage ?? latest?.executedCumulativePercentage ?? "";
   document.querySelector("#reportFinancialValue").value = formatPercent(project.financialProgressPercentage);
-  const hasChildren = currentProjects.some((item) => item.parentProjectId === projectId);
-  const detail = hasChildren
-    ? "Registra el avance de ejecución de este proyecto. Si tiene contrato propio, ese porcentaje se muestra para el centro principal; la facturación y los costos de los hijos se consolidan. El avance financiero se calcula con la facturación."
-    : "El administrador registra el avance de ejecución. El financiero cambia únicamente con la facturación.";
+  const detail = "Registra el estado del trabajo realizado. El porcentaje no depende del contrato, las facturas ni los pagos; no modifica ninguna cifra financiera.";
   document.querySelector("#reportProgressNote").textContent = existing?.validationStatus === "validado"
     ? `${detail} Al guardar, el seguimiento volverá a estar pendiente de validación.`
     : detail;
@@ -1600,11 +1597,11 @@ async function saveReportProgress(event) {
 }
 
 function exportManagementReport() {
-  const headers = ["Centro de costo", "Centro principal", "Proyecto", "Municipio", "Estado", "Contrato vigente", "Avance de ejecución %", "Valor de ejecución", "Facturado", "Avance financiero %", "Pagado", "Costos y gastos", "Rentabilidad", "Rentabilidad %", "Saldo contractual", "Cartera", "Cobro %", "Costos/contrato %", "Diferencia facturación-costos"];
+  const headers = ["Centro de costo", "Centro principal", "Proyecto", "Municipio", "Estado", "Contrato vigente", "Avance de ejecución %", "Facturado", "Avance financiero %", "Pagado", "Costos y gastos", "Rentabilidad", "Rentabilidad %", "Saldo contractual", "Cartera", "Cobro %", "Costos/contrato %", "Diferencia facturación-costos"];
   const quote = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
   const rows = currentReport.rows.map((row) => [
     row.costCenter, row.parentCostCenter, row.projectName, row.municipality, row.status, row.contractValue,
-    row.executionProgress, row.executedValue, row.invoiced, row.financialProgress, row.paid, row.costsExpenses,
+    row.executionProgress, row.invoiced, row.financialProgress, row.paid, row.costsExpenses,
     row.profitability, row.profitabilityPercentage, row.contractualBalance, row.paymentPending,
     row.collectionRate, row.costRate, row.billingCostDifference
   ].map(quote).join(","));
@@ -1692,6 +1689,7 @@ function projectNameForEvent(event) {
 function changedFields(event) {
   if (event.action !== "UPDATE") return [];
   const ignored = new Set(["id", "created_at", "updated_at", "updated_by", "created_by"]);
+  if (event.tableName === "monthly_tracking") ignored.add("recognized_value");
   const keys = new Set([...Object.keys(event.oldData ?? {}), ...Object.keys(event.newData ?? {})]);
   return [...keys].filter((key) => !ignored.has(key) && JSON.stringify(event.oldData?.[key]) !== JSON.stringify(event.newData?.[key]));
 }
@@ -1743,6 +1741,8 @@ function openHistoryDetail(historyId) {
       <div><span>Acción</span><strong>${escapeHtml(actionLabels[event.action] ?? event.action)}</strong></div>
     </div>
     <p>${escapeHtml(auditSummary(event))}</p>
+    ${event.tableName === "monthly_tracking"
+      ? '<p class="dialog-note">El campo técnico histórico recognized_value no representa avance físico y no participa en los cálculos financieros.</p>' : ""}
     <div class="history-json-grid">
       <section><h4>Antes</h4><pre>${escapeHtml(before)}</pre></section>
       <section><h4>Después</h4><pre>${escapeHtml(after)}</pre></section>

@@ -1,6 +1,6 @@
-import { executedIncrementalValue, incrementalExecutionPercent } from "./domain/execution.js?v=1.3.0";
+import { incrementalExecutionPercent } from "./domain/execution.js?v=1.4.1";
 import { parseCostCsv, resolveCostImportRows } from "./domain/cost-import.js?v=1.2.0";
-import { financialAdvance, formatCop } from "./domain/financial.js?v=1.1.0";
+import { financialAdvance } from "./domain/financial.js?v=1.4.1";
 
 function api() {
   if (!window.SOINSOLAR_APP_API) throw new Error("La aplicación todavía no está lista.");
@@ -26,7 +26,7 @@ function previousExecution(projectId, periodId, trackingId = "") {
 }
 
 function updateExecutionPreview() {
-  const cumulativeInput = document.querySelector("#monthlyRecognizedValue");
+  const cumulativeInput = document.querySelector("#monthlyExecutionPercentage");
   const preview = document.querySelector("#monthlyIncrementPreview");
   const financialPreview = document.querySelector("#monthlyFinancialPreview");
   if (!cumulativeInput || !preview) return;
@@ -39,16 +39,16 @@ function updateExecutionPreview() {
     .filter((row) => row.projectId === projectId && target && (periodBefore(row, target) || (row.year === target.year && row.month === target.month)))
     .sort((a, b) => b.year - a.year || b.month - a.month)[0];
   if (financialPreview) {
-    financialPreview.value = formatPercent(financialAdvance(
-      Number(latestBilling?.cumulativeInvoicedValue ?? 0), Number(project?.contractValue ?? 0)
-    ));
+    financialPreview.value = Number(project?.contractValue ?? 0) > 0
+      ? formatPercent(financialAdvance(
+        Number(latestBilling?.cumulativeInvoicedValue ?? 0), Number(project.contractValue)
+      )) : "Sin contrato";
   }
   const cumulative = Number(cumulativeInput.value || 0);
   const previous = previousExecution(projectId, periodId, trackingId);
   try {
     const incremental = incrementalExecutionPercent(cumulative, previous);
-    const value = executedIncrementalValue(project?.contractValue ?? 0, cumulative, previous);
-    preview.value = formatPercent(incremental) + " · " + formatCop(value);
+    preview.value = formatPercent(incremental);
   } catch (error) {
     preview.value = error.message;
   }
@@ -61,7 +61,6 @@ function exportMonthly() {
     Proyecto: row.projectName,
     "Avance mes %": row.executedIncrementalPercentage,
     "Avance de ejecución %": row.executedCumulativePercentage,
-    "Valor ejecutado en el mes COP": row.executedIncrementalValue,
     "Facturado mes COP": row.invoicedValue,
     "Facturación acumulada COP": row.cumulativeInvoicedValue,
     "Avance financiero en el mes %": row.monthlyBillingPercentage,
@@ -155,7 +154,7 @@ function wire() {
   document.querySelector("#exportMonthlyButton")?.addEventListener("click", exportMonthly);
   document.querySelector("#importCostsButton")?.addEventListener("click", () => document.querySelector("#costImportFile")?.click());
   document.querySelector("#costImportFile")?.addEventListener("change", handleImport);
-  ["monthlyRecognizedValue", "monthlyProject", "monthlyPeriod"].forEach((id) => {
+  ["monthlyExecutionPercentage", "monthlyProject", "monthlyPeriod"].forEach((id) => {
     document.querySelector("#" + id)?.addEventListener("input", updateExecutionPreview);
     document.querySelector("#" + id)?.addEventListener("change", updateExecutionPreview);
   });

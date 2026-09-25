@@ -22,7 +22,7 @@ import {
   INVOICE_STATUSES,
   PAYMENT_STATUSES,
   VALIDATION_STATUSES
-} from "./models.js?v=1.3.1";
+} from "./models.js?v=1.4.1";
 
 export class DataAccessError extends Error {
   constructor(message, cause = null) {

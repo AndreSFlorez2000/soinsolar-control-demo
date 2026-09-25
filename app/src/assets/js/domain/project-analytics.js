@@ -20,8 +20,8 @@ export function calculateProjectIndicators(project = {}, monthlyRows = []) {
 
   for (const row of monthlyRows) {
     const hasMovement = [
-      row.executedIncrementalValue, row.invoicedValue, row.paidValue, row.costsExpensesValue
-    ].some((value) => amount(value) > 0);
+      row.invoicedValue, row.paidValue, row.costsExpensesValue
+    ].some((value) => amount(value) > 0) || row.executedCumulativePercentage !== null && row.executedCumulativePercentage !== undefined;
     const key = validPeriodKey(row);
     if (hasMovement && key !== null) activePeriods.add(key);
 

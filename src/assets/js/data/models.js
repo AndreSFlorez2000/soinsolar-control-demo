@@ -175,8 +175,6 @@ export function normalizeProjectSummary(record) {
     ),
     executedProgressPercentage: record.executed_progress_percentage === null || record.executed_progress_percentage === undefined
       ? null : Number(record.executed_progress_percentage),
-    executedValue: record.executed_value === null || record.executed_value === undefined
-      ? null : assertMoney(record.executed_value, "valor ejecutado"),
     profitability: Number(record.profitability ?? (contractValue - totalCostsExpenses)),
     profitabilityPercentage: Number(
       record.profitability_percentage ??
@@ -207,9 +205,6 @@ export function normalizeMonthlySummary(record) {
     month: Number(record.month),
     periodStatus: String(record.period_status ?? record.status ?? ""),
     contractValue,
-    recognizedValue: assertMoney(record.recognized_value ?? 0, "valor ejecutado incremental"),
-    executedIncrementalValue: executionKnown
-      ? assertMoney(record.executed_incremental_value ?? record.recognized_value ?? 0, "valor ejecutado incremental") : null,
     executedIncrementalPercentage: executionKnown ? Number(record.executed_incremental_percentage ?? 0) : null,
     executedCumulativePercentage: executionKnown ? Number(record.executed_cumulative_percentage ?? 0) : null,
     invoicedValue,
@@ -274,13 +269,13 @@ export function periodInputToRecord(input) {
 
 export function monthlyTrackingInputToRecord(input, userId) {
   const user = userId ? assertUuid(userId, "usuario") : null;
-  const progress = input.executedCumulativePercentage ?? input.recognizedValue;
+  const progress = input.executedCumulativePercentage;
   if (progress === "" || progress === null || progress === undefined) {
     throw new ValidationError("Registra el avance de ejecución.", "executedCumulativePercentage");
   }
   return {
     project_id: assertUuid(input.projectId, "proyecto"),
-    contract_id: assertUuid(input.contractId, "contrato"),
+    contract_id: input.contractId ? assertUuid(input.contractId, "contrato") : null,
     period_id: assertUuid(input.periodId, "periodo"),
     executed_cumulative_percentage: assertPercentage(progress, "avance de ejecución"),
     recognized_value: 0,

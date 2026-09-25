@@ -1,9 +1,9 @@
-import { createDataService } from "./data.js?v=1.4.0";
+import { createDataService } from "./data.js?v=1.4.1";
 import { getCurrentUser, isDemoMode, requireSupabaseClient } from "./supabase.js?v=1.4.0";
 
 export async function createApplicationDataGateway() {
   if (isDemoMode()) {
-    const { createDemoStore } = await import("../data/demo-store.js?v=1.3.1");
+    const { createDemoStore } = await import("../data/demo-store.js?v=1.4.1");
     return createDemoStore();
   }
 

@@ -19,15 +19,6 @@ export function incrementalExecutionPercent(cumulativePercent, previousCumulativ
   return Math.round((current - previous + Number.EPSILON) * 100) / 100;
 }
 
-export function executedIncrementalValue(contractValue, cumulativePercent, previousCumulativePercent = 0) {
-  const contract = Number(contractValue);
-  if (!Number.isFinite(contract) || contract < 0) {
-    throw new RangeError("El valor contractual debe ser un número no negativo.");
-  }
-  const incremental = incrementalExecutionPercent(cumulativePercent, previousCumulativePercent);
-  return Math.round((contract * incremental / 100 + Number.EPSILON) * 100) / 100;
-}
-
 export function profitabilityValue(contractValue, costsExpenses) {
   const contract = Number(contractValue ?? 0);
   const costs = Number(costsExpenses ?? 0);

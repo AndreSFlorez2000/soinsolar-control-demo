@@ -11,7 +11,7 @@
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.4.0" />
+    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.4.1" />
   </head>
   <body>
     <section id="loginView" class="login-shell">
@@ -104,9 +104,7 @@
             </div>
             <button id="refreshAppButton" class="btn btn-sm btn-outline-primary" type="button">Actualizar</button>
             <select id="activePeriodSelect" class="form-select" aria-label="Periodo activo">
-              <option>Agosto 2026</option>
-              <option>Julio 2026</option>
-              <option>Junio 2026</option>
+              <option value="" disabled selected>Sin periodos registrados</option>
             </select>
             <div class="user-chip">
               <span id="currentUserAvatar" class="avatar">US</span>
@@ -133,7 +131,7 @@
             <div class="dashboard-secondary-grid">
               <article class="mini-kpi"><span>Saldo contractual</span><strong id="contractualBalanceValue">$0</strong></article>
               <article class="mini-kpi"><span>Pago pendiente</span><strong id="paymentPendingValue">$0</strong></article>
-              <article class="mini-kpi"><span>Avance de ejecución global</span><strong id="globalExecutionValue">0 %</strong></article>
+              <article class="mini-kpi"><span>Promedio de avance de proyectos</span><strong id="globalExecutionValue">—</strong></article>
               <article class="mini-kpi"><span>Avance financiero global</span><strong id="globalProgressValue">0 %</strong></article>
               <article class="mini-kpi"><span>Proyectos registrados</span><strong id="projectCountValue">0</strong></article>
             </div>
@@ -265,7 +263,7 @@
 
           <section id="monthlyView" class="content-view" hidden>
             <div class="section-heading">
-              <div><h3>Seguimiento mensual</h3><p>El administrador digita el avance de ejecución; el avance del mes y el financiero se calculan.</p></div>
+              <div><h3>Seguimiento mensual</h3><p>El administrador registra el estado del trabajo realizado. Facturar o recibir un pago no significa que el proyecto esté terminado.</p></div>
               <div class="heading-actions"><button id="exportMonthlyButton" class="btn btn-outline-primary">Exportar Excel</button><button id="newPeriodButton" class="btn btn-outline-primary">Nuevo periodo</button><button id="newMonthlyButton" class="btn btn-primary">Registrar seguimiento</button></div>
             </div>
 
@@ -444,7 +442,7 @@
 
           <section id="reportsView" class="content-view" hidden>
             <div class="section-heading">
-              <div><h3>Reportes gerenciales</h3><p>El administrador actualiza el avance de ejecución. El avance financiero se calcula con la facturación.</p></div>
+              <div><h3>Reportes gerenciales</h3><p>El administrador informa el estado físico del proyecto. Las facturas calculan el avance financiero por separado.</p></div>
               <button id="exportReportButton" class="btn btn-primary" type="button">Exportar reporte CSV</button>
             </div>
 
@@ -466,7 +464,7 @@
               <article class="mini-kpi"><span>Saldo contractual</span><strong id="reportBalance">$0</strong></article>
               <article class="mini-kpi"><span>Cartera pendiente</span><strong id="reportPending">$0</strong></article>
               <article class="mini-kpi"><span>Rentabilidad estimada</span><strong id="reportProfitability">$0</strong></article>
-              <article class="mini-kpi"><span>Avance de ejecución</span><strong id="reportExecution">0%</strong></article>
+              <article class="mini-kpi"><span>Promedio de avance de proyectos</span><strong id="reportExecution">—</strong></article>
             </div>
 
             <article class="panel report-formulas">
@@ -576,15 +574,15 @@
         <div class="dialog-heading"><div><p class="eyebrow">Seguimiento mensual</p><h3 id="monthlyDialogTitle">Registrar seguimiento</h3></div><button class="dialog-close" type="button" data-close-dialog="monthlyDialog" aria-label="Cerrar">×</button></div>
         <input id="monthlyTrackingId" type="hidden" />
         <div class="form-grid">
-          <label class="span-2">Proyecto con contrato *<select id="monthlyProject" class="form-select" required></select></label>
+          <label class="span-2">Proyecto *<select id="monthlyProject" class="form-select" required></select></label>
           <label>Periodo abierto *<select id="monthlyPeriod" class="form-select" required></select></label>
           <label>Estado *<select id="monthlyValidationStatus" class="form-select" required><option value="borrador">Borrador</option><option value="pendiente">Pendiente de validación</option></select></label>
-          <label>Avance de ejecución (%) · registro manual del administrador *<input id="monthlyRecognizedValue" class="form-control" type="number" min="0" max="100" step="0.01" required /></label>
+          <label>Avance de ejecución (%) · registro manual del administrador *<input id="monthlyExecutionPercentage" class="form-control" type="number" min="0" max="100" step="0.01" required /></label>
           <label>Avance financiero acumulado (%) · cálculo automático<input id="monthlyFinancialPreview" class="form-control" readonly value="0%" /></label>
-          <label>Avance mes · cálculo automático<input id="monthlyIncrementPreview" class="form-control" readonly value="0% · $0" /></label>
+          <label>Avance mes · diferencia en puntos porcentuales<input id="monthlyIncrementPreview" class="form-control" readonly value="0%" /></label>
           <label class="span-2">Observaciones<textarea id="monthlyObservations" class="form-control" rows="3" maxlength="500"></textarea></label>
         </div>
-        <p class="dialog-note">El administrador digita el porcentaje de ejecución alcanzado a la fecha. El sistema calcula el avance del mes; el avance financiero se obtiene de las facturas registradas ÷ el contrato vigente.</p>
+        <p class="dialog-note">El avance de ejecución describe solamente el trabajo realizado. No necesita contrato y no altera facturas, pagos, costos ni rentabilidad. El avance financiero se calcula únicamente con las facturas registradas ÷ el contrato vigente.</p>
         <p id="monthlyFormMessage" class="form-message" role="alert"></p>
         <div class="dialog-actions"><button class="btn btn-outline-secondary" type="button" data-close-dialog="monthlyDialog">Cancelar</button><button id="saveMonthlyButton" class="btn btn-primary" type="submit">Guardar seguimiento</button></div>
       </form>
@@ -598,7 +596,7 @@
           <label class="span-2">Avance de ejecución (%) · registro manual *<input id="reportProgressValue" class="form-control" type="number" min="0" max="100" step="0.01" required /></label>
           <label class="span-2">Avance financiero (%) · cálculo automático<input id="reportFinancialValue" class="form-control" readonly /></label>
         </div>
-        <p id="reportProgressNote" class="dialog-note">Solo el administrador puede registrar el avance de ejecución. El financiero cambia con la facturación.</p>
+        <p id="reportProgressNote" class="dialog-note">Solo el administrador puede registrar el avance de ejecución. No cambia las cifras financieras.</p>
         <p id="reportProgressMessage" class="form-message" role="alert"></p>
         <div class="dialog-actions"><button class="btn btn-outline-secondary" type="button" data-close-dialog="reportProgressDialog">Cancelar</button><button id="saveReportProgressButton" class="btn btn-primary" type="submit">Guardar avance</button></div>
       </form>
@@ -620,7 +618,7 @@
           <label>Fecha inicial *<input id="contractStartDate" class="form-control" type="date" required /></label>
           <label>Fecha final<input id="contractEndDate" class="form-control" type="date" /></label>
         </div>
-        <p class="dialog-note">Valor contractual vigente = valor inicial + adiciones − deducciones. No puede ser inferior a la facturación ni al avance reconocido.</p>
+        <p class="dialog-note">Valor contractual vigente = valor inicial + adiciones − deducciones. No puede ser inferior a la facturación registrada. El porcentaje de ejecución no modifica el contrato.</p>
         <p id="contractFormMessage" class="form-message" role="alert"></p>
         <div class="dialog-actions"><button class="btn btn-outline-secondary" type="button" data-close-dialog="contractDialog">Cancelar</button><button id="saveContractButton" class="btn btn-primary" type="submit">Guardar contrato</button></div>
       </form>
@@ -675,8 +673,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <script src="src/assets/js/config.js?v=1.4.0"></script>
-    <script type="module" src="src/assets/js/app.js?v=1.4.0"></script>
-    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.4.0"></script>
+    <script src="src/assets/js/config.js?v=1.4.1"></script>
+    <script type="module" src="src/assets/js/app.js?v=1.4.1"></script>
+    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.4.1"></script>
   </body>
 </html>

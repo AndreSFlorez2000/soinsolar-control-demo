@@ -15,13 +15,6 @@ export function paymentPending(invoiced, paid) {
   return Math.max(0, invoiced - paid);
 }
 
-export function expectedMonthlyValue(contractValue, monthlyAdvancePercent) {
-  if (!Number.isFinite(monthlyAdvancePercent) || monthlyAdvancePercent < 0 || monthlyAdvancePercent > 100) {
-    throw new RangeError("El avance mensual debe estar entre 0 y 100.");
-  }
-  return contractValue * (monthlyAdvancePercent / 100);
-}
-
 export function formatCop(value) {
   return new Intl.NumberFormat("es-CO", {
     style: "currency",
@@ -29,4 +22,3 @@ export function formatCop(value) {
     maximumFractionDigits: 0
   }).format(value);
 }
-
