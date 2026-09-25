@@ -1,27 +1,9 @@
-# Control Solar Demo
+# SOINSOLAR Control
 
-Demostración pública y anonimizada de la versión 1.1.0 de una aplicación web para controlar proyectos, contratos, periodos, facturación, pagos, costos, gastos, seguimiento e informes gerenciales.
+Aplicación de gestión de proyectos, ejecución y finanzas con inicio de sesión y datos persistentes.
 
-## Acceso
+[Ingresar al aplicativo](https://andresflorez2000.github.io/soinsolar-control-demo/)
 
-Utiliza el botón **Entrar al prototipo**. No se solicitan credenciales reales. Los nombres, municipios, proyectos, documentos y valores son completamente ficticios y no corresponden a información productiva.
+Las cuentas nuevas quedan pendientes hasta que el administrador las apruebe. El avance de ejecución lo registra el administrador; el avance financiero se calcula a partir de la facturación y el contrato.
 
-## Módulos disponibles
-
-- Inicio e indicadores generales.
-- Proyectos y detalle financiero.
-- Gestión contractual.
-- Seguimiento mensual y periodos.
-- Facturación y pagos.
-- Costos y gastos.
-- Reportes gerenciales y exportación CSV.
-- Historial de cambios.
-- Administración demostrativa de perfiles.
-
-## Funcionamiento
-
-La demo conserva temporalmente los cambios en el almacenamiento del navegador y no se conecta a la base de datos productiva. Las validaciones financieras reproducen las reglas previstas: límites de contrato y factura, fechas coherentes con el periodo, identificadores únicos y protección de periodos cerrados.
-
-## Seguridad
-
-Este repositorio no contiene contraseñas, llaves privadas, credenciales de Supabase, archivos reales ni datos identificables. El código productivo y la configuración del entorno conectado permanecen privados.
+El código fuente, el esquema SQL, las pruebas y las instrucciones de operación se mantienen en el repositorio privado `soinsolar-control`. Este repositorio contiene únicamente los archivos estáticos publicados. Las credenciales privadas y los datos empresariales se almacenan fuera de GitHub Pages.
