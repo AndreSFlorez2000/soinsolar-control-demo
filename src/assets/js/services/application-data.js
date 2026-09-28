@@ -1,9 +1,9 @@
-import { createDataService } from "./data.js?v=1.4.1";
+import { createDataService } from "./data.js?v=1.4.2";
 import { getCurrentUser, isDemoMode, requireSupabaseClient } from "./supabase.js?v=1.4.0";
 
 export async function createApplicationDataGateway() {
   if (isDemoMode()) {
-    const { createDemoStore } = await import("../data/demo-store.js?v=1.4.1");
+    const { createDemoStore } = await import("../data/demo-store.js?v=1.4.2");
     return createDemoStore();
   }
 
@@ -44,6 +44,7 @@ export async function createApplicationDataGateway() {
     createPayment: (input) => data.finance.createPayment(input, userId),
     listCostsExpenses: (filters) => data.finance.listCostsExpenses(filters),
     createCostExpense: (input) => data.finance.createCostExpense(input, userId),
+    createCostsExpenses: (inputs) => data.finance.createCostsExpenses(inputs, userId),
     listAudit: (filters) => data.audit.list(filters),
     uploadSupport: (input) => data.supports.upload(input),
     getSupportUrl: (path) => data.supports.createSignedUrl(path)

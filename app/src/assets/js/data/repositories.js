@@ -511,6 +511,21 @@ export class FinanceRepository {
     );
     return normalizeCostExpense(row);
   }
+
+  async createCostsExpenses(inputs, userId) {
+    if (!Array.isArray(inputs) || inputs.length < 1 || inputs.length > 500) {
+      throw new DataAccessError("Importa entre 1 y 500 movimientos por archivo.");
+    }
+    // Una sola inserción deja toda la importación dentro de una transacción.
+    // Si una fila falla las reglas de la base, no se guarda ninguna.
+    const records = inputs.map((input) => costExpenseInputToRecord(input, userId));
+    const rows = await unwrap(
+      this.client.from("costs_expenses").insert(records)
+        .select("*, projects(id, cost_center, name), periods(id, year, month, status)"),
+      "No fue posible importar los costos y gastos"
+    );
+    return rows.map(normalizeCostExpense);
+  }
 }
 
 export class SupportRepository {

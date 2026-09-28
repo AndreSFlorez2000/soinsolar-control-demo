@@ -3,7 +3,7 @@ import { calculateProjectIndicators } from "./domain/project-analytics.js?v=1.4.
 import { buildManagementReport } from "./domain/reports.js?v=1.4.1";
 import { canEditExecution } from "./domain/execution.js?v=1.3.0";
 import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=1.1.0";
-import { createApplicationDataGateway } from "./services/application-data.js?v=1.4.1";
+import { createApplicationDataGateway } from "./services/application-data.js?v=1.4.2";
 import { getCurrentSession, isDemoMode, registerAccount, signIn, signOut } from "./services/supabase.js?v=1.4.0";
 
 const loginView = document.querySelector("#loginView");

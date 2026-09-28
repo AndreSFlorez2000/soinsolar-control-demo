@@ -112,8 +112,6 @@ async function handleImport(event) {
   const file = event.target.files?.[0];
   if (!file) return;
   setCostMessage("Validando archivo…");
-  let imported = 0;
-  let expected = 0;
   try {
     const rows = await readImportRows(file);
     const result = resolveCostImportRows(rows, {
@@ -127,24 +125,15 @@ async function handleImport(event) {
       throw new Error("Importación cancelada. " + result.errors.length + " fila(s) con error. " + detail);
     }
     if (!result.valid.length) throw new Error("El archivo no contiene movimientos válidos.");
+    if (result.valid.length > 500) throw new Error("El archivo supera 500 movimientos. Divídelo en archivos más pequeños.");
 
     const gateway = await api().gateway();
-    expected = result.valid.length;
-    for (const input of result.valid) {
-      await gateway.createCostExpense(input);
-      imported += 1;
-    }
+    await gateway.createCostsExpenses(result.valid);
     await api().reloadReferenceData();
     setCostMessage(result.valid.length + " movimiento(s) importados correctamente.");
     document.querySelector("#refreshAppButton")?.click();
   } catch (error) {
-    if (imported) {
-      await api().reloadReferenceData();
-      document.querySelector("#refreshAppButton")?.click();
-      setCostMessage(`Importación parcial: ${imported} de ${expected} movimientos guardados. ${error.message || "Revisa el archivo antes de continuar."}`, true);
-    } else {
-      setCostMessage(error.message || "No fue posible importar los costos.", true);
-    }
+    setCostMessage(error.message || "No fue posible importar los costos.", true);
   } finally {
     event.target.value = "";
   }
