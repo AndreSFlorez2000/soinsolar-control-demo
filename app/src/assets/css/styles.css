@@ -375,6 +375,10 @@ button, input, select, textarea { font: inherit; }
 .formula-grid span { padding: 10px 12px; color: var(--muted); background: #f5f8fa; border-radius: 7px; font-size: 10px; }
 .security-note { margin-top: 18px; padding: 20px 22px; border-left: 4px solid var(--blue); }
 .security-note p { margin: 8px 0 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.execution-issues-panel { margin: 17px 0; padding: 20px 24px; }
+.execution-issues-list { display: grid; gap: 10px; margin-top: 12px; color: var(--muted); white-space: pre-wrap; }
+.execution-issues-list p { margin: 0; padding: 10px 12px; background: #f5f8fa; border-radius: 7px; }
+.execution-issues-list strong { display: block; color: var(--text); margin-bottom: 4px; }
 .profile-active-control { display: inline-flex; align-items: center; gap: 7px; font-size: 11px; }
 .profile-active-control input { accent-color: var(--green); }
 #contractCurrentValue, #paymentAvailable, #contractProjectLabel { background: #f3f6f8; font-weight: 700; }

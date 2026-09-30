@@ -7,7 +7,7 @@ import {
   ProfileRepository,
   ProjectRepository,
   SupportRepository
-} from "../data/repositories.js?v=1.4.2";
+} from "../data/repositories.js?v=1.5.0";
 import { requireSupabaseClient } from "./supabase.js?v=1.4.0";
 
 export function createDataService(client = requireSupabaseClient()) {

@@ -1,9 +1,10 @@
 import { buildMonthlySeries, calculateDashboardIndicators } from "./domain/dashboard.js?v=1.4.1";
 import { calculateProjectIndicators } from "./domain/project-analytics.js?v=1.4.1";
-import { buildManagementReport } from "./domain/reports.js?v=1.4.1";
+import { buildManagementReport, buildMonthlyExecutionReport } from "./domain/reports.js?v=1.5.0";
+import { createXlsx } from "./domain/xlsx-export.js?v=1.5.0";
 import { canEditExecution } from "./domain/execution.js?v=1.3.0";
 import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=1.1.0";
-import { createApplicationDataGateway } from "./services/application-data.js?v=1.4.2";
+import { createApplicationDataGateway } from "./services/application-data.js?v=1.5.0";
 import { getCurrentSession, isDemoMode, registerAccount, signIn, signOut } from "./services/supabase.js?v=1.4.0";
 
 const loginView = document.querySelector("#loginView");
@@ -61,7 +62,7 @@ const fieldLabels = {
   invoiced_value: "valor facturado", paid_value: "valor pagado",
   validation_status: "estado de validación", amount: "valor",
   movement_type: "tipo de movimiento", category: "categoría",
-  observations: "observaciones", closed_at: "fecha de cierre",
+  observations: "observaciones", execution_issue: "novedad de ejecución", closed_at: "fecha de cierre",
   full_name: "nombre", role: "rol", active: "estado de acceso",
   contract_number: "número de contrato", initial_value: "valor inicial",
   additions_value: "adiciones", deductions_value: "deducciones",
@@ -87,6 +88,7 @@ let balancePayments = [];
 let currentProfiles = [];
 let currentUserProfile = null;
 let currentReport = buildManagementReport([]);
+let currentReportMonthly = [];
 let reportProgressProjectId = null;
 let reportProgressPeriodId = null;
 let selectedProjectMonthly = [];
@@ -807,6 +809,12 @@ function renderProjectAnalytics(project) {
   document.querySelector("#projectPendingValidations").textContent = indicators.pendingValidations;
   renderProjectChart();
   renderProjectHistory();
+  const issues = [...selectedProjectMonthly]
+    .filter((row) => row.executionIssue)
+    .sort((a, b) => b.year - a.year || b.month - a.month);
+  document.querySelector("#detailExecutionIssues").innerHTML = issues.length
+    ? issues.map((row) => `<p><strong>${escapeHtml(monthNames[row.month - 1])} ${row.year}</strong>${escapeHtml(row.executionIssue)}</p>`).join("")
+    : "Sin novedades registradas.";
 }
 
 async function openProjectDetail(projectId) {
@@ -989,10 +997,11 @@ function renderMonthly() {
       <td>${escapeHtml(`${monthNames[tracking.month - 1]} ${tracking.year}`)}<br><small>${capitalize(tracking.periodStatus)}</small></td>
       <td><span class="project-name-cell"><strong>${escapeHtml(tracking.projectName)}</strong><small>${escapeHtml(tracking.costCenter)}</small></span></td>
       <td><strong>${formatCop(tracking.invoicedValue)}</strong><br><small>${formatPercent(tracking.monthlyBillingPercentage)} del contrato</small></td>
-      <td>${tracking.monthlyProgressPercentage === null ? "—" : formatPercent(tracking.monthlyProgressPercentage)}</td>
-      <td>${tracking.cumulativeProgressPercentage === null ? "—" : formatPercent(tracking.cumulativeProgressPercentage)}</td>
+      <td>${formatPercent(tracking.monthlyProgressPercentage)}</td>
+      <td>${formatPercent(tracking.cumulativeProgressPercentage ?? tracking.previousExecutedCumulativePercentage)}</td>
       <td>${formatPercent(tracking.cumulativeBillingPercentage)}</td>
       <td>${formatCop(tracking.costsExpensesValue)}</td>
+      <td>${tracking.executionIssue ? escapeHtml(tracking.executionIssue) : "—"}</td>
       <td><span class="validation-badge ${escapeHtml(tracking.validationStatus || "borrador")}">${escapeHtml(tracking.validationStatus || "sin registro")}</span></td>
       <td><span class="table-actions">${actions}</span></td>
     </tr>`;
@@ -1019,7 +1028,7 @@ async function loadMonthlyModule(filters) {
     allMonthlyRows = allRows;
     currentMonthly = shownRows;
     document.querySelector("#monthlyCount").textContent = allRows.length;
-    document.querySelector("#monthlyPendingCount").textContent = allRows.filter((row) => row.validationStatus !== "validado").length;
+    document.querySelector("#monthlyPendingCount").textContent = allRows.filter((row) => row.trackingId && row.validationStatus !== "validado").length;
     renderPeriods();
     renderMonthly();
     setMessage(message, shownRows.length ? "Consulta actualizada." : "");
@@ -1116,6 +1125,7 @@ function openEditMonthly(trackingId) {
   document.querySelector("#monthlyValidationStatus").value = tracking.validationStatus === "validado" ? "pendiente" : tracking.validationStatus;
   document.querySelector("#monthlyExecutionPercentage").value = tracking.executedCumulativePercentage;
   document.querySelector("#monthlyObservations").value = tracking.observations || "";
+  document.querySelector("#monthlyExecutionIssue").value = tracking.executionIssue || "";
   document.querySelector("#monthlyDialogTitle").textContent = "Editar seguimiento";
   setMessage(document.querySelector("#monthlyFormMessage"));
   monthlyDialog.showModal();
@@ -1130,7 +1140,8 @@ function readMonthlyForm() {
     periodId: document.querySelector("#monthlyPeriod").value,
     executedCumulativePercentage: document.querySelector("#monthlyExecutionPercentage").value,
     validationStatus: document.querySelector("#monthlyValidationStatus").value,
-    observations: document.querySelector("#monthlyObservations").value
+    observations: document.querySelector("#monthlyObservations").value,
+    executionIssue: document.querySelector("#monthlyExecutionIssue").value
   };
 }
 
@@ -1494,6 +1505,7 @@ async function loadReports() {
     && (!filters.municipality || normalizeSearch(project.municipality).includes(filters.municipality))
   );
   currentReport = buildManagementReport(rows);
+  currentReportMonthly = buildMonthlyExecutionReport(currentReport.rows, allMonthlyRows);
   renderReports();
 }
 
@@ -1518,6 +1530,18 @@ function renderReports() {
       : "Solo administrador"}</td>
   </tr>`).join("");
   document.querySelector("#reportEmpty").hidden = currentReport.rows.length > 0;
+  document.querySelector("#reportMonthlyRows").innerHTML = currentReportMonthly.map((row) => `<tr>
+    <td><strong>${escapeHtml(row.projectName)}</strong><br><small>${escapeHtml(row.costCenter)}</small></td>
+    <td>${escapeHtml(monthNames[row.month - 1])} ${row.year}</td>
+    <td>${formatCop(row.contractValue)}</td>
+    <td>${formatPercent(row.monthlyProgress)}</td>
+    <td>${formatCop(row.monthlyEquivalent)}</td>
+    <td>${formatPercent(row.cumulativeProgress)}</td>
+    <td>${formatCop(row.monthlyInvoiced)}</td>
+    <td>${formatPercent(row.monthlyBilling)}</td>
+    <td>${row.executionIssue ? escapeHtml(row.executionIssue) : "—"}</td>
+  </tr>`).join("");
+  document.querySelector("#reportMonthlyEmpty").hidden = currentReportMonthly.length > 0;
 }
 
 function reportTracking(projectId, periodId) {
@@ -1543,6 +1567,7 @@ function openReportProgressEditor(projectId) {
   document.querySelector("#reportProgressForm").reset();
   document.querySelector("#reportProgressContext").textContent = `${project.projectName} · ${periodLabel(period)}`;
   document.querySelector("#reportProgressValue").value = existing?.executedCumulativePercentage ?? latest?.executedCumulativePercentage ?? "";
+  document.querySelector("#reportExecutionIssue").value = existing?.executionIssue ?? "";
   document.querySelector("#reportFinancialValue").value = formatPercent(project.financialProgressPercentage);
   const detail = "Registra el estado del trabajo realizado. El porcentaje no depende del contrato, las facturas ni los pagos; no modifica ninguna cifra financiera.";
   document.querySelector("#reportProgressNote").textContent = existing?.validationStatus === "validado"
@@ -1576,7 +1601,8 @@ async function saveReportProgress(event) {
       periodId: reportProgressPeriodId,
       executedCumulativePercentage: input.value,
       validationStatus: existing?.validationStatus === "borrador" ? "borrador" : "pendiente",
-      observations: existing?.observations ?? ""
+      observations: existing?.observations ?? "",
+      executionIssue: document.querySelector("#reportExecutionIssue").value
     });
     saved = true;
     await loadReferenceData();
@@ -1597,21 +1623,40 @@ async function saveReportProgress(event) {
 }
 
 function exportManagementReport() {
-  const headers = ["Centro de costo", "Centro principal", "Proyecto", "Municipio", "Estado", "Contrato vigente", "Avance de ejecución %", "Facturado", "Avance financiero %", "Pagado", "Costos y gastos", "Rentabilidad", "Rentabilidad %", "Saldo contractual", "Cartera", "Cobro %", "Costos/contrato %", "Diferencia facturación-costos"];
-  const quote = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
-  const rows = currentReport.rows.map((row) => [
-    row.costCenter, row.parentCostCenter, row.projectName, row.municipality, row.status, row.contractValue,
-    row.executionProgress, row.invoiced, row.financialProgress, row.paid, row.costsExpenses,
-    row.profitability, row.profitabilityPercentage, row.contractualBalance, row.paymentPending,
-    row.collectionRate, row.costRate, row.billingCostDifference
-  ].map(quote).join(","));
-  const blob = new Blob(["\uFEFF", [headers.map(quote).join(","), ...rows].join("\n")], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = `reporte-gerencial-${new Date().toISOString().slice(0, 10)}.csv`;
-  anchor.click();
-  URL.revokeObjectURL(url);
+  try {
+    const blob = createXlsx([
+      {
+        name: "Resumen",
+        headers: ["Centro de costo", "Centro principal", "Proyecto", "Municipio", "Estado", "Contrato vigente", "Avance físico acumulado", "Facturado", "Avance financiero", "Pagado", "Costos y gastos", "Rentabilidad", "Saldo contractual", "Cartera"],
+        types: ["text", "text", "text", "text", "text", "money", "percent", "money", "percent", "money", "money", "money", "money", "money"],
+        rows: currentReport.rows.map((row) => [
+          row.costCenter, row.parentCostCenter, row.projectName, row.municipality, row.status, row.contractValue,
+          row.executionProgress === null ? null : row.executionProgress / 100, row.invoiced, row.financialProgress / 100,
+          row.paid, row.costsExpenses, row.profitability, row.contractualBalance, row.paymentPending
+        ])
+      },
+      {
+        name: "Avance mensual",
+        headers: ["Centro de costo", "Proyecto", "Año", "Mes", "Contrato vigente", "Avance físico del mes", "Valor equivalente del mes", "Avance físico acumulado", "Valor equivalente acumulado", "Facturado en el mes", "Avance financiero del mes", "Novedad que afecta la ejecución", "Estado del seguimiento"],
+        types: ["text", "text", "number", "text", "money", "percent", "money", "percent", "money", "money", "percent", "text", "text"],
+        rows: currentReportMonthly.map((row) => [
+          row.costCenter, row.projectName, row.year, monthNames[row.month - 1], row.contractValue,
+          row.monthlyProgress / 100, row.monthlyEquivalent, row.cumulativeProgress / 100,
+          row.cumulativeEquivalent, row.monthlyInvoiced, row.monthlyBilling / 100,
+          row.executionIssue, row.validationStatus
+        ])
+      }
+    ]);
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `informe-avance-proyectos-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setMessage(document.querySelector("#reportModuleMessage"), "Informe Excel generado con resumen, avance mensual y novedades.");
+  } catch (error) {
+    setMessage(document.querySelector("#reportModuleMessage"), error.message || "No fue posible generar el informe Excel.", true);
+  }
 }
 
 async function loadProfiles() {

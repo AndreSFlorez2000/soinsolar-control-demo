@@ -78,3 +78,35 @@ export function buildManagementReport(projects = []) {
     rows: Object.freeze(rows)
   });
 }
+
+// Los importes equivalentes al trabajo ejecutado sirven solo para este informe.
+// Nunca se suman a facturación, pagos, costos ni rentabilidad.
+export function buildMonthlyExecutionReport(projects = [], monthlyRows = []) {
+  const included = new Map(projects.map((project) => [project.projectId, project]));
+  const rows = monthlyRows
+    .filter((row) => included.has(row.projectId))
+    .sort((a, b) => a.projectName.localeCompare(b.projectName, "es") || a.year - b.year || a.month - b.month)
+    .map((row) => {
+      const project = included.get(row.projectId);
+      const contractValue = amount(row.contractValue || project.contractValue);
+      const monthlyProgress = Number(row.executedIncrementalPercentage ?? 0);
+      const cumulativeProgress = Number(row.executedCumulativePercentage ?? row.previousExecutedCumulativePercentage ?? 0);
+      return Object.freeze({
+        projectId: row.projectId,
+        costCenter: row.costCenter,
+        projectName: row.projectName,
+        year: row.year,
+        month: row.month,
+        contractValue,
+        monthlyProgress,
+        cumulativeProgress,
+        monthlyEquivalent: Math.round(contractValue * monthlyProgress) / 100,
+        cumulativeEquivalent: Math.round(contractValue * cumulativeProgress) / 100,
+        monthlyInvoiced: amount(row.invoicedValue),
+        monthlyBilling: Number(row.monthlyBillingPercentage ?? 0),
+        executionIssue: row.executionIssue || "",
+        validationStatus: row.validationStatus || "sin registro"
+      });
+    });
+  return Object.freeze(rows);
+}

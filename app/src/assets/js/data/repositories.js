@@ -22,7 +22,7 @@ import {
   INVOICE_STATUSES,
   PAYMENT_STATUSES,
   VALIDATION_STATUSES
-} from "./models.js?v=1.4.1";
+} from "./models.js?v=1.5.0";
 
 export class DataAccessError extends Error {
   constructor(message, cause = null) {
@@ -305,12 +305,19 @@ export class MonthlyTrackingRepository {
   }
 
   async list(filters = {}) {
-    let query = this.client.from("monthly_project_summary").select("*")
-      .order("year", { ascending: false }).order("month", { ascending: false }).order("project_name");
-    if (filters.projectId) query = query.eq("project_id", assertUuid(filters.projectId, "proyecto"));
-    if (filters.periodId) query = query.eq("period_id", assertUuid(filters.periodId, "periodo"));
-    if (filters.validationStatus) query = query.eq("validation_status", assertEnum(filters.validationStatus, VALIDATION_STATUSES, "estado de validación"));
-    const rows = await unwrap(query, "No fue posible consultar los registros mensuales");
+    const rows = [];
+    const pageSize = 1000;
+    for (let start = 0; ; start += pageSize) {
+      let query = this.client.from("monthly_project_summary").select("*")
+        .order("year", { ascending: false }).order("month", { ascending: false })
+        .order("project_name").order("project_id");
+      if (filters.projectId) query = query.eq("project_id", assertUuid(filters.projectId, "proyecto"));
+      if (filters.periodId) query = query.eq("period_id", assertUuid(filters.periodId, "periodo"));
+      if (filters.validationStatus) query = query.eq("validation_status", assertEnum(filters.validationStatus, VALIDATION_STATUSES, "estado de validación"));
+      const page = await unwrap(query.range(start, start + pageSize - 1), "No fue posible consultar los registros mensuales");
+      rows.push(...page);
+      if (page.length < pageSize) break;
+    }
     return rows.map(normalizeMonthlySummary);
   }
 

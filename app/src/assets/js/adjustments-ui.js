@@ -1,6 +1,8 @@
 import { incrementalExecutionPercent } from "./domain/execution.js?v=1.4.1";
 import { parseCostCsv, resolveCostImportRows } from "./domain/cost-import.js?v=1.2.0";
 import { financialAdvance } from "./domain/financial.js?v=1.4.1";
+import { buildMonthlyExecutionReport } from "./domain/reports.js?v=1.5.0";
+import { createXlsx } from "./domain/xlsx-export.js?v=1.5.0";
 
 function api() {
   if (!window.SOINSOLAR_APP_API) throw new Error("La aplicación todavía no está lista.");
@@ -55,43 +57,31 @@ function updateExecutionPreview() {
 }
 
 function exportMonthly() {
-  const rows = api().visibleMonthly().map((row) => ({
-    Periodo: row.year + "-" + String(row.month).padStart(2, "0"),
-    "Centro de costo": row.costCenter,
-    Proyecto: row.projectName,
-    "Avance mes %": row.executedIncrementalPercentage,
-    "Avance de ejecución %": row.executedCumulativePercentage,
-    "Facturado mes COP": row.invoicedValue,
-    "Facturación acumulada COP": row.cumulativeInvoicedValue,
-    "Avance financiero en el mes %": row.monthlyBillingPercentage,
-    "Avance financiero acumulado %": row.cumulativeBillingPercentage,
-    "Costos y gastos COP": row.costsExpensesValue,
-    Validación: row.validationStatus || ""
-  }));
+  const visible = api().visibleMonthly();
+  const rows = buildMonthlyExecutionReport(api().projects(), visible);
 
   if (!rows.length) {
-    window.alert("No hay seguimiento mensual para exportar.");
+    window.alert("No hay periodos mensuales para exportar.");
     return;
   }
 
-  if (window.XLSX) {
-    const sheet = window.XLSX.utils.json_to_sheet(rows);
-    const workbook = window.XLSX.utils.book_new();
-    window.XLSX.utils.book_append_sheet(workbook, sheet, "Seguimiento");
-    window.XLSX.writeFile(workbook, "seguimiento-mensual-" + new Date().toISOString().slice(0, 10) + ".xlsx");
-    return;
-  }
-
-  const headers = Object.keys(rows[0]);
-  const quote = (value) => '"' + String(value ?? "").replaceAll('"', '""') + '"';
-  const csv = [headers.map(quote).join(","), ...rows.map((row) => headers.map((key) => quote(row[key])).join(","))].join("\n");
-  const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" });
+  const blob = createXlsx([{
+    name: "Seguimiento mensual",
+    headers: ["Periodo", "Centro de costo", "Proyecto", "Contrato vigente", "Avance físico del mes", "Valor equivalente del mes", "Avance físico acumulado", "Valor equivalente acumulado", "Facturado en el mes", "Avance financiero del mes", "Novedad que afecta la ejecución", "Estado del seguimiento"],
+    types: ["text", "text", "text", "money", "percent", "money", "percent", "money", "money", "percent", "text", "text"],
+    rows: rows.map((row) => [
+      row.year + "-" + String(row.month).padStart(2, "0"), row.costCenter, row.projectName,
+      row.contractValue, row.monthlyProgress / 100, row.monthlyEquivalent,
+      row.cumulativeProgress / 100, row.cumulativeEquivalent, row.monthlyInvoiced,
+      row.monthlyBilling / 100, row.executionIssue, row.validationStatus
+    ])
+  }]);
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = "seguimiento-mensual-" + new Date().toISOString().slice(0, 10) + ".csv";
+  anchor.download = "seguimiento-mensual-" + new Date().toISOString().slice(0, 10) + ".xlsx";
   anchor.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 async function readImportRows(file) {

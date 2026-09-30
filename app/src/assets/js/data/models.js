@@ -205,6 +205,7 @@ export function normalizeMonthlySummary(record) {
     month: Number(record.month),
     periodStatus: String(record.period_status ?? record.status ?? ""),
     contractValue,
+    previousExecutedCumulativePercentage: Number(record.previous_executed_cumulative_percentage ?? 0),
     executedIncrementalPercentage: executionKnown ? Number(record.executed_incremental_percentage ?? 0) : null,
     executedCumulativePercentage: executionKnown ? Number(record.executed_cumulative_percentage ?? 0) : null,
     invoicedValue,
@@ -230,6 +231,7 @@ export function normalizeMonthlySummary(record) {
     ),
     validationStatus: record.validation_status || null,
     observations: record.observations || null,
+    executionIssue: record.execution_issue || null,
     validatedAt: record.validated_at || null
   });
 }
@@ -270,8 +272,12 @@ export function periodInputToRecord(input) {
 export function monthlyTrackingInputToRecord(input, userId) {
   const user = userId ? assertUuid(userId, "usuario") : null;
   const progress = input.executedCumulativePercentage;
+  const executionIssue = input.executionIssue?.trim() || null;
   if (progress === "" || progress === null || progress === undefined) {
     throw new ValidationError("Registra el avance de ejecución.", "executedCumulativePercentage");
+  }
+  if (executionIssue && executionIssue.length > 1000) {
+    throw new ValidationError("La novedad de ejecución no puede superar 1000 caracteres.", "executionIssue");
   }
   return {
     project_id: assertUuid(input.projectId, "proyecto"),
@@ -280,6 +286,7 @@ export function monthlyTrackingInputToRecord(input, userId) {
     executed_cumulative_percentage: assertPercentage(progress, "avance de ejecución"),
     recognized_value: 0,
     observations: input.observations?.trim() || null,
+    execution_issue: executionIssue,
     validation_status: assertEnum(
       input.validationStatus ?? "pendiente",
       VALIDATION_STATUSES,
