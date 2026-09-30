@@ -11,14 +11,12 @@
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.5.2" />
+    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.5.3" />
   </head>
   <body>
     <section id="loginView" class="login-shell">
       <div class="login-card">
-        <div class="brand brand-login" aria-label="SOINSOLAR Control">
-          <span>Soinsol</span><span class="brand-sun">a</span><span>r</span>
-        </div>
+        <div class="brand brand-login"><img src="src/assets/img/logo-soinsolar.png" alt="SOINSOLAR" /></div>
         <p class="eyebrow">Gestión de proyectos</p>
         <h1>Bienvenido</h1>
         <p class="text-secondary">Consulta contratos, avances mensuales, facturación, pagos y costos desde un solo lugar.</p>
@@ -54,7 +52,7 @@
 
     <section id="pendingView" class="login-shell" hidden>
       <div class="login-card text-center">
-        <div class="brand brand-login" aria-label="SOINSOLAR Control"><span>Soinsol</span><span class="brand-sun">a</span><span>r</span></div>
+        <div class="brand brand-login"><img src="src/assets/img/logo-soinsolar.png" alt="SOINSOLAR" /></div>
         <h1>Acceso pendiente</h1>
         <p class="text-secondary">Tu cuenta aún no tiene permiso para consultar información. Solicita al administrador que la active desde Administración → Usuarios.</p>
         <button id="checkAccessButton" class="btn btn-primary w-100" type="button">Comprobar acceso</button>
@@ -65,16 +63,16 @@
 
     <div id="appView" class="app-shell" hidden>
       <aside class="sidebar">
-        <div class="brand"><span>Soinsol</span><span class="brand-sun">a</span><span>r</span></div>
+        <div class="brand brand-sidebar"><img src="src/assets/img/logo-soinsolar.png" alt="SOINSOLAR" /></div>
         <nav class="side-nav" aria-label="Navegación principal">
-          <button class="nav-item active" data-view="dashboard"><span>IN</span>Inicio</button>
-          <button class="nav-item" data-view="projects"><span>PR</span>Proyectos</button>
-          <button class="nav-item" data-view="monthly"><span>SM</span>Seguimiento mensual</button>
-          <button class="nav-item" data-view="finance"><span>FP</span>Facturación y pagos</button>
-          <button class="nav-item" data-view="costs"><span>CG</span>Costos y gastos</button>
-          <button class="nav-item" data-view="reports"><span>RE</span>Reportes</button>
-          <button class="nav-item" data-view="history"><span>HI</span>Historial</button>
-          <button class="nav-item" data-view="admin"><span>AD</span>Administración</button>
+          <button class="nav-item active" data-view="dashboard"><img class="nav-icon" src="src/assets/img/nav-inicio.png" alt="" />Inicio</button>
+          <button class="nav-item" data-view="projects"><img class="nav-icon" src="src/assets/img/nav-proyectos.png" alt="" />Proyectos</button>
+          <button class="nav-item" data-view="monthly"><img class="nav-icon" src="src/assets/img/nav-seguimiento.png" alt="" />Seguimiento mensual</button>
+          <button class="nav-item" data-view="finance"><img class="nav-icon" src="src/assets/img/nav-facturacion.png" alt="" />Facturación y pagos</button>
+          <button class="nav-item" data-view="costs"><img class="nav-icon" src="src/assets/img/nav-costos.png" alt="" />Costos y gastos</button>
+          <button class="nav-item" data-view="reports"><img class="nav-icon" src="src/assets/img/nav-reportes.png" alt="" />Reportes</button>
+          <button class="nav-item" data-view="history"><img class="nav-icon" src="src/assets/img/nav-historial.png" alt="" />Historial</button>
+          <button class="nav-item" data-view="admin"><img class="nav-icon" src="src/assets/img/nav-administracion.png" alt="" />Administración</button>
         </nav>
         <div class="period-card">
           <small>PERIODO ACTIVO</small>
@@ -688,8 +686,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <script src="src/assets/js/config.js?v=1.5.2"></script>
-    <script type="module" src="src/assets/js/app.js?v=1.5.2"></script>
-    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.5.2"></script>
+    <script src="src/assets/js/config.js?v=1.5.3"></script>
+    <script type="module" src="src/assets/js/app.js?v=1.5.3"></script>
+    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.5.3"></script>
   </body>
 </html>
