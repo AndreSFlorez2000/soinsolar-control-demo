@@ -4,6 +4,7 @@ import { buildManagementReport, buildMonthlyExecutionReport } from "./domain/rep
 import { createXlsx } from "./domain/xlsx-export.js?v=1.5.0";
 import { canEditExecution } from "./domain/execution.js?v=1.3.0";
 import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=1.1.0";
+import { invoicePendingAmount, isSampleProject, payableInvoicesForProject } from "./domain/payment-selection.js?v=1.5.1";
 import { createApplicationDataGateway } from "./services/application-data.js?v=1.5.0";
 import { getCurrentSession, isDemoMode, registerAccount, signIn, signOut } from "./services/supabase.js?v=1.4.0";
 
@@ -83,6 +84,7 @@ let currentMonthly = [];
 let allMonthlyRows = [];
 let currentAudit = [];
 let currentInvoices = [];
+let payableInvoices = [];
 let currentPayments = [];
 let balancePayments = [];
 let currentProfiles = [];
@@ -270,6 +272,10 @@ function closeApp() {
   currentPeriods = [];
   currentMonthly = [];
   allMonthlyRows = [];
+  currentInvoices = [];
+  payableInvoices = [];
+  currentPayments = [];
+  balancePayments = [];
   currentProfiles = [];
   selectedProjectId = null;
   selectedProjectMonthly = [];
@@ -1303,30 +1309,36 @@ function financeFilters() {
   };
 }
 
-function invoicePaidAmount(invoiceId, rows = balancePayments) {
-  return rows
-    .filter((payment) => payment.invoiceId === invoiceId && payment.status !== "anulado")
-    .reduce((sum, payment) => sum + payment.amount, 0);
-}
-
-function invoicePendingAmount(invoice, rows = balancePayments) {
-  return Math.max(invoice.amount - invoicePaidAmount(invoice.id, rows), 0);
-}
-
 function populatePaymentInvoiceOptions(selectedInvoiceId = "") {
-  const options = currentInvoices
-    .filter((invoice) => invoice.status !== "anulada" && invoicePendingAmount(invoice) > 0)
-    .map((invoice) => `<option value="${invoice.id}">${escapeHtml(invoice.invoiceNumber)} · ${escapeHtml(invoice.project?.name || "Proyecto")} · saldo ${escapeHtml(formatCop(invoicePendingAmount(invoice)))}</option>`)
+  const projectId = document.querySelector("#paymentProject").value;
+  const available = payableInvoicesForProject(payableInvoices, balancePayments, projectId);
+  const options = available
+    .map((invoice) => `<option value="${invoice.id}">${escapeHtml(invoice.invoiceNumber)} · saldo ${escapeHtml(formatCop(invoicePendingAmount(invoice, balancePayments)))}</option>`)
     .join("");
   setSelectOptions(document.querySelector("#paymentInvoice"), '<option value="">Selecciona una factura con saldo</option>', options, selectedInvoiceId);
+  const project = currentProjects.find((item) => item.projectId === projectId);
+  document.querySelector("#paymentInvoiceHelp").textContent = !projectId
+    ? "Elige un centro de costo para consultar sus facturas."
+    : available.length
+      ? isSampleProject(project)
+        ? "Este es un proyecto de prueba. Sus facturas son ficticias."
+        : `${available.length} factura(s) con saldo para ${project.costCenter}.`
+      : "Este centro no tiene facturas con saldo. Para crear una factura, usa «Nueva factura» en la parte superior.";
   updatePaymentAvailable();
 }
 
 function updatePaymentAvailable() {
-  const invoice = currentInvoices.find((item) => item.id === document.querySelector("#paymentInvoice").value);
-  document.querySelector("#paymentAvailable").value = invoice ? formatCop(invoicePendingAmount(invoice)) : formatCop(0);
-  if (invoice) document.querySelector("#paymentAmount").max = String(invoicePendingAmount(invoice));
+  const invoice = payableInvoices.find((item) => item.id === document.querySelector("#paymentInvoice").value);
+  document.querySelector("#paymentAvailable").value = invoice ? formatCop(invoicePendingAmount(invoice, balancePayments)) : formatCop(0);
+  if (invoice) document.querySelector("#paymentAmount").max = String(invoicePendingAmount(invoice, balancePayments));
   else document.querySelector("#paymentAmount").removeAttribute("max");
+}
+
+function populatePaymentProjectOptions(selectedProjectId = "") {
+  const options = currentProjects.map((project) =>
+    `<option value="${project.projectId}">${escapeHtml(project.costCenter)} · ${escapeHtml(project.projectName)}${isSampleProject(project) ? " (Prueba)" : ""}</option>`
+  ).join("");
+  setSelectOptions(document.querySelector("#paymentProject"), '<option value="">Selecciona un centro de costo</option>', options, selectedProjectId);
 }
 
 async function loadFinance(filters) {
@@ -1341,13 +1353,13 @@ async function loadFinance(filters) {
       ["Hasta:", applied.dateTo ? formatDate(applied.dateTo) : "", "financeFilterTo"]
     ], "financeFilters");
     const data = await ensureGateway();
-    [currentInvoices, currentPayments, balancePayments] = await Promise.all([
+    [currentInvoices, currentPayments, payableInvoices, balancePayments] = await Promise.all([
       data.listInvoices(applied),
       data.listPayments(applied),
-      data.listPayments({ projectId: applied.projectId, periodId: applied.periodId })
+      data.listInvoices({}),
+      data.listPayments({})
     ]);
     renderFinance();
-    populatePaymentInvoiceOptions();
     setMessage(message, currentInvoices.length || currentPayments.length ? "Consulta actualizada." : "");
   } catch (error) {
     setMessage(message, error.message || "No fue posible consultar facturas y pagos.", true);
@@ -1359,18 +1371,18 @@ function renderFinance() {
   const activePayments = currentPayments.filter((payment) => payment.status !== "anulado");
   const invoiced = activeInvoices.reduce((sum, invoice) => sum + invoice.amount, 0);
   const paid = activePayments.reduce((sum, payment) => sum + payment.amount, 0);
-  const pendingInvoices = activeInvoices.filter((invoice) => invoicePendingAmount(invoice) > 0);
+  const pendingInvoices = activeInvoices.filter((invoice) => invoicePendingAmount(invoice, balancePayments) > 0);
 
   document.querySelector("#financeInvoicedTotal").textContent = formatCop(invoiced);
   document.querySelector("#financePaidTotal").textContent = formatCop(paid);
-  document.querySelector("#financePendingTotal").textContent = formatCop(pendingInvoices.reduce((sum, invoice) => sum + invoicePendingAmount(invoice), 0));
+  document.querySelector("#financePendingTotal").textContent = formatCop(pendingInvoices.reduce((sum, invoice) => sum + invoicePendingAmount(invoice, balancePayments), 0));
   document.querySelector("#financePendingInvoices").textContent = pendingInvoices.length;
 
   document.querySelector("#invoiceRows").innerHTML = currentInvoices.map((invoice) => {
-    const pending = invoice.status === "anulada" ? 0 : invoicePendingAmount(invoice);
+    const pending = invoice.status === "anulada" ? 0 : invoicePendingAmount(invoice, balancePayments);
     const canPay = invoice.status !== "anulada" && pending > 0;
     return `<tr>
-      <td><span class="reference-cell"><strong>${escapeHtml(invoice.invoiceNumber)}</strong>${supportAction(invoice.supportPath)}</span></td>
+      <td><span class="reference-cell"><strong>${escapeHtml(invoice.invoiceNumber)}</strong>${isSampleProject(invoice.project) ? '<small class="sample-invoice-badge">Factura de prueba</small>' : ""}${supportAction(invoice.supportPath)}</span></td>
       <td>${escapeHtml(formatDate(invoice.issueDate))}</td>
       <td><span class="project-name-cell"><strong>${escapeHtml(invoice.project?.name || "Proyecto")}</strong><small>${escapeHtml(invoice.project?.costCenter || "")}</small></span></td>
       <td>${escapeHtml(invoice.period ? `${monthNames[invoice.period.month - 1]} ${invoice.period.year}` : "Sin periodo")}</td>
@@ -1417,6 +1429,8 @@ function openNewInvoice(projectId = "") {
 function openNewPayment(invoiceId = "") {
   document.querySelector("#paymentForm").reset();
   populatePeriodOptions();
+  const selectedInvoice = payableInvoices.find((invoice) => invoice.id === invoiceId);
+  populatePaymentProjectOptions(selectedInvoice?.projectId || document.querySelector("#financeFilterProject").value);
   populatePaymentInvoiceOptions(invoiceId);
   setDefaultOpenPeriod(document.querySelector("#paymentPeriod"), document.querySelector("#paymentDate"));
   setMessage(document.querySelector("#paymentFormMessage"));
@@ -1457,8 +1471,13 @@ async function savePayment(event) {
   event.preventDefault();
   const button = document.querySelector("#savePaymentButton");
   const message = document.querySelector("#paymentFormMessage");
-  const invoice = currentInvoices.find((item) => item.id === document.querySelector("#paymentInvoice").value);
-  if (!invoice) return setMessage(message, "Selecciona una factura con saldo.", true);
+  const invoice = payableInvoices.find((item) =>
+    item.id === document.querySelector("#paymentInvoice").value &&
+    item.projectId === document.querySelector("#paymentProject").value
+  );
+  if (!invoice || invoicePendingAmount(invoice, balancePayments) <= 0) {
+    return setMessage(message, "Selecciona un centro de costo y una factura con saldo.", true);
+  }
   try {
     setBusy(button, true, "Guardando…");
     const supportPath = await uploadSelectedSupport(invoice.projectId, "pagos", document.querySelector("#paymentSupportFile"));
@@ -1923,6 +1942,7 @@ document.querySelector("#invoiceForm").addEventListener("submit", saveInvoice);
 document.querySelector("#newPaymentButton").addEventListener("click", () => openNewPayment());
 document.querySelector("#paymentForm").addEventListener("submit", savePayment);
 document.querySelector("#paymentInvoice").addEventListener("change", updatePaymentAvailable);
+document.querySelector("#paymentProject").addEventListener("change", () => populatePaymentInvoiceOptions());
 document.querySelector("#exportReportButton").addEventListener("click", exportManagementReport);
 document.querySelector("#reportProgressForm").addEventListener("submit", saveReportProgress);
 document.querySelector("#reloadProfilesButton").addEventListener("click", loadProfiles);

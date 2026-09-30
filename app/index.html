@@ -11,7 +11,7 @@
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.5.0" />
+    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.5.1" />
   </head>
   <body>
     <section id="loginView" class="login-shell">
@@ -409,7 +409,7 @@
 
           <section id="financeView" class="content-view" hidden>
             <div class="section-heading">
-              <div><h3>Facturación y pagos</h3><p>Registro de facturas, recaudos y cartera por proyecto.</p></div>
+              <div><h3>Facturación y pagos</h3><p>Las facturas se registran desde «Nueva factura». Para registrar un pago, selecciona primero el centro de costo y luego una factura con saldo.</p></div>
               <div class="heading-actions"><button id="newPaymentButton" class="btn btn-outline-primary" type="button">Registrar pago</button><button id="newInvoiceButton" class="btn btn-primary" type="button">Nueva factura</button></div>
             </div>
 
@@ -659,6 +659,7 @@
       <form id="paymentForm" method="dialog" novalidate>
         <div class="dialog-heading"><div><p class="eyebrow">Pagos</p><h3>Registrar pago</h3></div><button class="dialog-close" type="button" data-close-dialog="paymentDialog" aria-label="Cerrar">×</button></div>
         <div class="form-grid">
+          <label class="span-2">Centro de costo *<select id="paymentProject" class="form-select" required></select></label>
           <label class="span-2">Factura con saldo *<select id="paymentInvoice" class="form-select" required></select></label>
           <label>Periodo abierto *<select id="paymentPeriod" class="form-select" required></select></label>
           <label>Fecha del pago *<input id="paymentDate" class="form-control" type="date" required /></label>
@@ -668,6 +669,7 @@
           <label>Saldo disponible de la factura<input id="paymentAvailable" class="form-control" readonly /></label>
           <label>Soporte privado<input id="paymentSupportFile" class="form-control" type="file" accept=".pdf,.png,.jpg,.jpeg,.xls,.xlsx" /></label>
         </div>
+        <p id="paymentInvoiceHelp" class="dialog-note"></p>
         <p class="dialog-note">La suma de pagos activos no puede superar el valor de la factura.</p>
         <p id="paymentFormMessage" class="form-message" role="alert"></p>
         <div class="dialog-actions"><button class="btn btn-outline-secondary" type="button" data-close-dialog="paymentDialog">Cancelar</button><button id="savePaymentButton" class="btn btn-primary" type="submit">Guardar pago</button></div>
@@ -686,8 +688,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <script src="src/assets/js/config.js?v=1.5.0"></script>
-    <script type="module" src="src/assets/js/app.js?v=1.5.0"></script>
-    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.5.0"></script>
+    <script src="src/assets/js/config.js?v=1.5.1"></script>
+    <script type="module" src="src/assets/js/app.js?v=1.5.1"></script>
+    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.5.1"></script>
   </body>
 </html>

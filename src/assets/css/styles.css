@@ -368,6 +368,7 @@ button, input, select, textarea { font: inherit; }
 .finance-status.emitida, .finance-status.confirmado { color: var(--green); background: #e5f5eb; }
 .finance-status.registrada, .finance-status.registrado { color: var(--blue); background: #e7f0f8; }
 .finance-status.anulada, .finance-status.anulado { color: var(--red); background: #fae8e8; }
+.reference-cell .sample-invoice-badge { width: fit-content; padding: 3px 7px; border-radius: 6px; color: #805413; background: #fff1d4; font-weight: 700; }
 .report-kpi-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
 .report-kpi-grid .mini-kpi strong { font-size: clamp(15px, 1.15vw, 19px); }
 .report-formulas { margin-top: 17px; padding: 19px 22px; }
