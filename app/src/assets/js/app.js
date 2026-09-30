@@ -1,7 +1,8 @@
 import { buildMonthlySeries, calculateDashboardIndicators } from "./domain/dashboard.js?v=1.4.1";
 import { calculateProjectIndicators } from "./domain/project-analytics.js?v=1.4.1";
-import { buildManagementReport, buildMonthlyExecutionReport } from "./domain/reports.js?v=1.5.0";
-import { createXlsx } from "./domain/xlsx-export.js?v=1.5.0";
+import { buildManagementReport, buildMonthlyExecutionReport } from "./domain/reports.js?v=1.5.2";
+import { monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.5.2";
+import { createXlsx } from "./domain/xlsx-export.js?v=1.5.2";
 import { canEditExecution } from "./domain/execution.js?v=1.3.0";
 import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=1.1.0";
 import { invoicePendingAmount, isSampleProject, payableInvoicesForProject } from "./domain/payment-selection.js?v=1.5.1";
@@ -1654,17 +1655,7 @@ function exportManagementReport() {
           row.paid, row.costsExpenses, row.profitability, row.contractualBalance, row.paymentPending
         ])
       },
-      {
-        name: "Avance mensual",
-        headers: ["Centro de costo", "Proyecto", "Año", "Mes", "Contrato vigente", "Avance físico del mes", "Valor equivalente del mes", "Avance físico acumulado", "Valor equivalente acumulado", "Facturado en el mes", "Avance financiero del mes", "Novedad que afecta la ejecución", "Estado del seguimiento"],
-        types: ["text", "text", "number", "text", "money", "percent", "money", "percent", "money", "money", "percent", "text", "text"],
-        rows: currentReportMonthly.map((row) => [
-          row.costCenter, row.projectName, row.year, monthNames[row.month - 1], row.contractValue,
-          row.monthlyProgress / 100, row.monthlyEquivalent, row.cumulativeProgress / 100,
-          row.cumulativeEquivalent, row.monthlyInvoiced, row.monthlyBilling / 100,
-          row.executionIssue, row.validationStatus
-        ])
-      }
+      ...monthlyWorkbookSheets(currentReportMonthly)
     ]);
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");

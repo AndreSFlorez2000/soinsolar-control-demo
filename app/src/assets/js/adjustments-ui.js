@@ -1,8 +1,9 @@
 import { incrementalExecutionPercent } from "./domain/execution.js?v=1.4.1";
 import { parseCostCsv, resolveCostImportRows } from "./domain/cost-import.js?v=1.2.0";
 import { financialAdvance } from "./domain/financial.js?v=1.4.1";
-import { buildMonthlyExecutionReport } from "./domain/reports.js?v=1.5.0";
-import { createXlsx } from "./domain/xlsx-export.js?v=1.5.0";
+import { buildMonthlyExecutionReport } from "./domain/reports.js?v=1.5.2";
+import { monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.5.2";
+import { createXlsx } from "./domain/xlsx-export.js?v=1.5.2";
 
 function api() {
   if (!window.SOINSOLAR_APP_API) throw new Error("La aplicación todavía no está lista.");
@@ -65,17 +66,7 @@ function exportMonthly() {
     return;
   }
 
-  const blob = createXlsx([{
-    name: "Seguimiento mensual",
-    headers: ["Periodo", "Centro de costo", "Proyecto", "Contrato vigente", "Avance físico del mes", "Valor equivalente del mes", "Avance físico acumulado", "Valor equivalente acumulado", "Facturado en el mes", "Avance financiero del mes", "Novedad que afecta la ejecución", "Estado del seguimiento"],
-    types: ["text", "text", "text", "money", "percent", "money", "percent", "money", "money", "percent", "text", "text"],
-    rows: rows.map((row) => [
-      row.year + "-" + String(row.month).padStart(2, "0"), row.costCenter, row.projectName,
-      row.contractValue, row.monthlyProgress / 100, row.monthlyEquivalent,
-      row.cumulativeProgress / 100, row.cumulativeEquivalent, row.monthlyInvoiced,
-      row.monthlyBilling / 100, row.executionIssue, row.validationStatus
-    ])
-  }]);
+  const blob = createXlsx(monthlyWorkbookSheets(rows));
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;

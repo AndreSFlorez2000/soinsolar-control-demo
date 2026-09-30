@@ -91,6 +91,7 @@ export function buildMonthlyExecutionReport(projects = [], monthlyRows = []) {
       const contractValue = amount(row.contractValue || project.contractValue);
       const monthlyProgress = Number(row.executedIncrementalPercentage ?? 0);
       const cumulativeProgress = Number(row.executedCumulativePercentage ?? row.previousExecutedCumulativePercentage ?? 0);
+      const previousProgress = Number(row.previousExecutedCumulativePercentage ?? cumulativeProgress - monthlyProgress);
       return Object.freeze({
         projectId: row.projectId,
         costCenter: row.costCenter,
@@ -99,6 +100,7 @@ export function buildMonthlyExecutionReport(projects = [], monthlyRows = []) {
         month: row.month,
         contractValue,
         monthlyProgress,
+        previousProgress,
         cumulativeProgress,
         monthlyEquivalent: Math.round(contractValue * monthlyProgress) / 100,
         cumulativeEquivalent: Math.round(contractValue * cumulativeProgress) / 100,
