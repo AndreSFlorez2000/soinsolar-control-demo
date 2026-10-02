@@ -24,21 +24,22 @@ function worksheet({
   const lastColumn = column(headers.length - 1);
   const headerStyle = (index) => headerGroups.find(({ from, to }) => index >= from && index <= to)?.style ?? 1;
   const cell = (value, rowIndex, colIndex, kind, style = 0, formula = null, banded = false, wrap = false) => {
-    if (value === null || value === undefined || value === "") return "";
     const ref = `${column(colIndex)}${rowIndex}`;
     if (["number", "money", "money0", "percent", "points"].includes(kind)) {
-      const number = Number(value);
-      if (!Number.isFinite(number)) return "";
       const numericStyle = kind === "money" ? (highlighted.has(colIndex) ? 22 : banded ? 17 : 2)
         : kind === "money0" ? (highlighted.has(colIndex) ? 21 : banded ? 18 : 7)
         : kind === "percent" ? (highlighted.has(colIndex) ? 6 : banded ? 19 : 3)
         : kind === "points" ? (highlighted.has(colIndex) ? 8 : banded ? 20 : 9)
         : banded ? 16 : 0;
+      if (value === null || value === undefined || value === "") return `<c r="${ref}" s="${numericStyle}"/>`;
+      const number = Number(value);
+      if (!Number.isFinite(number)) return `<c r="${ref}" s="${numericStyle}"/>`;
       // Las fórmulas solo proceden de funciones fijas del informe, nunca de observaciones del usuario.
       if (formula && !/^[A-Z0-9$()+\-*/., ]+$/.test(formula)) throw new TypeError("Fórmula de informe no válida.");
       return `<c r="${ref}" s="${numericStyle}">${formula ? `<f>${xml(formula)}</f>` : ""}<v>${number}</v></c>`;
     }
     const textStyle = style || (wrap ? (banded ? 24 : 23) : banded ? 16 : 0);
+    if (value === null || value === undefined || value === "") return `<c r="${ref}" s="${textStyle}"/>`;
     return `<c r="${ref}" s="${textStyle}" t="inlineStr"><is><t xml:space="preserve">${xml(value)}</t></is></c>`;
   };
   const leading = title
@@ -54,8 +55,8 @@ function worksheet({
     const rowHeight = index
       ? (wrappedLines > 1 ? ` ht="${Math.min(240, wrappedLines * 17 + 5)}" customHeight="1"` : "")
       : ' ht="48" customHeight="1"';
-    return `<row r="${rowIndex}"${rowHeight}>${values.map((value, colIndex) =>
-      cell(value, rowIndex, colIndex, index ? types[colIndex] : "text", index ? 0 : headerStyle(colIndex),
+    return `<row r="${rowIndex}"${rowHeight}>${headers.map((_, colIndex) =>
+      cell(values[colIndex], rowIndex, colIndex, index ? types[colIndex] : "text", index ? 0 : headerStyle(colIndex),
         index ? formulas[colIndex]?.(rowIndex) : null, index > 0 && index % 2 === 0,
         index > 0 && wrapped.has(colIndex))
     ).join("")}</row>`;
@@ -106,10 +107,11 @@ const workbookStyles = [
   ...["123A56", "E2F5F1", "0C5361", "245C94", "2D7C68", "A46A1A", "6A5792", "53687B", "F4F8FA"].map(solidFill),
   '</fills>',
   '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border>',
-  '<border><left/><right/><top/><bottom style="thin"><color rgb="FFDCE6EB"/></bottom><diagonal/></border></borders>',
+  '<border><left style="thin"><color rgb="FFDCE6EB"/></left><right style="thin"><color rgb="FFDCE6EB"/></right>',
+  '<top style="thin"><color rgb="FFDCE6EB"/></top><bottom style="thin"><color rgb="FFDCE6EB"/></bottom><diagonal/></border></borders>',
   '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>',
   '<cellXfs count="25">',
-  styleXf(0, 0, 0, 0),      // 0: texto
+  styleXf(0, 0, 0),         // 0: texto con cuadrícula
   styleXf(0, 1, 1, 1, true), // 1: encabezado
   styleXf(164, 0, 0),       // 2: COP con centavos
   styleXf(165, 0, 0),       // 3: porcentaje

@@ -1,9 +1,9 @@
 import { incrementalExecutionPercent } from "./domain/execution.js?v=1.4.1";
-import { parseCostCsv, resolveCostImportRows } from "./domain/cost-import.js?v=1.2.0";
+import { parseCostCsv, resolveCostImportRows } from "./domain/cost-import.js?v=1.5.7";
 import { financialAdvance } from "./domain/financial.js?v=1.4.1";
-import { buildMonthlyExecutionReport } from "./domain/reports.js?v=1.5.6";
-import { monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.5.6";
-import { createXlsx } from "./domain/xlsx-export.js?v=1.5.6";
+import { buildMonthlyExecutionReport } from "./domain/reports.js?v=1.5.7";
+import { monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.5.7";
+import { createXlsx } from "./domain/xlsx-export.js?v=1.5.7";
 
 function api() {
   if (!window.SOINSOLAR_APP_API) throw new Error("La aplicación todavía no está lista.");
@@ -79,7 +79,10 @@ async function readImportRows(file) {
   if (/\.csv$/i.test(file.name)) return parseCostCsv(await file.text());
   if (!window.XLSX) throw new Error("No fue posible cargar el lector de Excel.");
   const workbook = window.XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true });
-  return window.XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { defval: "" });
+  const sheetName = workbook.SheetNames.find((name) => name.trim().toLocaleLowerCase("es") === "costos y gastos")
+    ?? workbook.SheetNames[0];
+  if (!sheetName) throw new Error("El archivo Excel no contiene hojas para importar.");
+  return window.XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: "", blankrows: false });
 }
 
 function setCostMessage(message, isError = false) {

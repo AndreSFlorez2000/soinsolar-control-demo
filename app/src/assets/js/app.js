@@ -1,8 +1,9 @@
 import { buildMonthlySeries, calculateDashboardIndicators } from "./domain/dashboard.js?v=1.4.1";
 import { calculateProjectIndicators } from "./domain/project-analytics.js?v=1.4.1";
-import { buildManagementReport, buildMonthlyExecutionReport } from "./domain/reports.js?v=1.5.6";
-import { managementSummarySheet, monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.5.6";
-import { createXlsx } from "./domain/xlsx-export.js?v=1.5.6";
+import { buildManagementReport, buildMonthlyExecutionReport } from "./domain/reports.js?v=1.5.7";
+import { managementSummarySheet, monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.5.7";
+import { createXlsx } from "./domain/xlsx-export.js?v=1.5.7";
+import { costWorkbookSheets } from "./domain/cost-workbook.js?v=1.5.7";
 import { canEditExecution } from "./domain/execution.js?v=1.3.0";
 import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=1.1.0";
 import { invoicePendingAmount, isSampleProject, payableInvoicesForProject } from "./domain/payment-selection.js?v=1.5.1";
@@ -1294,18 +1295,18 @@ async function saveCost(event) {
   }
 }
 
-function exportCosts() {
-  const headers = ["Fecha", "Centro de costo", "Proyecto", "Tipo", "Categoría", "Descripción", "Proveedor", "Referencia", "Valor COP"];
-  const quote = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
-  const rows = currentCosts.map((item) => [item.movementDate, item.project?.costCenter, item.project?.name, item.type, item.category, item.description, item.supplierName, item.documentReference, item.amount].map(quote).join(","));
-  const blob = new Blob(["\uFEFF", [headers.map(quote).join(","), ...rows].join("\n")], { type: "text/csv;charset=utf-8" });
+function downloadCostWorkbook(template = false) {
+  const blob = createXlsx(costWorkbookSheets(currentCosts, { template }));
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `costos-gastos-${new Date().toISOString().slice(0, 10)}.csv`;
+  anchor.download = `${template ? "formato-costos-gastos" : "costos-gastos"}-${new Date().toISOString().slice(0, 10)}.xlsx`;
   anchor.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+function exportCosts() { downloadCostWorkbook(); }
+function downloadCostTemplate() { downloadCostWorkbook(true); }
 
 function financeFilters() {
   const dateFrom = document.querySelector("#financeFilterFrom").value;
@@ -1923,6 +1924,7 @@ document.querySelector("#monthlyForm").addEventListener("submit", saveMonthly);
 document.querySelector("#newCostButton").addEventListener("click", openNewCost);
 document.querySelector("#costForm").addEventListener("submit", saveCost);
 document.querySelector("#exportCostsButton").addEventListener("click", exportCosts);
+document.querySelector("#downloadCostTemplateButton").addEventListener("click", downloadCostTemplate);
 document.querySelector("#exportHistoryButton").addEventListener("click", exportHistory);
 document.querySelector("#exportDashboardButton").addEventListener("click", exportDashboard);
 document.querySelector("#detailEditProject").addEventListener("click", () => selectedProjectId && openEditProject(selectedProjectId));

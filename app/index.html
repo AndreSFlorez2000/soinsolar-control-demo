@@ -11,7 +11,7 @@
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.5.6" />
+    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.5.7" />
   </head>
   <body>
     <section id="loginView" class="login-shell">
@@ -345,8 +345,9 @@
           <section id="costsView" class="content-view" hidden>
             <div class="section-heading">
               <div><h3>Costos y gastos</h3><p>Movimientos financieros asociados a proyecto y periodo.</p></div>
-              <div class="heading-actions"><input id="costImportFile" type="file" accept=".csv,.xlsx,.xls" hidden /><button id="importCostsButton" class="btn btn-outline-primary">Importar Excel/CSV</button><button id="exportCostsButton" class="btn btn-outline-primary">Exportar CSV</button><button id="newCostButton" class="btn btn-primary">Nuevo movimiento</button></div>
+              <div class="heading-actions"><input id="costImportFile" type="file" accept=".csv,.xlsx,.xls" hidden /><button id="downloadCostTemplateButton" class="btn btn-outline-primary" type="button">Descargar formato</button><button id="importCostsButton" class="btn btn-outline-primary" type="button">Importar Excel/CSV</button><button id="exportCostsButton" class="btn btn-outline-primary" type="button">Exportar Excel</button><button id="newCostButton" class="btn btn-primary" type="button">Nuevo movimiento</button></div>
             </div>
+            <p class="cost-import-hint">Completa la hoja “Costos y gastos” del formato y luego pulsa “Importar Excel/CSV”. El periodo de cada fecha debe estar abierto.</p>
 
             <article class="panel filter-panel">
               <form id="costFilters" class="filter-grid filter-grid-costs" autocomplete="off">
@@ -686,8 +687,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <script src="src/assets/js/config.js?v=1.5.6"></script>
-    <script type="module" src="src/assets/js/app.js?v=1.5.6"></script>
-    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.5.6"></script>
+    <script src="src/assets/js/config.js?v=1.5.7"></script>
+    <script type="module" src="src/assets/js/app.js?v=1.5.7"></script>
+    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.5.7"></script>
   </body>
 </html>

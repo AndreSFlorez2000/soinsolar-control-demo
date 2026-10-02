@@ -124,6 +124,8 @@ button, input, select, textarea { font: inherit; }
 .empty-icon { display: grid; place-items: center; width: 64px; height: 64px; margin-bottom: 12px; color: var(--blue); background: #e4f0fa; border-radius: 18px; font-weight: 800; }
 
 .heading-actions, .filter-actions, .dialog-actions { display: flex; align-items: center; gap: 10px; }
+.heading-actions { flex-wrap: wrap; justify-content: flex-end; }
+.cost-import-hint { margin: -6px 0 18px; color: var(--muted); font-size: 12px; }
 .filter-panel { padding: 18px 20px; }
 .filter-grid { display: grid; grid-template-columns: repeat(4, minmax(150px, 1fr)) auto; align-items: end; gap: 14px; }
 .filter-grid-costs { grid-template-columns: repeat(3, minmax(145px, 1fr)) repeat(3, minmax(125px, .8fr)); }

@@ -97,7 +97,8 @@ export function resolveCostImportRows(rows = [], { projects = [], periods = [] }
   const errors = [];
 
   rows.forEach((row, index) => {
-    const rowNumber = index + 2;
+    if (Object.values(row ?? {}).every((value) => value === null || value === undefined || String(value).trim() === "")) return;
+    const rowNumber = Number.isInteger(row?.__rowNum__) ? row.__rowNum__ + 1 : index + 2;
     const costCenter = String(firstValue(row, ["centro_costo", "centro de costo", "cost_center", "centro"])).trim();
     const type = String(firstValue(row, ["tipo", "tipo_movimiento", "movimiento"])).trim().toLocaleLowerCase("es");
     const category = String(firstValue(row, ["categoria", "categoría"])).trim();
