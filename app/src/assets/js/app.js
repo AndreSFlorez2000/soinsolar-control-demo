@@ -1,7 +1,7 @@
 import { buildMonthlySeries, calculateDashboardIndicators } from "./domain/dashboard.js?v=1.4.1";
 import { calculateProjectIndicators } from "./domain/project-analytics.js?v=1.4.1";
-import { buildManagementReport, buildMonthlyExecutionReport } from "./domain/reports.js?v=1.5.2";
-import { monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.5.2";
+import { buildManagementReport, buildMonthlyExecutionReport } from "./domain/reports.js?v=1.5.4";
+import { monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.5.4";
 import { createXlsx } from "./domain/xlsx-export.js?v=1.5.2";
 import { canEditExecution } from "./domain/execution.js?v=1.3.0";
 import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=1.1.0";
@@ -993,7 +993,10 @@ function renderPeriods() {
 }
 
 function renderMonthly() {
+  const paymentTotals = new Map(buildMonthlyExecutionReport(currentProjects, currentMonthly, allMonthlyRows)
+    .map((row) => [`${row.projectId}:${row.year}:${row.month}`, row]));
   document.querySelector("#monthlyRows").innerHTML = currentMonthly.map((tracking) => {
+    const payment = paymentTotals.get(`${tracking.projectId}:${tracking.year}:${tracking.month}`);
     const locked = tracking.periodStatus === "cerrado";
     const canValidate = !locked && tracking.validationStatus !== "validado";
     const mayEdit = canEditExecution(currentUserProfile);
@@ -1007,6 +1010,8 @@ function renderMonthly() {
       <td>${formatPercent(tracking.monthlyProgressPercentage)}</td>
       <td>${formatPercent(tracking.cumulativeProgressPercentage ?? tracking.previousExecutedCumulativePercentage)}</td>
       <td>${formatPercent(tracking.cumulativeBillingPercentage)}</td>
+      <td>${formatCop(tracking.paidValue)}</td>
+      <td>${formatCop(payment?.cumulativePaid ?? 0)}</td>
       <td>${formatCop(tracking.costsExpensesValue)}</td>
       <td>${tracking.executionIssue ? escapeHtml(tracking.executionIssue) : "—"}</td>
       <td><span class="validation-badge ${escapeHtml(tracking.validationStatus || "borrador")}">${escapeHtml(tracking.validationStatus || "sin registro")}</span></td>
@@ -1558,6 +1563,8 @@ function renderReports() {
     <td>${formatCop(row.monthlyEquivalent)}</td>
     <td>${formatPercent(row.cumulativeProgress)}</td>
     <td>${formatCop(row.monthlyInvoiced)}</td>
+    <td>${formatCop(row.monthlyPaid)}</td>
+    <td>${formatCop(row.cumulativePaid)}</td>
     <td>${formatPercent(row.monthlyBilling)}</td>
     <td>${row.executionIssue ? escapeHtml(row.executionIssue) : "—"}</td>
   </tr>`).join("");
@@ -1663,7 +1670,7 @@ function exportManagementReport() {
     anchor.download = `informe-avance-proyectos-${new Date().toISOString().slice(0, 10)}.xlsx`;
     anchor.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    setMessage(document.querySelector("#reportModuleMessage"), "Informe Excel generado con resumen, avance mensual y novedades.");
+    setMessage(document.querySelector("#reportModuleMessage"), "Informe Excel generado con avance mensual, pagos de cada mes y pagos acumulados.");
   } catch (error) {
     setMessage(document.querySelector("#reportModuleMessage"), error.message || "No fue posible generar el informe Excel.", true);
   }

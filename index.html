@@ -11,7 +11,7 @@
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.5.3" />
+    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.5.4" />
   </head>
   <body>
     <section id="loginView" class="login-shell">
@@ -294,7 +294,7 @@
 
             <div id="monthlyModuleMessage" class="module-message module-message-block" role="status" aria-live="polite"></div>
             <article class="panel data-panel">
-              <div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Periodo</th><th>Proyecto</th><th>Facturación mes</th><th>Avance mes</th><th>Avance de ejecución</th><th>Avance financiero</th><th>Costos y gastos</th><th>Novedad de ejecución</th><th>Validación</th><th>Acciones</th></tr></thead><tbody id="monthlyRows"></tbody></table></div>
+              <div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Periodo</th><th>Proyecto</th><th>Facturación mes</th><th>Avance físico mes</th><th>Avance físico acumulado</th><th>Avance financiero</th><th>Pagado mes</th><th>Pagado acumulado</th><th>Costos y gastos</th><th>Novedad de ejecución</th><th>Validación</th><th>Acciones</th></tr></thead><tbody id="monthlyRows"></tbody></table></div>
               <div id="monthlyEmpty" class="inline-empty" hidden>No se encontraron registros mensuales.</div>
             </article>
           </section>
@@ -490,8 +490,8 @@
             </article>
 
             <article class="panel data-panel report-data-panel">
-              <div class="panel-heading"><div><h4>Avance mes a mes</h4><small>Avance físico del mes = acumulado actual − acumulado anterior. El valor equivalente usa el contrato vigente; no es facturación. Los meses sin registro muestran 0 % de avance del mes.</small></div></div>
-              <div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Proyecto</th><th>Periodo</th><th>Contrato</th><th>Avance del mes</th><th>Valor equivalente</th><th>Avance acumulado</th><th>Facturado en el mes</th><th>Avance financiero del mes</th><th>Novedad de ejecución</th></tr></thead><tbody id="reportMonthlyRows"></tbody></table></div>
+              <div class="panel-heading"><div><h4>Avance y pagos mes a mes</h4><small>Avance físico del mes = acumulado actual − acumulado anterior. El pago del mes y el pagado acumulado se muestran por separado; recibir un pago no cambia el avance físico. Los meses sin registro muestran 0 % de avance del mes.</small></div></div>
+              <div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Proyecto</th><th>Periodo</th><th>Contrato</th><th>Avance físico del mes</th><th>Valor equivalente</th><th>Avance físico acumulado</th><th>Facturado en el mes</th><th>Pagado en el mes</th><th>Pagado acumulado</th><th>Avance financiero del mes</th><th>Novedad de ejecución</th></tr></thead><tbody id="reportMonthlyRows"></tbody></table></div>
               <div id="reportMonthlyEmpty" class="inline-empty" hidden>No hay periodos registrados para estos proyectos.</div>
             </article>
           </section>
@@ -686,8 +686,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <script src="src/assets/js/config.js?v=1.5.3"></script>
-    <script type="module" src="src/assets/js/app.js?v=1.5.3"></script>
-    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.5.3"></script>
+    <script src="src/assets/js/config.js?v=1.5.4"></script>
+    <script type="module" src="src/assets/js/app.js?v=1.5.4"></script>
+    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.5.4"></script>
   </body>
 </html>

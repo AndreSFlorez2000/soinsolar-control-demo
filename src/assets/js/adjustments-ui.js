@@ -1,8 +1,8 @@
 import { incrementalExecutionPercent } from "./domain/execution.js?v=1.4.1";
 import { parseCostCsv, resolveCostImportRows } from "./domain/cost-import.js?v=1.2.0";
 import { financialAdvance } from "./domain/financial.js?v=1.4.1";
-import { buildMonthlyExecutionReport } from "./domain/reports.js?v=1.5.2";
-import { monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.5.2";
+import { buildMonthlyExecutionReport } from "./domain/reports.js?v=1.5.4";
+import { monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.5.4";
 import { createXlsx } from "./domain/xlsx-export.js?v=1.5.2";
 
 function api() {
@@ -59,7 +59,7 @@ function updateExecutionPreview() {
 
 function exportMonthly() {
   const visible = api().visibleMonthly();
-  const rows = buildMonthlyExecutionReport(api().projects(), visible);
+  const rows = buildMonthlyExecutionReport(api().projects(), visible, api().monthly());
 
   if (!rows.length) {
     window.alert("No hay periodos mensuales para exportar.");

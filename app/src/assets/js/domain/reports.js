@@ -81,8 +81,18 @@ export function buildManagementReport(projects = []) {
 
 // Los importes equivalentes al trabajo ejecutado sirven solo para este informe.
 // Nunca se suman a facturación, pagos, costos ni rentabilidad.
-export function buildMonthlyExecutionReport(projects = [], monthlyRows = []) {
+export function buildMonthlyExecutionReport(projects = [], monthlyRows = [], allMonthlyRows = monthlyRows) {
   const included = new Map(projects.map((project) => [project.projectId, project]));
+  // El acumulado usa todos los periodos del proyecto, incluso si la exportación
+  // muestra solo un mes filtrado. Un pago no modifica el avance físico.
+  const cumulativePayments = new Map();
+  const paidByProject = new Map();
+  for (const row of [...allMonthlyRows].sort((a, b) => a.year - b.year || a.month - b.month)) {
+    if (!included.has(row.projectId)) continue;
+    const paid = (paidByProject.get(row.projectId) ?? 0) + amount(row.paidValue);
+    paidByProject.set(row.projectId, paid);
+    cumulativePayments.set(`${row.projectId}:${row.year}:${row.month}`, paid);
+  }
   const rows = monthlyRows
     .filter((row) => included.has(row.projectId))
     .sort((a, b) => a.projectName.localeCompare(b.projectName, "es") || a.year - b.year || a.month - b.month)
@@ -106,6 +116,8 @@ export function buildMonthlyExecutionReport(projects = [], monthlyRows = []) {
         cumulativeEquivalent: Math.round(contractValue * cumulativeProgress) / 100,
         monthlyInvoiced: amount(row.invoicedValue),
         monthlyBilling: Number(row.monthlyBillingPercentage ?? 0),
+        monthlyPaid: amount(row.paidValue),
+        cumulativePaid: cumulativePayments.get(`${row.projectId}:${row.year}:${row.month}`) ?? 0,
         executionIssue: row.executionIssue || "",
         validationStatus: row.validationStatus || "sin registro"
       });
