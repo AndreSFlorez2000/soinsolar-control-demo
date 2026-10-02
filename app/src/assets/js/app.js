@@ -1,9 +1,9 @@
 import { buildMonthlySeries, calculateDashboardIndicators } from "./domain/dashboard.js?v=1.4.1";
 import { calculateProjectIndicators } from "./domain/project-analytics.js?v=1.4.1";
-import { buildManagementReport, buildMonthlyExecutionReport } from "./domain/reports.js?v=1.5.7";
-import { managementSummarySheet, monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.5.7";
-import { createXlsx } from "./domain/xlsx-export.js?v=1.5.7";
-import { costWorkbookSheets } from "./domain/cost-workbook.js?v=1.5.7";
+import { buildManagementReport, buildMonthlyExecutionReport } from "./domain/reports.js?v=1.5.8";
+import { managementSummarySheet, monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.5.8";
+import { createXlsx } from "./domain/xlsx-export.js?v=1.5.8";
+import { costWorkbookSheets } from "./domain/cost-workbook.js?v=1.5.8";
 import { canEditExecution } from "./domain/execution.js?v=1.3.0";
 import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=1.1.0";
 import { invoicePendingAmount, isSampleProject, payableInvoicesForProject } from "./domain/payment-selection.js?v=1.5.1";

@@ -21,6 +21,7 @@ export function managementSummarySheet(reportRows = []) {
       { from: 10, to: 11, style: 13 }, { from: 12, to: 13, style: 14 }
     ],
     tabColor: "123A56",
+    printPagesWide: 2,
     columnWidths: [20, 22, 42, 24, 20, 23, 26, 23, 26, 23, 24, 24, 25, 23],
     rows: reportRows.map((row) => [
       row.costCenter, row.parentCostCenter, row.projectName, row.municipality, row.status, row.contractValue,
@@ -66,6 +67,7 @@ export function monthlyWorkbookSheets(rows = []) {
       highlightColumns: [...monthNames.map((_, index) => index + 4), 17],
       headerGroups: [{ from: 0, to: 3, style: 1 }, { from: 4, to: 15, style: 10 }, { from: 16, to: 17, style: 15 }],
       tabColor: "245C94",
+      printPagesWide: 2,
       columnWidths: [20, 40, 10, 20, ...monthNames.map(() => 13), 21, 21]
     };
   const detail = {
@@ -120,6 +122,7 @@ export function monthlyWorkbookSheets(rows = []) {
       ],
       wrapColumns: [21, 22],
       tabColor: "0C5361",
+      printPagesWide: 3,
       columnWidths: [20, 40, 14, 22, 20, 21, 21, 27, 30, 34, 25, 28, 26, 30, 25, 28, 23, 27, 26, 27, 25, 48, 48, 21]
     };
   const paymentMatrix = {
@@ -147,6 +150,7 @@ export function monthlyWorkbookSheets(rows = []) {
         { from: 15, to: 17, style: 14 }
       ],
       tabColor: "2D7C68",
+      printPagesWide: 2,
       columnWidths: [20, 40, 10, ...monthNames.map(() => 19), 21, 25, 28]
     };
   return [detail, monthlyMatrix, paymentMatrix];

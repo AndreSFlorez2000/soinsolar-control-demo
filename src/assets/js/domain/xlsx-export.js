@@ -16,31 +16,34 @@ function column(index) {
 
 function worksheet({
   headers, rows, types, title = "", notes = [], freezeColumns = 0,
-  highlightColumns = [], columnWidths = [], formulas = {}, headerGroups = [], wrapColumns = [], tabColor = "0C5361"
+  highlightColumns = [], columnWidths = [], formulas = {}, headerGroups = [], wrapColumns = [],
+  tabColor = "0C5361", printPagesWide = 0
 }) {
   const headerRow = (title ? 1 + notes.length : 0) + 1;
   const highlighted = new Set(highlightColumns);
   const wrapped = new Set(wrapColumns);
+  const sectionStarts = new Set(headerGroups.map(({ from }) => from).filter((index) => index > 0));
   const lastColumn = column(headers.length - 1);
   const headerStyle = (index) => headerGroups.find(({ from, to }) => index >= from && index <= to)?.style ?? 1;
-  const cell = (value, rowIndex, colIndex, kind, style = 0, formula = null, banded = false, wrap = false) => {
+  const cell = (value, rowIndex, colIndex, kind, style = 0, formula = null, banded = false, wrap = false, sectionStart = false) => {
     const ref = `${column(colIndex)}${rowIndex}`;
+    const withBorder = (baseStyle) => baseStyle + (sectionStart ? 25 : 0);
     if (["number", "money", "money0", "percent", "points"].includes(kind)) {
       const numericStyle = kind === "money" ? (highlighted.has(colIndex) ? 22 : banded ? 17 : 2)
         : kind === "money0" ? (highlighted.has(colIndex) ? 21 : banded ? 18 : 7)
         : kind === "percent" ? (highlighted.has(colIndex) ? 6 : banded ? 19 : 3)
         : kind === "points" ? (highlighted.has(colIndex) ? 8 : banded ? 20 : 9)
         : banded ? 16 : 0;
-      if (value === null || value === undefined || value === "") return `<c r="${ref}" s="${numericStyle}"/>`;
+      if (value === null || value === undefined || value === "") return `<c r="${ref}" s="${withBorder(numericStyle)}"/>`;
       const number = Number(value);
-      if (!Number.isFinite(number)) return `<c r="${ref}" s="${numericStyle}"/>`;
+      if (!Number.isFinite(number)) return `<c r="${ref}" s="${withBorder(numericStyle)}"/>`;
       // Las fórmulas solo proceden de funciones fijas del informe, nunca de observaciones del usuario.
       if (formula && !/^[A-Z0-9$()+\-*/., ]+$/.test(formula)) throw new TypeError("Fórmula de informe no válida.");
-      return `<c r="${ref}" s="${numericStyle}">${formula ? `<f>${xml(formula)}</f>` : ""}<v>${number}</v></c>`;
+      return `<c r="${ref}" s="${withBorder(numericStyle)}">${formula ? `<f>${xml(formula)}</f>` : ""}<v>${number}</v></c>`;
     }
     const textStyle = style || (wrap ? (banded ? 24 : 23) : banded ? 16 : 0);
-    if (value === null || value === undefined || value === "") return `<c r="${ref}" s="${textStyle}"/>`;
-    return `<c r="${ref}" s="${textStyle}" t="inlineStr"><is><t xml:space="preserve">${xml(value)}</t></is></c>`;
+    if (value === null || value === undefined || value === "") return `<c r="${ref}" s="${withBorder(textStyle)}"/>`;
+    return `<c r="${ref}" s="${withBorder(textStyle)}" t="inlineStr"><is><t xml:space="preserve">${xml(value)}</t></is></c>`;
   };
   const leading = title
     ? [`<row r="1" ht="34" customHeight="1">${cell(title, 1, 0, "text", 4)}</row>`,
@@ -58,7 +61,7 @@ function worksheet({
     return `<row r="${rowIndex}"${rowHeight}>${headers.map((_, colIndex) =>
       cell(values[colIndex], rowIndex, colIndex, index ? types[colIndex] : "text", index ? 0 : headerStyle(colIndex),
         index ? formulas[colIndex]?.(rowIndex) : null, index > 0 && index % 2 === 0,
-        index > 0 && wrapped.has(colIndex))
+        index > 0 && wrapped.has(colIndex), sectionStarts.has(colIndex))
     ).join("")}</row>`;
   });
   const widths = headers.map((header, index) => {
@@ -72,7 +75,11 @@ function worksheet({
   const merges = title ? `<mergeCells count="${1 + notes.length}">${[1, ...notes.map((_, index) => index + 2)].map((index) => `<mergeCell ref="A${index}:${lastColumn}${index}"/>`).join("")}</mergeCells>` : "";
   const filter = rows.length ? `<autoFilter ref="A${headerRow}:${lastColumn}${headerRow + rows.length}"/>` : "";
   const safeColor = /^[A-F0-9]{6}$/i.test(tabColor) ? tabColor.toUpperCase() : "0C5361";
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetPr><tabColor rgb="FF${safeColor}"/></sheetPr><dimension ref="A1:${lastColumn}${headerRow + rows.length}"/><sheetViews><sheetView showGridLines="0" workbookViewId="0">${pane}</sheetView></sheetViews><sheetFormatPr defaultRowHeight="20"/><cols>${widths}</cols><sheetData>${[...leading, ...body].join("")}</sheetData>${filter}${merges}</worksheet>`;
+  const printWidth = Number.isInteger(printPagesWide) && printPagesWide > 0 ? Math.min(printPagesWide, 3) : 0;
+  const print = printWidth
+    ? `<pageMargins left="0.25" right="0.25" top="0.4" bottom="0.4" header="0.2" footer="0.2"/><pageSetup paperSize="8" orientation="landscape" fitToWidth="${printWidth}" fitToHeight="0"/>`
+    : "";
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetPr><tabColor rgb="FF${safeColor}"/>${printWidth ? '<pageSetUpPr fitToPage="1"/>' : ""}</sheetPr><dimension ref="A1:${lastColumn}${headerRow + rows.length}"/><sheetViews><sheetView showGridLines="0" workbookViewId="0">${pane}</sheetView></sheetViews><sheetFormatPr defaultRowHeight="22"/><cols>${widths}</cols><sheetData>${[...leading, ...body].join("")}</sheetData>${filter}${merges}${print}</worksheet>`;
 }
 
 const solidFill = (rgb) => '<fill><patternFill patternType="solid"><fgColor rgb="FF' + rgb + '"/><bgColor indexed="64"/></patternFill></fill>';
@@ -88,6 +95,20 @@ const styleXf = (numFmtId, fontId, fillId, borderId = 1, wrap = false) => {
     ? '<xf' + attributes + '><alignment vertical="center" wrapText="1"/></xf>'
     : '<xf' + attributes + '/>';
 };
+
+// Los estilos 25–49 conservan el formato de los estilos 0–24 y añaden
+// un separador vertical visible al inicio de cada bloque de columnas.
+const cellFormats = [
+  [0, 0, 0, 1, false], [0, 1, 1, 1, true], [164, 0, 0, 1, false],
+  [165, 0, 0, 1, false], [0, 2, 0, 0, false], [0, 3, 0, 0, true],
+  [165, 4, 2, 1, false], [166, 0, 0, 1, false], [167, 4, 2, 1, false],
+  [167, 0, 0, 1, false],
+  ...[3, 4, 5, 6, 7, 8].map((fill) => [0, 1, fill, 1, true]),
+  [0, 0, 9, 1, false], [164, 0, 9, 1, false], [166, 0, 9, 1, false],
+  [165, 0, 9, 1, false], [167, 0, 9, 1, false],
+  [166, 4, 2, 1, false], [164, 4, 2, 1, false],
+  [0, 0, 0, 1, true], [0, 0, 9, 1, true]
+];
 
 const workbookStyles = [
   '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
@@ -106,31 +127,15 @@ const workbookStyles = [
   '<fills count="10"><fill><patternFill patternType="none"/></fill>',
   ...["123A56", "E2F5F1", "0C5361", "245C94", "2D7C68", "A46A1A", "6A5792", "53687B", "F4F8FA"].map(solidFill),
   '</fills>',
-  '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border>',
-  '<border><left style="thin"><color rgb="FFDCE6EB"/></left><right style="thin"><color rgb="FFDCE6EB"/></right>',
-  '<top style="thin"><color rgb="FFDCE6EB"/></top><bottom style="thin"><color rgb="FFDCE6EB"/></bottom><diagonal/></border></borders>',
+  '<borders count="3"><border><left/><right/><top/><bottom/><diagonal/></border>',
+  '<border><left style="thin"><color rgb="FFADBECA"/></left><right style="thin"><color rgb="FFADBECA"/></right>',
+  '<top style="thin"><color rgb="FFADBECA"/></top><bottom style="thin"><color rgb="FFADBECA"/></bottom><diagonal/></border>',
+  '<border><left style="medium"><color rgb="FF63849A"/></left><right style="thin"><color rgb="FFADBECA"/></right>',
+  '<top style="thin"><color rgb="FFADBECA"/></top><bottom style="thin"><color rgb="FFADBECA"/></bottom><diagonal/></border></borders>',
   '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>',
-  '<cellXfs count="25">',
-  styleXf(0, 0, 0),         // 0: texto con cuadrícula
-  styleXf(0, 1, 1, 1, true), // 1: encabezado
-  styleXf(164, 0, 0),       // 2: COP con centavos
-  styleXf(165, 0, 0),       // 3: porcentaje
-  styleXf(0, 2, 0, 0),      // 4: título
-  styleXf(0, 3, 0, 0, true), // 5: explicación
-  styleXf(165, 4, 2),       // 6: porcentaje destacado
-  styleXf(166, 0, 0),       // 7: COP sin centavos
-  styleXf(167, 4, 2),       // 8: puntos porcentuales destacados
-  styleXf(167, 0, 0),       // 9: puntos porcentuales
-  ...[3, 4, 5, 6, 7, 8].map((fill) => styleXf(0, 1, fill, 1, true)), // 10–15: secciones
-  styleXf(0, 0, 9),         // 16: fila alterna
-  styleXf(164, 0, 9),       // 17: COP con centavos, alterna
-  styleXf(166, 0, 9),       // 18: COP sin centavos, alterna
-  styleXf(165, 0, 9),       // 19: porcentaje, alterna
-  styleXf(167, 0, 9),       // 20: puntos porcentuales, alterna
-  styleXf(166, 4, 2),       // 21: COP sin centavos destacado
-  styleXf(164, 4, 2),       // 22: COP con centavos destacado
-  styleXf(0, 0, 0, 1, true), // 23: texto largo
-  styleXf(0, 0, 9, 1, true), // 24: texto largo, alterna
+  '<cellXfs count="50">',
+  ...cellFormats.map((format) => styleXf(...format)),
+  ...cellFormats.map(([numFmtId, fontId, fillId, , wrap]) => styleXf(numFmtId, fontId, fillId, 2, wrap)),
   '</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>',
   '</styleSheet>'
 ].join("");

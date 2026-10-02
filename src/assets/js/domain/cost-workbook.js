@@ -20,9 +20,10 @@ export function costWorkbookSheets(movements = [], { template = false } = {}) {
         { from: 0, to: 2, style: 1 }, { from: 3, to: 5, style: 10 },
         { from: 6, to: 7, style: 11 }, { from: 8, to: 8, style: 12 }
       ],
-      wrapColumns: [5],
+      wrapColumns: [2, 4, 5, 6, 7],
       tabColor: "0C5361",
-      columnWidths: [17, 22, 40, 16, 28, 55, 30, 28, 23]
+      printPagesWide: 1,
+      columnWidths: [16, 19, 32, 13, 22, 42, 25, 22, 20]
     },
     {
       name: "Guía de carga",
@@ -49,6 +50,7 @@ export function costWorkbookSheets(movements = [], { template = false } = {}) {
       headerGroups: [{ from: 0, to: 0, style: 1 }, { from: 1, to: 1, style: 10 }, { from: 2, to: 2, style: 12 }],
       wrapColumns: [1],
       tabColor: "A46A1A",
+      printPagesWide: 1,
       columnWidths: [24, 82, 18]
     }
   ];
