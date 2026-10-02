@@ -1,9 +1,9 @@
 import { incrementalExecutionPercent } from "./domain/execution.js?v=1.4.1";
 import { parseCostCsv, resolveCostImportRows } from "./domain/cost-import.js?v=1.2.0";
 import { financialAdvance } from "./domain/financial.js?v=1.4.1";
-import { buildMonthlyExecutionReport } from "./domain/reports.js?v=1.5.4";
-import { monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.5.4";
-import { createXlsx } from "./domain/xlsx-export.js?v=1.5.2";
+import { buildMonthlyExecutionReport } from "./domain/reports.js?v=1.5.5";
+import { monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.5.5";
+import { createXlsx } from "./domain/xlsx-export.js?v=1.5.5";
 
 function api() {
   if (!window.SOINSOLAR_APP_API) throw new Error("La aplicación todavía no está lista.");

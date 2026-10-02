@@ -14,18 +14,22 @@ function column(index) {
   return letters;
 }
 
-function worksheet({ headers, rows, types, title = "", notes = [], freezeColumns = 0, highlightColumns = [], columnWidths = [] }) {
+function worksheet({ headers, rows, types, title = "", notes = [], freezeColumns = 0, highlightColumns = [], columnWidths = [], formulas = {} }) {
   const headerRow = (title ? 1 + notes.length : 0) + 1;
   const highlighted = new Set(highlightColumns);
   const lastColumn = column(headers.length - 1);
-  const cell = (value, rowIndex, colIndex, kind, style = 0) => {
+  const cell = (value, rowIndex, colIndex, kind, style = 0, formula = null) => {
     if (value === null || value === undefined || value === "") return "";
     const ref = `${column(colIndex)}${rowIndex}`;
-    if (["number", "money", "money0", "percent"].includes(kind)) {
+    if (["number", "money", "money0", "percent", "points"].includes(kind)) {
       const number = Number(value);
       if (!Number.isFinite(number)) return "";
-      const numericStyle = kind === "money" ? 2 : kind === "money0" ? 7 : kind === "percent" ? (highlighted.has(colIndex) ? 6 : 3) : 0;
-      return `<c r="${ref}" s="${numericStyle}"><v>${number}</v></c>`;
+      const numericStyle = kind === "money" ? 2 : kind === "money0" ? 7
+        : kind === "percent" ? (highlighted.has(colIndex) ? 6 : 3)
+        : kind === "points" ? (highlighted.has(colIndex) ? 8 : 9) : 0;
+      // Las fórmulas solo proceden de funciones fijas del informe, nunca de observaciones del usuario.
+      if (formula && !/^[A-Z0-9$()+\-*/., ]+$/.test(formula)) throw new TypeError("Fórmula de informe no válida.");
+      return `<c r="${ref}" s="${numericStyle}">${formula ? `<f>${xml(formula)}</f>` : ""}<v>${number}</v></c>`;
     }
     return `<c r="${ref}" s="${style}" t="inlineStr"><is><t xml:space="preserve">${xml(value)}</t></is></c>`;
   };
@@ -36,7 +40,8 @@ function worksheet({ headers, rows, types, title = "", notes = [], freezeColumns
   const body = [headers, ...rows].map((values, index) => {
     const rowIndex = headerRow + index;
     return `<row r="${rowIndex}"${index ? "" : ' ht="34" customHeight="1"'}>${values.map((value, colIndex) =>
-      cell(value, rowIndex, colIndex, index ? types[colIndex] : "text", index ? 0 : 1)
+      cell(value, rowIndex, colIndex, index ? types[colIndex] : "text", index ? 0 : 1,
+        index ? formulas[colIndex]?.(rowIndex) : null)
     ).join("")}</row>`;
   });
   const widths = headers.map((header, index) => {
@@ -52,6 +57,13 @@ function worksheet({ headers, rows, types, title = "", notes = [], freezeColumns
 }
 
 const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="3"><numFmt numFmtId="164" formatCode="&quot;$&quot;#,##0.00"/><numFmt numFmtId="165" formatCode="0.00%"/><numFmt numFmtId="166" formatCode="&quot;$&quot;#,##0"/></numFmts><fonts count="5"><font><sz val="11"/><name val="Calibri"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Calibri"/></font><font><b/><color rgb="FF123A56"/><sz val="16"/><name val="Calibri"/></font><font><color rgb="FF53687B"/><sz val="10"/><name val="Calibri"/></font><font><b/><color rgb="FF0C5361"/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF123A56"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE2F5F1"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="8"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="1" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="165" fontId="4" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyNumberFormat="1"/><xf numFmtId="166" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+
+// El avance del mes se presenta como diferencia en puntos porcentuales.
+const reportStyles = styles
+  .replace('<numFmts count="3">', '<numFmts count="4">')
+  .replace('</numFmts>', '<numFmt numFmtId="167" formatCode="0.00&quot; p.p.&quot;"/></numFmts>')
+  .replace('<cellXfs count="8">', '<cellXfs count="10">')
+  .replace('</cellXfs>', '<xf numFmtId="167" fontId="4" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyNumberFormat="1"/><xf numFmtId="167" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs>');
 
 function crc32(bytes) {
   let crc = -1;
@@ -114,9 +126,9 @@ export function createXlsx(sheets) {
   const files = [
     ["[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${sheets.map((_, index) => `<Override PartName="/xl/worksheets/sheet${index + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join("")}</Types>`],
     ["_rels/.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`],
-    ["xl/workbook.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheets.map((sheet, index) => `<sheet name="${xml(sheet.name)}" sheetId="${index + 1}" r:id="rId${index + 1}"/>`).join("")}</sheets></workbook>`],
+    ["xl/workbook.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheets.map((sheet, index) => `<sheet name="${xml(sheet.name)}" sheetId="${index + 1}" r:id="rId${index + 1}"/>`).join("")}</sheets><calcPr calcId="0" fullCalcOnLoad="1"/></workbook>`],
     ["xl/_rels/workbook.xml.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets.map((_, index) => `<Relationship Id="rId${index + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${index + 1}.xml"/>`).join("")}<Relationship Id="rId${sheets.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`],
-    ["xl/styles.xml", styles],
+    ["xl/styles.xml", reportStyles],
     ...sheets.map((sheet, index) => [`xl/worksheets/sheet${index + 1}.xml`, worksheet(sheet)])
   ];
   return zip(files);

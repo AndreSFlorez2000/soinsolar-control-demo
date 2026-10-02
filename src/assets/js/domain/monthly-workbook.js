@@ -25,13 +25,12 @@ export function monthlyWorkbookSheets(rows = []) {
       ...months, monthNames[last.month - 1], last.cumulativeProgress / 100
     ]);
 
-  return [
-    {
+  const monthlyMatrix = {
       name: "Mes a mes",
       title: "Avance físico mes a mes",
       notes: [
         "Cada porcentaje mensual es el avance acumulado del mes menos el acumulado anterior. Ejemplo: 50 % en octubre − 15 % en septiembre = 35 % en octubre.",
-        "0 %: mes incluido sin avance consignado. Celda vacía: periodo fuera de esta exportación. La facturación se consulta por separado en Detalle mensual."
+        "0 %: sin avance consignado para ese mes; consulta Estado del avance en Detalle mensual para saber si hubo registro. Celda vacía: periodo fuera de esta exportación."
       ],
       headers: ["Centro de costo", "Proyecto", "Año", "Contrato (COP)", ...monthNames, "Último mes incluido", "Avance acumulado"],
       types: ["text", "text", "number", "money0", ...monthNames.map(() => "percent"), "text", "percent"],
@@ -39,35 +38,54 @@ export function monthlyWorkbookSheets(rows = []) {
       freezeColumns: 3,
       highlightColumns: [...monthNames.map((_, index) => index + 4), 17],
       columnWidths: [20, 40, 10, 20, ...monthNames.map(() => 13), 21, 21]
-    },
-    {
+    };
+  const detail = {
       name: "Detalle mensual",
-      title: "Detalle del avance por periodo",
+      title: "Comparación mensual de ejecución, facturación y pagos",
       notes: [
-        "Avance del mes = avance acumulado − avance anterior. El valor equivalente es una referencia del contrato; no es facturación ni pago.",
-        "Facturación del mes (%) = facturado del mes ÷ contrato vigente. Los meses sin factura se muestran con 0 % y $0.",
-        "Pagado del mes suma los pagos registrados en ese periodo. Pagado acumulado suma los pagos hasta ese mes, incluso en años anteriores; ninguno modifica el avance físico."
+        "Lee F → G → H: avance anterior 15 %; avance actual 50 %; diferencia de octubre = 35 p.p. (puntos porcentuales). H se recalcula en Excel como (G − F) × 100.",
+        "El valor equivalente del mes = contrato × H ÷ 100. Es una referencia física: no es una factura, un pago ni un costo.",
+        "Facturado y pagado del mes son movimientos del periodo. Los acumulados suman los periodos anteriores, incluso de otros años. Cartera = facturado acumulado − pagado acumulado.",
+        "Sin registro físico: 0 p.p. consignados no equivale a una verificación de obra sin avance. Una celda vacía en las matrices indica que el periodo no está exportado."
       ],
       headers: [
-        "Centro de costo", "Proyecto", "Periodo", "Contrato (COP)", "Avance anterior",
-        "Avance del mes", "Avance acumulado", "Equivalente del mes (COP)",
-        "Equivalente acumulado (COP)", "Facturado del mes (COP)",
-        "Facturación del mes", "Pagado del mes (COP)", "Pagado acumulado (COP)",
-        "Novedad que afecta la ejecución", "Estado del seguimiento"
+        "Centro de costo", "Proyecto", "Periodo", "Comparado con", "Contrato (COP)",
+        "Avance cierre anterior", "Avance cierre actual", "Avance logrado en el mes (p.p.)",
+        "Equivalente físico del mes (COP)", "Equivalente físico acumulado (COP)",
+        "Facturado del mes (COP)", "Facturado acumulado (COP)",
+        "Avance financiero del mes", "Avance financiero acumulado",
+        "Pagado del mes (COP)", "Pagado acumulado (COP)",
+        "Costos del mes (COP)", "Costos acumulados (COP)",
+        "Cartera por cobrar (COP)", "Saldo por facturar (COP)",
+        "Estado del avance", "Novedad que afecta la ejecución", "Observaciones", "Validación"
       ],
-      types: ["text", "text", "text", "money0", "percent", "percent", "percent", "money0", "money0", "money0", "percent", "money0", "money0", "text", "text"],
+      types: ["text", "text", "text", "text", "money0", "percent", "percent", "points", "money0", "money0", "money0", "money0", "percent", "percent", "money0", "money0", "money0", "money0", "money0", "money0", "text", "text", "text", "text"],
       rows: rows.map((row) => [
         row.costCenter, row.projectName, `${row.year}-${String(row.month).padStart(2, "0")}`,
-        row.contractValue, row.previousProgress / 100, row.monthlyProgress / 100,
-        row.cumulativeProgress / 100, row.monthlyEquivalent, row.cumulativeEquivalent,
-        row.monthlyInvoiced, row.monthlyBilling / 100, row.monthlyPaid, row.cumulativePaid,
-        row.executionIssue, row.validationStatus
+        row.previousExecutionPeriod
+          ? `${monthNames[row.previousExecutionPeriod.month - 1]} ${row.previousExecutionPeriod.year}` : "Inicio (0 %)",
+        row.contractValue, row.previousProgress / 100, row.cumulativeProgress / 100,
+        row.monthlyProgress, row.monthlyEquivalent, row.cumulativeEquivalent,
+        row.monthlyInvoiced, row.cumulativeInvoiced, row.monthlyBilling / 100, row.cumulativeBilling / 100,
+        row.monthlyPaid, row.cumulativePaid, row.monthlyCosts, row.cumulativeCosts,
+        row.receivable, row.contractBalance,
+        row.executionRecorded ? "Avance registrado" : "Sin seguimiento físico",
+        row.executionIssue, row.observations, row.validationStatus
       ]),
+      formulas: {
+        7: (r) => `ROUND((G${r}-F${r})*100,2)`,
+        8: (r) => `ROUND(E${r}*H${r}/100,2)`,
+        9: (r) => `ROUND(E${r}*G${r},2)`,
+        12: (r) => `IFERROR(ROUND(K${r}/E${r},4),0)`,
+        13: (r) => `IFERROR(ROUND(L${r}/E${r},4),0)`,
+        18: (r) => `MAX(L${r}-P${r},0)`,
+        19: (r) => `MAX(E${r}-L${r},0)`
+      },
       freezeColumns: 3,
-      highlightColumns: [5],
-      columnWidths: [20, 40, 14, 20, 19, 19, 21, 28, 31, 26, 21, 25, 28, 48, 24]
-    },
-    {
+      highlightColumns: [7],
+      columnWidths: [20, 40, 14, 22, 20, 21, 21, 27, 30, 34, 25, 28, 26, 30, 25, 28, 23, 27, 26, 27, 25, 48, 48, 21]
+    };
+  const paymentMatrix = {
       name: "Pagos mes a mes",
       title: "Pagos registrados mes a mes",
       notes: [
@@ -87,6 +105,6 @@ export function monthlyWorkbookSheets(rows = []) {
         ]),
       freezeColumns: 3,
       columnWidths: [20, 40, 10, ...monthNames.map(() => 19), 21, 25, 28]
-    }
-  ];
+    };
+  return [detail, monthlyMatrix, paymentMatrix];
 }

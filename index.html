@@ -11,7 +11,7 @@
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.5.4" />
+    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.5.5" />
   </head>
   <body>
     <section id="loginView" class="login-shell">
@@ -267,7 +267,7 @@
           <section id="monthlyView" class="content-view" hidden>
             <div class="section-heading">
               <div><h3>Seguimiento mensual</h3><p>El administrador registra el estado del trabajo realizado. Facturar o recibir un pago no significa que el proyecto esté terminado.</p></div>
-              <div class="heading-actions"><button id="exportMonthlyButton" class="btn btn-outline-primary">Exportar Excel</button><button id="newPeriodButton" class="btn btn-outline-primary">Nuevo periodo</button><button id="newMonthlyButton" class="btn btn-primary">Registrar seguimiento</button></div>
+              <div class="heading-actions"><button id="exportMonthlyButton" class="btn btn-outline-primary">Exportar Excel detallado</button><button id="newPeriodButton" class="btn btn-outline-primary">Nuevo periodo</button><button id="newMonthlyButton" class="btn btn-primary">Registrar seguimiento</button></div>
             </div>
 
             <div class="cost-summary-grid">
@@ -446,7 +446,7 @@
           <section id="reportsView" class="content-view" hidden>
             <div class="section-heading">
               <div><h3>Reportes gerenciales</h3><p>El administrador informa el estado físico del proyecto. Las facturas calculan el avance financiero por separado.</p></div>
-              <button id="exportReportButton" class="btn btn-primary" type="button">Exportar informe Excel</button>
+              <button id="exportReportButton" class="btn btn-primary" type="button">Exportar informe detallado en Excel</button>
             </div>
 
             <article class="panel filter-panel">
@@ -490,8 +490,8 @@
             </article>
 
             <article class="panel data-panel report-data-panel">
-              <div class="panel-heading"><div><h4>Avance y pagos mes a mes</h4><small>Avance físico del mes = acumulado actual − acumulado anterior. El pago del mes y el pagado acumulado se muestran por separado; recibir un pago no cambia el avance físico. Los meses sin registro muestran 0 % de avance del mes.</small></div></div>
-              <div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Proyecto</th><th>Periodo</th><th>Contrato</th><th>Avance físico del mes</th><th>Valor equivalente</th><th>Avance físico acumulado</th><th>Facturado en el mes</th><th>Pagado en el mes</th><th>Pagado acumulado</th><th>Avance financiero del mes</th><th>Novedad de ejecución</th></tr></thead><tbody id="reportMonthlyRows"></tbody></table></div>
+              <div class="panel-heading"><div><h4>Avance y pagos mes a mes</h4><small>Ejemplo: cierre anterior 15 % → cierre actual 50 % = 35 puntos porcentuales logrados en el mes. Los pagos se suman por periodo y no modifican el avance físico. Un mes sin seguimiento se identifica como «Sin registro físico».</small></div></div>
+              <div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Proyecto</th><th>Periodo</th><th>Contrato</th><th>Avance cierre anterior</th><th>Avance cierre actual</th><th>Avance logrado en el mes</th><th>Valor equivalente</th><th>Facturado en el mes</th><th>Pagado en el mes</th><th>Pagado acumulado</th><th>Avance financiero del mes</th><th>Novedad de ejecución</th></tr></thead><tbody id="reportMonthlyRows"></tbody></table></div>
               <div id="reportMonthlyEmpty" class="inline-empty" hidden>No hay periodos registrados para estos proyectos.</div>
             </article>
           </section>
@@ -686,8 +686,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <script src="src/assets/js/config.js?v=1.5.4"></script>
-    <script type="module" src="src/assets/js/app.js?v=1.5.4"></script>
-    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.5.4"></script>
+    <script src="src/assets/js/config.js?v=1.5.5"></script>
+    <script type="module" src="src/assets/js/app.js?v=1.5.5"></script>
+    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.5.5"></script>
   </body>
 </html>

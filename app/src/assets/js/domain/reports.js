@@ -83,15 +83,25 @@ export function buildManagementReport(projects = []) {
 // Nunca se suman a facturación, pagos, costos ni rentabilidad.
 export function buildMonthlyExecutionReport(projects = [], monthlyRows = [], allMonthlyRows = monthlyRows) {
   const included = new Map(projects.map((project) => [project.projectId, project]));
-  // El acumulado usa todos los periodos del proyecto, incluso si la exportación
-  // muestra solo un mes filtrado. Un pago no modifica el avance físico.
-  const cumulativePayments = new Map();
-  const paidByProject = new Map();
+  // El contexto completo conserva saldos y mes de comparación al exportar un
+  // único periodo filtrado. La ejecución física sigue siendo independiente.
+  const cumulativeByPeriod = new Map();
+  const runningByProject = new Map();
   for (const row of [...allMonthlyRows].sort((a, b) => a.year - b.year || a.month - b.month)) {
     if (!included.has(row.projectId)) continue;
-    const paid = (paidByProject.get(row.projectId) ?? 0) + amount(row.paidValue);
-    paidByProject.set(row.projectId, paid);
-    cumulativePayments.set(`${row.projectId}:${row.year}:${row.month}`, paid);
+    const previous = runningByProject.get(row.projectId) ?? { invoiced: 0, paid: 0, costs: 0, lastExecution: null };
+    const running = {
+      invoiced: previous.invoiced + amount(row.invoicedValue),
+      paid: previous.paid + amount(row.paidValue),
+      costs: previous.costs + amount(row.costsExpensesValue),
+      lastExecution: row.executedCumulativePercentage === null || row.executedCumulativePercentage === undefined
+        ? previous.lastExecution : { year: row.year, month: row.month }
+    };
+    cumulativeByPeriod.set(`${row.projectId}:${row.year}:${row.month}`, {
+      invoiced: running.invoiced, paid: running.paid, costs: running.costs,
+      previousExecutionPeriod: previous.lastExecution
+    });
+    runningByProject.set(row.projectId, running);
   }
   const rows = monthlyRows
     .filter((row) => included.has(row.projectId))
@@ -102,6 +112,9 @@ export function buildMonthlyExecutionReport(projects = [], monthlyRows = [], all
       const monthlyProgress = Number(row.executedIncrementalPercentage ?? 0);
       const cumulativeProgress = Number(row.executedCumulativePercentage ?? row.previousExecutedCumulativePercentage ?? 0);
       const previousProgress = Number(row.previousExecutedCumulativePercentage ?? cumulativeProgress - monthlyProgress);
+      const running = cumulativeByPeriod.get(`${row.projectId}:${row.year}:${row.month}`);
+      const cumulativeInvoiced = running?.invoiced ?? amount(row.cumulativeInvoicedValue ?? row.invoicedValue);
+      const cumulativePaid = running?.paid ?? amount(row.paidValue);
       return Object.freeze({
         projectId: row.projectId,
         costCenter: row.costCenter,
@@ -115,10 +128,19 @@ export function buildMonthlyExecutionReport(projects = [], monthlyRows = [], all
         monthlyEquivalent: Math.round(contractValue * monthlyProgress) / 100,
         cumulativeEquivalent: Math.round(contractValue * cumulativeProgress) / 100,
         monthlyInvoiced: amount(row.invoicedValue),
+        cumulativeInvoiced,
         monthlyBilling: Number(row.monthlyBillingPercentage ?? 0),
+        cumulativeBilling: contractValue > 0 ? Math.round(cumulativeInvoiced / contractValue * 10000) / 100 : 0,
         monthlyPaid: amount(row.paidValue),
-        cumulativePaid: cumulativePayments.get(`${row.projectId}:${row.year}:${row.month}`) ?? 0,
+        cumulativePaid,
+        monthlyCosts: amount(row.costsExpensesValue),
+        cumulativeCosts: running?.costs ?? amount(row.costsExpensesValue),
+        receivable: Math.max(cumulativeInvoiced - cumulativePaid, 0),
+        contractBalance: Math.max(contractValue - cumulativeInvoiced, 0),
+        previousExecutionPeriod: running?.previousExecutionPeriod ?? null,
+        executionRecorded: row.executedCumulativePercentage !== null && row.executedCumulativePercentage !== undefined,
         executionIssue: row.executionIssue || "",
+        observations: row.observations || "",
         validationStatus: row.validationStatus || "sin registro"
       });
     });

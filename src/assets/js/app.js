@@ -1,8 +1,8 @@
 import { buildMonthlySeries, calculateDashboardIndicators } from "./domain/dashboard.js?v=1.4.1";
 import { calculateProjectIndicators } from "./domain/project-analytics.js?v=1.4.1";
-import { buildManagementReport, buildMonthlyExecutionReport } from "./domain/reports.js?v=1.5.4";
-import { monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.5.4";
-import { createXlsx } from "./domain/xlsx-export.js?v=1.5.2";
+import { buildManagementReport, buildMonthlyExecutionReport } from "./domain/reports.js?v=1.5.5";
+import { monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.5.5";
+import { createXlsx } from "./domain/xlsx-export.js?v=1.5.5";
 import { canEditExecution } from "./domain/execution.js?v=1.3.0";
 import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=1.1.0";
 import { invoicePendingAmount, isSampleProject, payableInvoicesForProject } from "./domain/payment-selection.js?v=1.5.1";
@@ -117,6 +117,10 @@ function capitalize(value) {
 
 function formatPercent(value) {
   return `${Number(value ?? 0).toLocaleString("es-CO", { maximumFractionDigits: 2 })} %`;
+}
+
+function formatPoints(value) {
+  return `${Number(value ?? 0).toLocaleString("es-CO", { maximumFractionDigits: 2 })} p.p.`;
 }
 
 function formatExecutionPercent(value) {
@@ -1559,9 +1563,11 @@ function renderReports() {
     <td><strong>${escapeHtml(row.projectName)}</strong><br><small>${escapeHtml(row.costCenter)}</small></td>
     <td>${escapeHtml(monthNames[row.month - 1])} ${row.year}</td>
     <td>${formatCop(row.contractValue)}</td>
-    <td>${formatPercent(row.monthlyProgress)}</td>
+    <td>${formatPercent(row.previousProgress)}<br><small>${row.previousExecutionPeriod
+      ? `${escapeHtml(monthNames[row.previousExecutionPeriod.month - 1])} ${row.previousExecutionPeriod.year}` : "Inicio"}</small></td>
+    <td>${row.executionRecorded ? formatPercent(row.cumulativeProgress) : "Sin registro físico"}</td>
+    <td><strong>${formatPoints(row.monthlyProgress)}</strong><br><small>${formatPercent(row.previousProgress)} → ${formatPercent(row.cumulativeProgress)}</small></td>
     <td>${formatCop(row.monthlyEquivalent)}</td>
-    <td>${formatPercent(row.cumulativeProgress)}</td>
     <td>${formatCop(row.monthlyInvoiced)}</td>
     <td>${formatCop(row.monthlyPaid)}</td>
     <td>${formatCop(row.cumulativePaid)}</td>
@@ -1670,7 +1676,7 @@ function exportManagementReport() {
     anchor.download = `informe-avance-proyectos-${new Date().toISOString().slice(0, 10)}.xlsx`;
     anchor.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    setMessage(document.querySelector("#reportModuleMessage"), "Informe Excel generado con avance mensual, pagos de cada mes y pagos acumulados.");
+    setMessage(document.querySelector("#reportModuleMessage"), "Informe detallado generado con la comparación física de cada mes, facturación, pagos y saldos acumulados.");
   } catch (error) {
     setMessage(document.querySelector("#reportModuleMessage"), error.message || "No fue posible generar el informe Excel.", true);
   }
