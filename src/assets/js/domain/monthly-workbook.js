@@ -3,6 +3,33 @@ const monthNames = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
 ];
 
+export function managementSummarySheet(reportRows = []) {
+  return {
+    name: "Resumen",
+    title: "Resumen de proyectos | SOINSOLAR",
+    notes: [
+      "Avance físico acumulado: obra ejecutada. Avance financiero: facturado ÷ contrato. Pagado: dinero recibido. Consulta las hojas mensuales para comparar cada periodo.",
+      "Importes en pesos colombianos (COP). Las celdas vacías de avance físico indican que aún no se registró seguimiento."
+    ],
+    headers: ["Centro de costo", "Centro principal", "Proyecto", "Municipio", "Estado", "Contrato vigente", "Avance físico acumulado", "Facturado", "Avance financiero", "Pagado", "Costos y gastos", "Rentabilidad", "Saldo contractual", "Cartera"],
+    types: ["text", "text", "text", "text", "text", "money", "percent", "money", "percent", "money", "money", "money", "money", "money"],
+    freezeColumns: 3,
+    highlightColumns: [6, 8, 9, 13],
+    headerGroups: [
+      { from: 0, to: 4, style: 1 }, { from: 5, to: 6, style: 10 },
+      { from: 7, to: 8, style: 11 }, { from: 9, to: 9, style: 12 },
+      { from: 10, to: 11, style: 13 }, { from: 12, to: 13, style: 14 }
+    ],
+    tabColor: "123A56",
+    columnWidths: [20, 22, 42, 24, 20, 23, 26, 23, 26, 23, 24, 24, 25, 23],
+    rows: reportRows.map((row) => [
+      row.costCenter, row.parentCostCenter, row.projectName, row.municipality, row.status, row.contractValue,
+      row.executionProgress === null ? null : row.executionProgress / 100, row.invoiced, row.financialProgress / 100,
+      row.paid, row.costsExpenses, row.profitability, row.contractualBalance, row.paymentPending
+    ])
+  };
+}
+
 // Una celda vacía indica que el periodo no está en la exportación; cero indica
 // que sí está incluido y no tiene avance físico consignado en ese mes.
 export function monthlyWorkbookSheets(rows = []) {
@@ -37,6 +64,8 @@ export function monthlyWorkbookSheets(rows = []) {
       rows: annualRows,
       freezeColumns: 3,
       highlightColumns: [...monthNames.map((_, index) => index + 4), 17],
+      headerGroups: [{ from: 0, to: 3, style: 1 }, { from: 4, to: 15, style: 10 }, { from: 16, to: 17, style: 15 }],
+      tabColor: "245C94",
       columnWidths: [20, 40, 10, 20, ...monthNames.map(() => 13), 21, 21]
     };
   const detail = {
@@ -82,7 +111,15 @@ export function monthlyWorkbookSheets(rows = []) {
         19: (r) => `MAX(E${r}-L${r},0)`
       },
       freezeColumns: 3,
-      highlightColumns: [7],
+      highlightColumns: [7, 15, 18, 19],
+      headerGroups: [
+        { from: 0, to: 3, style: 1 }, { from: 4, to: 9, style: 10 },
+        { from: 10, to: 13, style: 11 }, { from: 14, to: 15, style: 12 },
+        { from: 16, to: 17, style: 13 }, { from: 18, to: 19, style: 14 },
+        { from: 20, to: 23, style: 15 }
+      ],
+      wrapColumns: [21, 22],
+      tabColor: "0C5361",
       columnWidths: [20, 40, 14, 22, 20, 21, 21, 27, 30, 34, 25, 28, 26, 30, 25, 28, 23, 27, 26, 27, 25, 48, 48, 21]
     };
   const paymentMatrix = {
@@ -104,6 +141,12 @@ export function monthlyWorkbookSheets(rows = []) {
           monthNames[last.month - 1], paymentMonths.reduce((sum, value) => sum + (value ?? 0), 0), last.cumulativePaid
         ]),
       freezeColumns: 3,
+      highlightColumns: [16, 17],
+      headerGroups: [
+        { from: 0, to: 2, style: 1 }, { from: 3, to: 14, style: 12 },
+        { from: 15, to: 17, style: 14 }
+      ],
+      tabColor: "2D7C68",
       columnWidths: [20, 40, 10, ...monthNames.map(() => 19), 21, 25, 28]
     };
   return [detail, monthlyMatrix, paymentMatrix];

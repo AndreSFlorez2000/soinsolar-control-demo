@@ -1,8 +1,8 @@
 import { buildMonthlySeries, calculateDashboardIndicators } from "./domain/dashboard.js?v=1.4.1";
 import { calculateProjectIndicators } from "./domain/project-analytics.js?v=1.4.1";
-import { buildManagementReport, buildMonthlyExecutionReport } from "./domain/reports.js?v=1.5.5";
-import { monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.5.5";
-import { createXlsx } from "./domain/xlsx-export.js?v=1.5.5";
+import { buildManagementReport, buildMonthlyExecutionReport } from "./domain/reports.js?v=1.5.6";
+import { managementSummarySheet, monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.5.6";
+import { createXlsx } from "./domain/xlsx-export.js?v=1.5.6";
 import { canEditExecution } from "./domain/execution.js?v=1.3.0";
 import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=1.1.0";
 import { invoicePendingAmount, isSampleProject, payableInvoicesForProject } from "./domain/payment-selection.js?v=1.5.1";
@@ -508,7 +508,7 @@ function exportDashboard() {
   anchor.href = url;
   anchor.download = `indicadores-generales-${new Date().toISOString().slice(0, 10)}.csv`;
   anchor.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function normalizeSearch(value) {
@@ -1304,7 +1304,7 @@ function exportCosts() {
   anchor.href = url;
   anchor.download = `costos-gastos-${new Date().toISOString().slice(0, 10)}.csv`;
   anchor.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function financeFilters() {
@@ -1657,19 +1657,7 @@ async function saveReportProgress(event) {
 
 function exportManagementReport() {
   try {
-    const blob = createXlsx([
-      {
-        name: "Resumen",
-        headers: ["Centro de costo", "Centro principal", "Proyecto", "Municipio", "Estado", "Contrato vigente", "Avance físico acumulado", "Facturado", "Avance financiero", "Pagado", "Costos y gastos", "Rentabilidad", "Saldo contractual", "Cartera"],
-        types: ["text", "text", "text", "text", "text", "money", "percent", "money", "percent", "money", "money", "money", "money", "money"],
-        rows: currentReport.rows.map((row) => [
-          row.costCenter, row.parentCostCenter, row.projectName, row.municipality, row.status, row.contractValue,
-          row.executionProgress === null ? null : row.executionProgress / 100, row.invoiced, row.financialProgress / 100,
-          row.paid, row.costsExpenses, row.profitability, row.contractualBalance, row.paymentPending
-        ])
-      },
-      ...monthlyWorkbookSheets(currentReportMonthly)
-    ]);
+    const blob = createXlsx([managementSummarySheet(currentReport.rows), ...monthlyWorkbookSheets(currentReportMonthly)]);
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
@@ -1829,7 +1817,7 @@ function exportHistory() {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url; anchor.download = `historial-${new Date().toISOString().slice(0, 10)}.csv`; anchor.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 document.querySelector("#loginForm").addEventListener("submit", async (event) => {
