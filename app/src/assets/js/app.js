@@ -20,6 +20,7 @@ const monthlyView = document.querySelector("#monthlyView");
 const financeView = document.querySelector("#financeView");
 const costsView = document.querySelector("#costsView");
 const reportsView = document.querySelector("#reportsView");
+const assistantView = document.querySelector("#assistantView");
 const historyView = document.querySelector("#historyView");
 const adminView = document.querySelector("#adminView");
 const title = document.querySelector("#pageTitle");
@@ -42,6 +43,7 @@ const viewLabels = {
   costs: "Costos y gastos",
   history: "Historial y trazabilidad",
   reports: "Reportes",
+  assistant: "Asistente SOINSOLAR",
   admin: "Administración",
   detail: "Detalle del proyecto"
 };
@@ -100,7 +102,7 @@ let selectedProjectHistory = [];
 let dashboardChart = null;
 let projectChart = null;
 
-const functionalViews = new Set(["dashboard", "projects", "monthly", "finance", "costs", "reports", "history", "admin"]);
+const functionalViews = new Set(["dashboard", "projects", "monthly", "finance", "costs", "reports", "assistant", "history", "admin"]);
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -269,6 +271,7 @@ async function openApp() {
 }
 
 function closeApp() {
+  window.dispatchEvent(new Event("soinsolar:logout"));
   appView.hidden = true;
   pendingView.hidden = true;
   loginView.hidden = false;
@@ -317,7 +320,7 @@ async function showView(requestedView) {
   const visible = {
     dashboard: dashboardView, detail: detailView, projects: projectsView,
     monthly: monthlyView, finance: financeView, costs: costsView,
-    reports: reportsView, history: historyView, admin: adminView
+    reports: reportsView, assistant: assistantView, history: historyView, admin: adminView
   };
   Object.values(visible).forEach((element) => { element.hidden = true; });
   visible[view].hidden = false;

@@ -11,7 +11,7 @@
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.5.10" />
+    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.6.0" />
   </head>
   <body>
     <section id="loginView" class="login-shell">
@@ -71,6 +71,7 @@
           <button class="nav-item" data-view="finance"><img class="nav-icon" src="src/assets/img/nav-facturacion.png" alt="" />Facturación y pagos</button>
           <button class="nav-item" data-view="costs"><img class="nav-icon" src="src/assets/img/nav-costos.png" alt="" />Costos y gastos</button>
           <button class="nav-item" data-view="reports"><img class="nav-icon" src="src/assets/img/nav-reportes.png" alt="" />Reportes</button>
+          <button class="nav-item" data-view="assistant"><span class="nav-assistant-icon" aria-hidden="true">✦</span>Asistente SOINSOLAR</button>
           <button class="nav-item" data-view="history"><img class="nav-icon" src="src/assets/img/nav-historial.png" alt="" />Historial</button>
           <button class="nav-item" data-view="admin"><img class="nav-icon" src="src/assets/img/nav-administracion.png" alt="" />Administración</button>
         </nav>
@@ -501,6 +502,34 @@
             </article>
           </section>
 
+          <section id="assistantView" class="content-view" hidden>
+            <div class="section-heading">
+              <div><h3>Asistente SOINSOLAR</h3><p>Consulta los datos de un proyecto por su nombre o centro de costo.</p></div>
+            </div>
+            <div class="assistant-layout">
+              <article class="panel assistant-panel" aria-label="Consultas de proyectos">
+                <div id="assistantMessages" class="assistant-messages" role="log" aria-live="polite" aria-relevant="additions text"></div>
+                <div class="assistant-composer">
+                  <form id="assistantForm" class="assistant-form" autocomplete="off">
+                    <label class="visually-hidden" for="assistantQuestion">Pregunta sobre un proyecto</label>
+                    <input id="assistantQuestion" class="form-control" type="search" maxlength="220" placeholder="Ejemplo: ¿Cómo va Samuel Charri o CC-102?" required />
+                    <button id="assistantSend" class="btn btn-primary" type="submit">Consultar</button>
+                  </form>
+                  <small>Respuestas basadas en los registros disponibles de tu cuenta. Las consultas no modifican datos.</small>
+                </div>
+              </article>
+              <aside class="panel assistant-help">
+                <h4>Prueba estas consultas</h4>
+                <p>Escribe el nombre, el centro de costo o selecciona un ejemplo.</p>
+                <div class="assistant-examples">
+                  <button type="button" data-assistant-prompt="¿Cómo va Samuel Charri?">¿Cómo va Samuel Charri?</button>
+                  <button type="button" data-assistant-prompt="Resumen general">Resumen general</button>
+                </div>
+                <div class="assistant-help-note"><strong>Qué puedes consultar</strong><span>Contrato, ejecución física, valor equivalente, facturación, recaudo, cartera, costos y movimientos recientes. El avance de ejecución lo registra el administrador y no cambia con los pagos.</span></div>
+              </aside>
+            </div>
+          </section>
+
           <section id="adminView" class="content-view" hidden>
             <div class="section-heading">
               <div><h3>Administración</h3><p>Perfiles, roles y estado de acceso de los usuarios registrados.</p></div>
@@ -691,8 +720,9 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <script src="src/assets/js/config.js?v=1.5.10"></script>
-    <script type="module" src="src/assets/js/app.js?v=1.5.10"></script>
-    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.5.10"></script>
+    <script src="src/assets/js/config.js?v=1.6.0"></script>
+    <script type="module" src="src/assets/js/app.js?v=1.6.0"></script>
+    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.6.0"></script>
+    <script type="module" src="src/assets/js/assistant-ui.js?v=1.6.0"></script>
   </body>
 </html>
