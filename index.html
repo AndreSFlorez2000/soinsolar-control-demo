@@ -11,7 +11,7 @@
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.5.9" />
+    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.5.10" />
   </head>
   <body>
     <section id="loginView" class="login-shell">
@@ -269,7 +269,7 @@
 
           <section id="monthlyView" class="content-view" hidden>
             <div class="section-heading">
-              <div><h3>Seguimiento mensual</h3><p>El administrador registra el estado del trabajo realizado. Facturar o recibir un pago no significa que el proyecto esté terminado.</p></div>
+              <div><h3>Seguimiento mensual</h3><p>El administrador registra el trabajo realizado. Si falta un mes anterior, créalo en «Nuevo periodo» y después selecciónalo en «Registrar seguimiento».</p></div>
               <div class="heading-actions"><button id="exportMonthlyButton" class="btn btn-outline-primary">Exportar Excel detallado</button><button id="newPeriodButton" class="btn btn-outline-primary">Nuevo periodo</button><button id="newMonthlyButton" class="btn btn-primary">Registrar seguimiento</button></div>
             </div>
 
@@ -577,7 +577,7 @@
           <label>Año *<input id="periodYear" class="form-control" type="number" min="2020" max="2100" required /></label>
           <label>Mes *<select id="periodMonth" class="form-select" required><option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option><option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option><option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option><option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option></select></label>
         </div>
-        <p class="dialog-note">El periodo se crea abierto. Para mantener la integridad, primero debe cerrarse cualquier periodo activo.</p>
+        <p class="dialog-note">Puedes elegir un mes anterior y crearlo abierto aunque ya haya otros periodos abiertos. Después selecciónalo al registrar el seguimiento o un movimiento.</p>
         <p id="periodFormMessage" class="form-message" role="alert"></p>
         <div class="dialog-actions"><button class="btn btn-outline-secondary" type="button" data-close-dialog="periodDialog">Cancelar</button><button id="savePeriodButton" class="btn btn-primary" type="submit">Crear periodo</button></div>
       </form>
@@ -691,8 +691,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <script src="src/assets/js/config.js?v=1.5.9"></script>
-    <script type="module" src="src/assets/js/app.js?v=1.5.9"></script>
-    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.5.9"></script>
+    <script src="src/assets/js/config.js?v=1.5.10"></script>
+    <script type="module" src="src/assets/js/app.js?v=1.5.10"></script>
+    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.5.10"></script>
   </body>
 </html>
