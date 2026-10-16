@@ -298,7 +298,22 @@ button, input, select, textarea { font: inherit; }
 .active-filter-chip { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
 .active-filter-chip:hover, .active-filter-chip:focus-visible { color: var(--red); background: #fff; border-color: #efcaca; }
 .active-filter-chip > span { font-size: 14px; line-height: 1; }
-.dashboard-secondary-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }
+.dashboard-secondary-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }
+.execution-panel { margin-top: 18px; }
+.execution-panel .panel-heading small { display: block; margin-top: 5px; color: var(--muted); font-size: 11px; }
+.execution-progress-cell { display: flex; align-items: center; gap: 10px; min-width: 155px; }
+.execution-progress-cell strong { flex: 0 0 78px; font-size: 11px; }
+.execution-track { width: 95px; height: 9px; overflow: hidden; border-radius: 999px; background: #e7edf2; }
+.execution-track span { display: block; height: 100%; border-radius: inherit; background: var(--green); }
+.monthly-table { min-width: 1450px; }
+.monthly-project-heading th { padding: 15px 12px !important; background: #eaf3fa; border-top: 14px solid #fff; border-bottom: 1px solid #d5e5f0 !important; text-transform: none; letter-spacing: normal; }
+.monthly-project-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 30px; }
+.monthly-project-summary > div { display: grid; gap: 4px; }
+.monthly-project-summary > div:first-child { flex: 1 1 220px; }
+.monthly-project-summary strong { color: var(--text); font-size: 13px; }
+.monthly-project-summary span, .monthly-project-summary small { color: var(--muted); font-size: 11px; }
+.monthly-table tbody tr:not(.monthly-project-heading) td:first-child { padding-left: 20px; white-space: nowrap; }
+.monthly-table .table-actions { flex-wrap: wrap; }
 .status-panel { min-height: 410px; padding: 20px 22px; }
 .project-status-stats { display: grid; gap: 15px; margin-top: 24px; }
 .status-stat { display: grid; gap: 6px; }

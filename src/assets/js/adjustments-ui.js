@@ -1,6 +1,5 @@
 import { incrementalExecutionPercent } from "./domain/execution.js?v=1.4.1";
 import { parseCostCsv, resolveCostImportRows } from "./domain/cost-import.js?v=1.5.8";
-import { financialAdvance } from "./domain/financial.js?v=1.4.1";
 import { buildMonthlyExecutionReport } from "./domain/reports.js?v=1.5.8";
 import { monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.5.8";
 import { createXlsx } from "./domain/xlsx-export.js?v=1.5.8";
@@ -38,14 +37,12 @@ function updateExecutionPreview() {
   const trackingId = document.querySelector("#monthlyTrackingId")?.value ?? "";
   const project = api().projects().find((item) => item.projectId === projectId);
   const target = api().periods().find((item) => item.id === periodId);
-  const latestBilling = api().monthly()
+  const collected = api().monthly()
     .filter((row) => row.projectId === projectId && target && (periodBefore(row, target) || (row.year === target.year && row.month === target.month)))
-    .sort((a, b) => b.year - a.year || b.month - a.month)[0];
+    .reduce((sum, row) => sum + Number(row.paidValue ?? 0), 0);
   if (financialPreview) {
     financialPreview.value = Number(project?.contractValue ?? 0) > 0
-      ? formatPercent(financialAdvance(
-        Number(latestBilling?.cumulativeInvoicedValue ?? 0), Number(project.contractValue)
-      )) : "Sin contrato";
+      ? formatPercent(collected / Number(project.contractValue) * 100) : "Sin contrato";
   }
   const cumulative = Number(cumulativeInput.value || 0);
   const previous = previousExecution(projectId, periodId, trackingId);

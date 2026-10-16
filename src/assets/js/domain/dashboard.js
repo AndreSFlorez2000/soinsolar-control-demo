@@ -16,6 +16,8 @@ export function calculateDashboardIndicators(projects = []) {
     contractualBalance: 0,
     paymentPending: 0,
     financialProgress: 0,
+    collectionProgress: 0,
+    executedEquivalent: 0,
     executionProgress: 0,
     profitability: 0,
     profitabilityPercentage: 0,
@@ -43,10 +45,17 @@ export function calculateDashboardIndicators(projects = []) {
     indicators.costsExpenses += amount(project.totalCostsExpenses);
     indicators.contractualBalance += amount(project.contractualBalance);
     indicators.paymentPending += amount(project.paymentPending);
+    if (project.executedProgressPercentage !== null && project.executedProgressPercentage !== undefined
+      && Number.isFinite(Number(project.executedProgressPercentage))) {
+      indicators.executedEquivalent += Math.round(amount(project.contractValue) * Number(project.executedProgressPercentage)) / 100;
+    }
   }
 
   indicators.financialProgress = indicators.contractValue > 0
     ? (indicators.invoiced / indicators.contractValue) * 100
+    : 0;
+  indicators.collectionProgress = indicators.contractValue > 0
+    ? (indicators.paid / indicators.contractValue) * 100
     : 0;
   const recorded = projects
     .map((project) => project.executedProgressPercentage)

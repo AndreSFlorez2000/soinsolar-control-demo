@@ -1,7 +1,7 @@
-import { buildMonthlySeries, calculateDashboardIndicators } from "./domain/dashboard.js?v=1.4.1";
+import { buildMonthlySeries, calculateDashboardIndicators } from "./domain/dashboard.js?v=1.5.9";
 import { calculateProjectIndicators } from "./domain/project-analytics.js?v=1.4.1";
 import { buildManagementReport, buildMonthlyExecutionReport } from "./domain/reports.js?v=1.5.8";
-import { managementSummarySheet, monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.5.8";
+import { managementSummarySheet, monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.5.9";
 import { createXlsx } from "./domain/xlsx-export.js?v=1.5.8";
 import { costWorkbookSheets } from "./domain/cost-workbook.js?v=1.5.8";
 import { canEditExecution } from "./domain/execution.js?v=1.3.0";
@@ -368,20 +368,24 @@ function renderDashboard() {
   document.querySelector("#costRatio").textContent = `${formatPercent(indicators.costRatio)} del contrato`;
   document.querySelector("#contractualBalanceValue").textContent = formatCop(indicators.contractualBalance);
   document.querySelector("#paymentPendingValue").textContent = formatCop(indicators.paymentPending);
-  document.querySelector("#globalProgressValue").textContent = formatPercent(indicators.financialProgress);
+  document.querySelector("#globalExecutedEquivalent").textContent = formatCop(indicators.executedEquivalent);
+  document.querySelector("#globalProgressValue").textContent = formatPercent(indicators.collectionProgress);
   document.querySelector("#globalExecutionValue").textContent = formatExecutionPercent(indicators.executionProgress);
   document.querySelector("#projectCountValue").textContent = indicators.projectCount;
 
   renderProjectStatusStats(indicators);
   renderDashboardAlerts(indicators);
 
+  document.querySelector("#dashboardProjectsEmpty").hidden = currentProjects.length > 0;
   document.querySelector("#projectRows").innerHTML = [...currentProjects]
-    .sort((left, right) => right.financialProgressPercentage - left.financialProgressPercentage)
-    .slice(0, 5)
+    .sort((left, right) => String(left.costCenter).localeCompare(String(right.costCenter), "es", { numeric: true }))
     .map((project) => `
       <tr>
-        <td>${escapeHtml(project.costCenter)}</td><td><strong>${escapeHtml(project.projectName)}</strong></td><td>${escapeHtml(project.municipality)}</td>
-        <td>${formatExecutionPercent(project.executedProgressPercentage)}</td><td>${formatPercent(project.financialProgressPercentage)}</td><td>${formatCop(project.contractualBalance)}</td>
+        <td><span class="project-name-cell"><strong>${escapeHtml(project.projectName)}</strong><small>${escapeHtml(project.costCenter)}</small></span></td>
+        <td><div class="execution-progress-cell"><div class="execution-track"><span style="width:${Math.min(100, Math.max(0, Number(project.executedProgressPercentage) || 0))}%"></span></div><strong>${formatExecutionPercent(project.executedProgressPercentage)}</strong></div></td>
+        <td>${project.executedProgressPercentage === null ? "—" : formatCop(Math.round(project.contractValue * project.executedProgressPercentage) / 100)}</td>
+        <td>${formatCop(project.contractValue)}</td><td>${formatCop(project.totalInvoiced)}</td><td>${formatCop(project.totalPaid)}</td>
+        <td>${project.contractValue > 0 ? formatPercent(project.totalPaid / project.contractValue * 100) : "—"}</td>
         <td><button class="open-project" type="button" data-action="open-project" data-project-id="${project.projectId}">Abrir</button></td>
       </tr>`).join("");
   renderChart();
@@ -499,7 +503,9 @@ function exportDashboard() {
     ["Saldo contractual", indicators.contractualBalance],
     ["Pago pendiente", indicators.paymentPending],
     ["Promedio de avance de proyectos (%)", indicators.executionProgress ?? ""],
-    ["Avance financiero global (%)", indicators.financialProgress],
+    ["Valor equivalente ejecutado (referencia)", indicators.executedEquivalent],
+    ["Facturación del contrato (%)", indicators.financialProgress],
+    ["Recaudo Financiero global (%)", indicators.collectionProgress],
     ["Relación costos / contrato (%)", indicators.costRatio]
   ];
   const quote = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
@@ -629,8 +635,8 @@ async function loadProjects(filters) {
       ["Municipio:", appliedFilters.municipality, "projectFilterMunicipality"],
       ["Estado:", appliedFilters.status ? capitalize(appliedFilters.status) : "", "projectFilterStatus"],
       ["Tipo de servicio:", appliedFilters.serviceType, "projectFilterService"],
-      ["Avance financiero mínimo:", appliedFilters.progressMin === null ? "" : formatPercent(appliedFilters.progressMin), "projectFilterProgressMin"],
-      ["Avance financiero máximo:", appliedFilters.progressMax === null ? "" : formatPercent(appliedFilters.progressMax), "projectFilterProgressMax"]
+      ["Facturación mínima:", appliedFilters.progressMin === null ? "" : formatPercent(appliedFilters.progressMin), "projectFilterProgressMin"],
+      ["Facturación máxima:", appliedFilters.progressMax === null ? "" : formatPercent(appliedFilters.progressMax), "projectFilterProgressMax"]
     ], "projectFilters");
 
     const rows = await (await ensureGateway()).listProjects(appliedFilters);
@@ -986,42 +992,69 @@ function monthlyFilters() {
 }
 
 function renderPeriods() {
-  const hasOpen = currentPeriods.some((period) => period.status === "abierto");
+  const mayEdit = canEditExecution(currentUserProfile);
   document.querySelector("#periodCount").textContent = currentPeriods.length;
   document.querySelector("#openPeriodCount").textContent = currentPeriods.filter((period) => period.status === "abierto").length;
   document.querySelector("#periodRows").innerHTML = currentPeriods.map((period) => {
-    const action = period.status === "abierto"
+    const action = !mayEdit ? "Solo administrador" : period.status === "abierto"
       ? `<button class="table-action" data-action="close-period" data-period-id="${period.id}">Cerrar periodo</button>`
-      : `<button class="table-action" data-action="reopen-period" data-period-id="${period.id}" ${!hasOpen ? "" : 'disabled title="Cierra el periodo actual antes de reabrir este"'}>Reabrir</button>`;
+      : `<button class="table-action" data-action="reopen-period" data-period-id="${period.id}">Reabrir para corregir</button>`;
     return `<tr><td><strong>${escapeHtml(periodLabel(period).replace(" · Cerrado", ""))}</strong></td><td><span class="period-badge ${period.status}">${capitalize(period.status)}</span></td><td>${period.closedAt ? escapeHtml(formatDateTime(period.closedAt)) : "—"}</td><td>${action}</td></tr>`;
   }).join("");
 }
 
 function renderMonthly() {
-  const paymentTotals = new Map(buildMonthlyExecutionReport(currentProjects, currentMonthly, allMonthlyRows)
+  const reportRows = new Map(buildMonthlyExecutionReport(currentProjects, currentMonthly, allMonthlyRows)
     .map((row) => [`${row.projectId}:${row.year}:${row.month}`, row]));
-  document.querySelector("#monthlyRows").innerHTML = currentMonthly.map((tracking) => {
-    const payment = paymentTotals.get(`${tracking.projectId}:${tracking.year}:${tracking.month}`);
+  const grouped = new Map();
+  for (const tracking of currentMonthly) {
+    if (!grouped.has(tracking.projectId)) grouped.set(tracking.projectId, []);
+    grouped.get(tracking.projectId).push(tracking);
+  }
+  const orderedProjects = [...grouped.keys()].sort((a, b) => {
+    const left = grouped.get(a)[0], right = grouped.get(b)[0];
+    return String(left.costCenter).localeCompare(String(right.costCenter), "es", { numeric: true })
+      || left.projectName.localeCompare(right.projectName, "es");
+  });
+  document.querySelector("#monthlyRows").innerHTML = orderedProjects.map((projectId) => {
+    const months = grouped.get(projectId).sort((a, b) => a.year - b.year || a.month - b.month);
+    const project = currentProjects.find((item) => item.projectId === projectId);
+    const latest = months.at(-1);
+    const contract = project?.contractValue ?? latest.contractValue;
+    const summary = reportRows.get(`${latest.projectId}:${latest.year}:${latest.month}`);
+    const header = `<tr class="monthly-project-heading"><th colspan="14" scope="rowgroup"><div class="monthly-project-summary">
+      <div><strong>${escapeHtml(latest.costCenter)} · ${escapeHtml(latest.projectName)}</strong><small>Centro de costo / proyecto</small></div>
+      <div><span>Valor de contrato</span><strong>${formatCop(contract)}</strong></div>
+      <div><span>Ejecutado al último mes mostrado (referencia)</span><strong>${summary?.executionRecorded ? formatCop(summary.cumulativeEquivalent) : "—"}</strong></div>
+      <div><span>Recaudado al último mes mostrado</span><strong>${formatCop(summary?.cumulativePaid ?? 0)}</strong></div>
+    </div></th></tr>`;
+    return header + months.map((tracking) => {
+    const payment = reportRows.get(`${tracking.projectId}:${tracking.year}:${tracking.month}`);
     const locked = tracking.periodStatus === "cerrado";
-    const canValidate = !locked && tracking.validationStatus !== "validado";
+    const canValidate = !locked && tracking.trackingId && tracking.validationStatus !== "validado";
     const mayEdit = canEditExecution(currentUserProfile);
     const actions = tracking.trackingId
-      ? `${mayEdit ? `<button class="table-action" data-action="edit-monthly" data-tracking-id="${tracking.trackingId}" ${locked ? "disabled" : ""}>Editar</button>` : ""}${canValidate ? `<button class="table-action success" data-action="validate-monthly" data-tracking-id="${tracking.trackingId}">Validar</button>` : ""}`
-      : mayEdit ? `<button class="table-action" data-action="new-monthly-preset" data-project-id="${tracking.projectId}" data-period-id="${tracking.periodId}" ${locked ? "disabled" : ""}>Completar</button>` : "Solo administrador";
+      ? `${mayEdit && !locked ? `<button class="table-action" data-action="edit-monthly" data-tracking-id="${tracking.trackingId}">Editar</button>` : ""}${canValidate ? `<button class="table-action success" data-action="validate-monthly" data-tracking-id="${tracking.trackingId}">Validar</button>` : ""}`
+      : mayEdit && !locked ? `<button class="table-action" data-action="new-monthly-preset" data-project-id="${tracking.projectId}" data-period-id="${tracking.periodId}">Completar</button>` : "";
+    const periodAction = locked && mayEdit
+      ? `<button class="table-action" data-action="reopen-period" data-period-id="${tracking.periodId}">Reabrir para corregir</button>` : "";
     return `<tr>
-      <td>${escapeHtml(`${monthNames[tracking.month - 1]} ${tracking.year}`)}<br><small>${capitalize(tracking.periodStatus)}</small></td>
-      <td><span class="project-name-cell"><strong>${escapeHtml(tracking.projectName)}</strong><small>${escapeHtml(tracking.costCenter)}</small></span></td>
-      <td><strong>${formatCop(tracking.invoicedValue)}</strong><br><small>${formatPercent(tracking.monthlyBillingPercentage)} del contrato</small></td>
-      <td>${formatPercent(tracking.monthlyProgressPercentage)}</td>
-      <td>${formatPercent(tracking.cumulativeProgressPercentage ?? tracking.previousExecutedCumulativePercentage)}</td>
-      <td>${formatPercent(tracking.cumulativeBillingPercentage)}</td>
+      <td><strong>${escapeHtml(`${monthNames[tracking.month - 1]} ${tracking.year}`)}</strong><br><small>${capitalize(tracking.periodStatus)}</small></td>
+      <td>${tracking.monthlyProgressPercentage == null ? "—" : formatPercent(tracking.monthlyProgressPercentage)}</td>
+      <td>${tracking.cumulativeProgressPercentage == null ? "—" : formatPercent(tracking.cumulativeProgressPercentage)}</td>
+      <td>${payment?.executionRecorded ? formatCop(payment.cumulativeEquivalent) : "—"}</td>
+      <td>${formatCop(tracking.invoicedValue)}</td>
+      <td>${formatCop(payment?.cumulativeInvoiced ?? tracking.cumulativeInvoicedValue)}</td>
+      <td>${formatPercent(payment?.cumulativeBilling ?? tracking.cumulativeBillingPercentage)}</td>
       <td>${formatCop(tracking.paidValue)}</td>
       <td>${formatCop(payment?.cumulativePaid ?? 0)}</td>
+      <td>${contract > 0 ? formatPercent((payment?.cumulativePaid ?? 0) / contract * 100) : "—"}</td>
       <td>${formatCop(tracking.costsExpensesValue)}</td>
       <td>${tracking.executionIssue ? escapeHtml(tracking.executionIssue) : "—"}</td>
       <td><span class="validation-badge ${escapeHtml(tracking.validationStatus || "borrador")}">${escapeHtml(tracking.validationStatus || "sin registro")}</span></td>
-      <td><span class="table-actions">${actions}</span></td>
+      <td><span class="table-actions">${actions || periodAction || "—"}</span></td>
     </tr>`;
+    }).join("");
   }).join("");
   document.querySelector("#monthlyEmpty").hidden = currentMonthly.length > 0;
 }
@@ -1549,7 +1582,7 @@ function renderReports() {
   document.querySelector("#reportPending").textContent = formatCop(totals.paymentPending);
   document.querySelector("#reportProfitability").textContent = formatCop(totals.profitability);
   document.querySelector("#reportExecution").textContent = formatExecutionPercent(totals.executionProgress);
-  document.querySelector("#reportResultCount").textContent = `${totals.projectCount} proyecto(s) · promedio avance físico ${formatExecutionPercent(totals.executionProgress)} · avance financiero ${formatPercent(totals.financialProgress)}`;
+  document.querySelector("#reportResultCount").textContent = `${totals.projectCount} proyecto(s) · promedio avance de ejecución ${formatExecutionPercent(totals.executionProgress)} · facturación ${formatPercent(totals.financialProgress)}`;
   document.querySelector("#reportRows").innerHTML = currentReport.rows.map((row) => `<tr>
     <td>${escapeHtml(row.costCenter)}</td><td>${escapeHtml(row.parentCostCenter || "—")}</td><td><strong>${escapeHtml(row.projectName)}</strong><br><small>${escapeHtml(row.municipality)}</small></td>
     <td>${formatCop(row.contractValue)}</td><td>${formatExecutionPercent(row.executionProgress)}</td><td>${formatCop(row.invoiced)}</td><td>${formatCop(row.paid)}</td>
@@ -1643,7 +1676,7 @@ async function saveReportProgress(event) {
     await loadReports();
     updateSystemStatus();
     reportProgressDialog.close();
-    setMessage(document.querySelector("#reportModuleMessage"), "Avance de ejecución actualizado. El avance financiero continúa calculado desde la facturación.");
+    setMessage(document.querySelector("#reportModuleMessage"), "Avance de ejecución actualizado. La facturación y el recaudo se calculan por separado.");
   } catch (error) {
     if (saved) {
       reportProgressDialog.close();

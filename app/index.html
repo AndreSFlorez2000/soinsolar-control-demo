@@ -11,7 +11,7 @@
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.5.8" />
+    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.5.9" />
   </head>
   <body>
     <section id="loginView" class="login-shell">
@@ -130,9 +130,21 @@
               <article class="mini-kpi"><span>Saldo contractual</span><strong id="contractualBalanceValue">$0</strong></article>
               <article class="mini-kpi"><span>Pago pendiente</span><strong id="paymentPendingValue">$0</strong></article>
               <article class="mini-kpi"><span>Promedio de avance de proyectos</span><strong id="globalExecutionValue">—</strong></article>
-              <article class="mini-kpi"><span>Avance financiero global</span><strong id="globalProgressValue">0 %</strong></article>
+              <article class="mini-kpi"><span>Valor equivalente ejecutado</span><strong id="globalExecutedEquivalent">$0</strong></article>
+              <article class="mini-kpi"><span>Recaudo Financiero global</span><strong id="globalProgressValue">0 %</strong></article>
               <article class="mini-kpi"><span>Proyectos registrados</span><strong id="projectCountValue">0</strong></article>
             </div>
+
+            <article class="panel projects-table-panel execution-panel">
+              <div class="panel-heading"><div><h4>Ejecución por proyecto</h4><small>El avance de ejecución se registra manualmente; el valor equivalente es una referencia del contrato, no una factura.</small></div><button class="link-button" type="button" data-view="projects">Ver proyectos</button></div>
+              <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                  <thead><tr><th>Centro de costo / Proyecto</th><th>Avance de ejecución</th><th>Equivalente ejecutado</th><th>Contrato</th><th>Facturado</th><th>Recaudado</th><th>Recaudo Financiero</th><th></th></tr></thead>
+                  <tbody id="projectRows"></tbody>
+                </table>
+              </div>
+              <div id="dashboardProjectsEmpty" class="inline-empty" hidden>No hay proyectos registrados.</div>
+            </article>
 
             <div class="dashboard-grid">
               <article class="panel chart-panel">
@@ -148,15 +160,6 @@
               </article>
             </div>
 
-            <article class="panel projects-table-panel">
-              <div class="panel-heading"><h4>Proyectos con mayor avance financiero</h4><button class="link-button" type="button" data-view="projects">Ver todos</button></div>
-              <div class="table-responsive">
-                <table class="table align-middle mb-0">
-                  <thead><tr><th>Centro de costo</th><th>Proyecto</th><th>Municipio</th><th>Avance de ejecución</th><th>Avance financiero</th><th>Saldo contractual</th><th></th></tr></thead>
-                  <tbody id="projectRows"></tbody>
-                </table>
-              </div>
-            </article>
           </section>
 
           <section id="detailView" class="content-view" hidden>
@@ -172,7 +175,7 @@
               <div class="project-kpis">
                 <div><span>Valor contractual vigente</span><strong id="detailContractValue">$0</strong></div>
                 <div><span>Avance de ejecución</span><strong id="detailProjectProgress">0 %</strong></div>
-                <div><span>Avance financiero acumulado</span><strong id="detailFinancialProgress" class="positive">0 %</strong></div>
+                <div><span>Facturación del contrato</span><strong id="detailFinancialProgress" class="positive">0 %</strong></div>
                 <div><span>Pago pendiente</span><strong id="detailPaymentPending">$0</strong></div>
               </div>
             </article>
@@ -194,7 +197,7 @@
                   <div><span>Costos y gastos</span><strong id="detailCosts">$0</strong></div>
                   <div><span>Saldo contractual</span><strong id="detailContractBalance">$0</strong></div>
                 </div>
-                <div class="progress-label"><strong>Avance financiero</strong><strong id="detailProgressLabel">0 %</strong></div>
+                <div class="progress-label"><strong>Facturación del contrato</strong><strong id="detailProgressLabel">0 %</strong></div>
                 <div class="progress"><div id="detailProgressBar" class="progress-bar bg-success" style="width:0%"></div></div>
               </article>
               <article class="panel">
@@ -272,13 +275,13 @@
 
             <div class="cost-summary-grid">
               <article class="mini-kpi"><span>Periodos registrados</span><strong id="periodCount">0</strong></article>
-              <article class="mini-kpi"><span>Periodo abierto</span><strong id="openPeriodCount">0</strong></article>
+              <article class="mini-kpi"><span>Periodos abiertos</span><strong id="openPeriodCount">0</strong></article>
               <article class="mini-kpi"><span>Meses de proyectos</span><strong id="monthlyCount">0</strong></article>
               <article class="mini-kpi"><span>Pendientes de validar</span><strong id="monthlyPendingCount">0</strong></article>
             </div>
 
             <article class="panel data-panel period-panel">
-              <div class="panel-heading"><div><h4>Periodos</h4><small>Solo puede existir un periodo abierto.</small></div><span id="periodModuleMessage" class="module-message" role="status" aria-live="polite"></span></div>
+              <div class="panel-heading"><div><h4>Periodos</h4><small>El administrador puede reabrir un mes anterior para corregirlo sin cerrar el mes actual. Los cambios quedan en el historial; cierra el mes al terminar.</small></div><span id="periodModuleMessage" class="module-message" role="status" aria-live="polite"></span></div>
               <div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Periodo</th><th>Estado</th><th>Fecha de cierre</th><th>Acción</th></tr></thead><tbody id="periodRows"></tbody></table></div>
             </article>
 
@@ -294,7 +297,7 @@
 
             <div id="monthlyModuleMessage" class="module-message module-message-block" role="status" aria-live="polite"></div>
             <article class="panel data-panel">
-              <div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Periodo</th><th>Proyecto</th><th>Facturación mes</th><th>Avance físico mes</th><th>Avance físico acumulado</th><th>Avance financiero</th><th>Pagado mes</th><th>Pagado acumulado</th><th>Costos y gastos</th><th>Novedad de ejecución</th><th>Validación</th><th>Acciones</th></tr></thead><tbody id="monthlyRows"></tbody></table></div>
+              <div class="table-responsive"><table class="table monthly-table align-middle mb-0"><thead><tr><th>Periodo</th><th>Ejecución mes</th><th>Ejecución acumulada</th><th>Equivalente ejecutado</th><th>Facturado mes</th><th>Facturado acumulado</th><th>Facturación %</th><th>Recaudado mes</th><th>Recaudado acumulado</th><th>Recaudo Financiero</th><th>Costos y gastos</th><th>Novedad de ejecución</th><th>Validación</th><th>Acciones</th></tr></thead><tbody id="monthlyRows"></tbody></table></div>
               <div id="monthlyEmpty" class="inline-empty" hidden>No se encontraron registros mensuales.</div>
             </article>
           </section>
@@ -319,8 +322,8 @@
                 <label>Municipio<input id="projectFilterMunicipality" class="form-control" type="search" placeholder="Municipio" /></label>
                 <label>Estado<select id="projectFilterStatus" class="form-select"><option value="">Todos</option><option value="planeado">Planeado</option><option value="activo">Activo</option><option value="suspendido">Suspendido</option><option value="finalizado">Finalizado</option><option value="cancelado">Cancelado</option></select></label>
                 <label>Tipo de servicio<input id="projectFilterService" class="form-control" type="search" placeholder="Ej. Construcción EPC" /></label>
-                <label>Avance financiero mínimo (%)<input id="projectFilterProgressMin" class="form-control" type="number" min="0" max="100" step="0.1" placeholder="0" /></label>
-                <label>Avance financiero máximo (%)<input id="projectFilterProgressMax" class="form-control" type="number" min="0" max="100" step="0.1" placeholder="100" /></label>
+                <label>Facturación mínima (%)<input id="projectFilterProgressMin" class="form-control" type="number" min="0" max="100" step="0.1" placeholder="0" /></label>
+                <label>Facturación máxima (%)<input id="projectFilterProgressMax" class="form-control" type="number" min="0" max="100" step="0.1" placeholder="100" /></label>
                 <div class="filter-actions"><button class="btn btn-primary" type="submit">Aplicar filtros</button><button id="clearProjectFilters" class="btn btn-outline-secondary" type="button">Limpiar</button></div>
               </form>
             </article>
@@ -334,7 +337,7 @@
             <article class="panel data-panel">
               <div class="table-responsive">
                 <table class="table align-middle mb-0">
-                  <thead><tr><th>Centro de costo</th><th>Proyecto</th><th>Municipio</th><th>Tipo de servicio</th><th>Estado</th><th>Avance de ejecución</th><th>Avance financiero</th><th>Acciones</th></tr></thead>
+                  <thead><tr><th>Centro de costo</th><th>Proyecto</th><th>Municipio</th><th>Tipo de servicio</th><th>Estado</th><th>Avance de ejecución</th><th>Facturación %</th><th>Acciones</th></tr></thead>
                   <tbody id="projectsManagementRows"></tbody>
                 </table>
               </div>
@@ -446,7 +449,7 @@
 
           <section id="reportsView" class="content-view" hidden>
             <div class="section-heading">
-              <div><h3>Reportes gerenciales</h3><p>El administrador informa el estado físico del proyecto. Las facturas calculan el avance financiero por separado.</p></div>
+              <div><h3>Reportes gerenciales</h3><p>El administrador informa el estado físico del proyecto. La facturación y el recaudo se calculan por separado.</p></div>
               <button id="exportReportButton" class="btn btn-primary" type="button">Exportar informe detallado en Excel</button>
             </div>
 
@@ -475,7 +478,8 @@
               <h4>Lectura del reporte</h4>
               <div class="formula-grid">
                 <span>Avance de ejecución = porcentaje registrado manualmente por el administrador</span>
-                <span>Avance financiero = facturación acumulada ÷ contrato vigente × 100</span>
+                <span>Facturación % = facturación acumulada ÷ contrato vigente × 100</span>
+                <span>Recaudo Financiero = pagos acumulados ÷ contrato vigente × 100</span>
                 <span>Rentabilidad estimada = contrato vigente − costos y gastos</span>
                 <span>Cobro = pagado ÷ facturado</span>
                 <span>Saldo contractual = contrato vigente − facturado</span>
@@ -486,13 +490,13 @@
             <article class="panel data-panel report-data-panel">
               <div class="panel-heading"><div><h4>Resultados por proyecto</h4><small id="reportResultCount">0 proyectos incluidos</small></div></div>
               <div id="reportModuleMessage" class="module-message module-message-block" role="status" aria-live="polite"></div>
-              <div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Centro</th><th>Principal</th><th>Proyecto</th><th>Contrato</th><th>Avance de ejecución</th><th>Facturado</th><th>Pagado</th><th>Costos</th><th>Rentabilidad</th><th>Saldo</th><th>Cartera</th><th>Avance financiero</th><th>Acción</th></tr></thead><tbody id="reportRows"></tbody></table></div>
+              <div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Centro</th><th>Principal</th><th>Proyecto</th><th>Contrato</th><th>Avance de ejecución</th><th>Facturado</th><th>Pagado</th><th>Costos</th><th>Rentabilidad</th><th>Saldo</th><th>Cartera</th><th>Facturación %</th><th>Acción</th></tr></thead><tbody id="reportRows"></tbody></table></div>
               <div id="reportEmpty" class="inline-empty" hidden>No hay proyectos que coincidan con los filtros.</div>
             </article>
 
             <article class="panel data-panel report-data-panel">
               <div class="panel-heading"><div><h4>Avance y pagos mes a mes</h4><small>Ejemplo: cierre anterior 15 % → cierre actual 50 % = 35 puntos porcentuales logrados en el mes. Los pagos se suman por periodo y no modifican el avance físico. Un mes sin seguimiento se identifica como «Sin registro físico».</small></div></div>
-              <div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Proyecto</th><th>Periodo</th><th>Contrato</th><th>Avance cierre anterior</th><th>Avance cierre actual</th><th>Avance logrado en el mes</th><th>Valor equivalente</th><th>Facturado en el mes</th><th>Pagado en el mes</th><th>Pagado acumulado</th><th>Avance financiero del mes</th><th>Novedad de ejecución</th></tr></thead><tbody id="reportMonthlyRows"></tbody></table></div>
+              <div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Proyecto</th><th>Periodo</th><th>Contrato</th><th>Avance cierre anterior</th><th>Avance cierre actual</th><th>Avance logrado en el mes</th><th>Valor equivalente</th><th>Facturado en el mes</th><th>Pagado en el mes</th><th>Pagado acumulado</th><th>Facturación del mes %</th><th>Novedad de ejecución</th></tr></thead><tbody id="reportMonthlyRows"></tbody></table></div>
               <div id="reportMonthlyEmpty" class="inline-empty" hidden>No hay periodos registrados para estos proyectos.</div>
             </article>
           </section>
@@ -588,12 +592,12 @@
           <label>Periodo abierto *<select id="monthlyPeriod" class="form-select" required></select></label>
           <label>Estado *<select id="monthlyValidationStatus" class="form-select" required><option value="borrador">Borrador</option><option value="pendiente">Pendiente de validación</option></select></label>
           <label>Avance de ejecución (%) · registro manual del administrador *<input id="monthlyExecutionPercentage" class="form-control" type="number" min="0" max="100" step="0.01" required /></label>
-          <label>Avance financiero acumulado (%) · cálculo automático<input id="monthlyFinancialPreview" class="form-control" readonly value="0%" /></label>
+          <label>Recaudo Financiero acumulado (%) · cálculo automático<input id="monthlyFinancialPreview" class="form-control" readonly value="0%" /></label>
           <label>Avance mes · diferencia en puntos porcentuales<input id="monthlyIncrementPreview" class="form-control" readonly value="0%" /></label>
           <label class="span-2">Observaciones<textarea id="monthlyObservations" class="form-control" rows="3" maxlength="500"></textarea></label>
           <label class="span-2">Novedad que afecta la ejecución<textarea id="monthlyExecutionIssue" class="form-control" rows="3" maxlength="1000" placeholder="Describe el impedimento, retraso o situación que afecta este periodo"></textarea></label>
         </div>
-        <p class="dialog-note">El avance de ejecución describe solamente el trabajo realizado. No necesita contrato y no altera facturas, pagos, costos ni rentabilidad. El avance financiero se calcula únicamente con las facturas registradas ÷ el contrato vigente.</p>
+        <p class="dialog-note">El avance de ejecución describe el trabajo realizado y no altera facturas, pagos, costos ni rentabilidad. Su equivalente monetario es una referencia: contrato × ejecución %. El Recaudo Financiero se calcula con pagos acumulados ÷ contrato vigente.</p>
         <p id="monthlyFormMessage" class="form-message" role="alert"></p>
         <div class="dialog-actions"><button class="btn btn-outline-secondary" type="button" data-close-dialog="monthlyDialog">Cancelar</button><button id="saveMonthlyButton" class="btn btn-primary" type="submit">Guardar seguimiento</button></div>
       </form>
@@ -605,7 +609,7 @@
         <p id="reportProgressContext" class="dialog-note"></p>
         <div class="form-grid">
           <label class="span-2">Avance de ejecución (%) · registro manual *<input id="reportProgressValue" class="form-control" type="number" min="0" max="100" step="0.01" required /></label>
-          <label class="span-2">Avance financiero (%) · cálculo automático<input id="reportFinancialValue" class="form-control" readonly /></label>
+          <label class="span-2">Facturación del contrato (%) · cálculo automático<input id="reportFinancialValue" class="form-control" readonly /></label>
           <label class="span-2">Novedad que afecta la ejecución<textarea id="reportExecutionIssue" class="form-control" rows="3" maxlength="1000" placeholder="Describe el impedimento o retraso de este periodo"></textarea></label>
         </div>
         <p id="reportProgressNote" class="dialog-note">Solo el administrador puede registrar el avance de ejecución. No cambia las cifras financieras.</p>
@@ -687,8 +691,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <script src="src/assets/js/config.js?v=1.5.8"></script>
-    <script type="module" src="src/assets/js/app.js?v=1.5.8"></script>
-    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.5.8"></script>
+    <script src="src/assets/js/config.js?v=1.5.9"></script>
+    <script type="module" src="src/assets/js/app.js?v=1.5.9"></script>
+    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.5.9"></script>
   </body>
 </html>

@@ -8,10 +8,10 @@ export function managementSummarySheet(reportRows = []) {
     name: "Resumen",
     title: "Resumen de proyectos | SOINSOLAR",
     notes: [
-      "Avance físico acumulado: obra ejecutada. Avance financiero: facturado ÷ contrato. Pagado: dinero recibido. Consulta las hojas mensuales para comparar cada periodo.",
+      "Avance físico acumulado: obra ejecutada. Facturación: facturado ÷ contrato. Recaudo Financiero: pagado ÷ contrato. Consulta las hojas mensuales para comparar cada periodo.",
       "Importes en pesos colombianos (COP). Las celdas vacías de avance físico indican que aún no se registró seguimiento."
     ],
-    headers: ["Centro de costo", "Centro principal", "Proyecto", "Municipio", "Estado", "Contrato vigente", "Avance físico acumulado", "Facturado", "Avance financiero", "Pagado", "Costos y gastos", "Rentabilidad", "Saldo contractual", "Cartera"],
+    headers: ["Centro de costo", "Centro principal", "Proyecto", "Municipio", "Estado", "Contrato vigente", "Avance físico acumulado", "Facturado", "Facturación %", "Pagado", "Costos y gastos", "Rentabilidad", "Saldo contractual", "Cartera"],
     types: ["text", "text", "text", "text", "text", "money", "percent", "money", "percent", "money", "money", "money", "money", "money"],
     freezeColumns: 3,
     highlightColumns: [6, 8, 9, 13],
@@ -84,7 +84,7 @@ export function monthlyWorkbookSheets(rows = []) {
         "Avance cierre anterior", "Avance cierre actual", "Avance logrado en el mes (p.p.)",
         "Equivalente físico del mes (COP)", "Equivalente físico acumulado (COP)",
         "Facturado del mes (COP)", "Facturado acumulado (COP)",
-        "Avance financiero del mes", "Avance financiero acumulado",
+        "Facturación del mes (%)", "Facturación acumulada (%)",
         "Pagado del mes (COP)", "Pagado acumulado (COP)",
         "Costos del mes (COP)", "Costos acumulados (COP)",
         "Cartera por cobrar (COP)", "Saldo por facturar (COP)",
