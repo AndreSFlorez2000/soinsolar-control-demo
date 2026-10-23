@@ -438,6 +438,8 @@ button, input, select, textarea { font: inherit; }
 .assistant-detail dd { margin: 3px 0 0; font-size: 12px; font-weight: 650; }
 .assistant-choice, .assistant-examples button { display: block; width: 100%; margin-top: 8px; padding: 10px 12px; color: var(--navy); text-align: left; background: #fff; border: 1px solid #cfe3f2; border-radius: 8px; font-size: 12px; }
 .assistant-choice:hover, .assistant-choice:focus-visible, .assistant-examples button:hover, .assistant-examples button:focus-visible { background: #eaf3fa; border-color: var(--blue); }
+.assistant-choice-primary { color: #fff; background: var(--navy); border-color: var(--navy); font-weight: 700; }
+.assistant-choice-primary:hover, .assistant-choice-primary:focus-visible { color: var(--navy); }
 .assistant-composer { padding: 16px 20px; border-top: 1px solid var(--border); }
 .assistant-form { display: flex; gap: 10px; }
 .assistant-form input { min-width: 0; }

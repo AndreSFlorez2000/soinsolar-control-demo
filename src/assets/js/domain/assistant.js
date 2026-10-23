@@ -1,4 +1,5 @@
 import { calculateDashboardIndicators } from "./dashboard.js?v=1.5.9";
+import { assertDate, assertMoney, assertText, projectInputToRecord, PROJECT_STATUSES } from "../data/models.js?v=1.5.0";
 
 function words(value) {
   return String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
@@ -27,18 +28,112 @@ function scoreProject(question, project) {
   return matches ? 10 + matches * 5 : 0;
 }
 
+export function isCreateProjectRequest(query) {
+  const question = words(query);
+  return /\b(crear|crea|agregar|agrega|registrar|registra|nuevo|nueva)\b/.test(question)
+    && /\b(proyecto|centro de costo)\b/.test(question);
+}
+
+export function detectAssistantIntents(query) {
+  const question = words(query);
+  if (/\b(resumen|general|completo|todo|como va|situacion)\b/.test(question)) return ["full"];
+  const intents = [];
+  const add = (name, pattern) => { if (pattern.test(question)) intents.push(name); };
+  add("executedEquivalent", /\b(equivalente|ejecutado en pesos|ejecucion en pesos|avanzado monetariamente|valor ejecutado)\b/);
+  add("execution", /\b(avance de ejecucion|avance fisico|avance del proyecto|progreso fisico|porcentaje ejecutado|porcentaje de ejecucion|ejecucion del proyecto|cuanto se ha ejecutado)\b/);
+  add("billing", /\b(facturad[oa]|facturacion|facturas|facturo|facturar)\b/);
+  add("collection", /\b(recaud[oa]|recaudo financiero|avance financiero|cobrad[oa]|pagad[oa]|pagos|recogid[oa]|recogio)\b/);
+  add("receivable", /\b(cartera|por cobrar|pendiente de pago|deben|adeudan)\b/);
+  add("balance", /\b(saldo contractual|sin facturar|resta del contrato)\b/);
+  add("costs", /\b(costos|gastos|gastado)\b/);
+  add("profitability", /\b(rentabilidad|utilidad)\b/);
+  add("contract", /\b(contrato|contractual|contratado)\b/);
+  add("status", /\b(estado|estatus|situacion actual)\b/);
+  add("activity", /\b(ultim[oa]|movimientos|actividad|historial)\b/);
+  return intents.length ? [...new Set(intents)] : ["full"];
+}
+
 export function resolveAssistantQuestion(query, projects = []) {
   const question = words(query);
   if (!question) return { kind: "help" };
+  const intents = detectAssistantIntents(query);
   const matches = projects.map((project) => ({ project, score: scoreProject(question, project) }))
     .filter((item) => item.score > 0).sort((left, right) => right.score - left.score);
   if (matches.length) {
     const best = matches[0].score;
     const choices = matches.filter((item) => item.score === best).map((item) => item.project);
-    return choices.length === 1 ? { kind: "project", project: choices[0] } : { kind: "choose", projects: choices.slice(0, 8) };
+    return choices.length === 1 ? { kind: "project", project: choices[0], intents } : { kind: "choose", projects: choices.slice(0, 8), intents };
   }
-  if (/\b(resumen|general|global|totales|todos|cuantos)\b/.test(question)) return { kind: "overview" };
+  if (/\b(resumen|general|global|total|totales|todos|cuantos)\b/.test(question)) return { kind: "overview", intents };
   return { kind: "help" };
+}
+
+export const PROJECT_DRAFT_FIELDS = Object.freeze([
+  { key: "costCenter", label: "Centro de costo", prompt: "Escribe el centro de costo (por ejemplo, CC-205).", required: true },
+  { key: "name", label: "Nombre del proyecto", prompt: "¿Cómo se llama el proyecto?", required: true },
+  { key: "municipality", label: "Municipio", prompt: "¿En qué municipio se realiza?", required: true },
+  { key: "serviceType", label: "Tipo de servicio", prompt: "¿Qué tipo de servicio es? (por ejemplo, construcción EPC).", required: true },
+  { key: "clientName", label: "Cliente", prompt: "¿Quién es el cliente? Puedes escribir «omitir».", required: false },
+  { key: "parentProjectId", label: "Centro principal", prompt: "Si es un centro asociado, escribe el código del centro principal. Si es independiente, «omitir».", required: false },
+  { key: "powerKwp", label: "Potencia (kWp)", prompt: "¿Cuál es su potencia en kWp? Escribe un número o «omitir».", required: false },
+  { key: "status", label: "Estado", prompt: "¿Estado inicial? planeado, activo, suspendido, finalizado o cancelado. «Omitir» deja planeado.", required: false },
+  { key: "startDate", label: "Fecha de inicio", prompt: "Fecha de inicio en AAAA-MM-DD, o «omitir».", required: false },
+  { key: "endDate", label: "Fecha de finalización", prompt: "Fecha de finalización en AAAA-MM-DD, o «omitir».", required: false },
+  { key: "notes", label: "Notas", prompt: "Notas adicionales, o «omitir».", required: false }
+]);
+
+export function parseProjectDraftField(key, rawValue, projects = []) {
+  const field = PROJECT_DRAFT_FIELDS.find((item) => item.key === key);
+  if (!field) throw new Error("Ese campo no pertenece al proyecto.");
+  const value = String(rawValue ?? "").trim();
+  if (!value || /^omitir$/i.test(value)) {
+    if (field.required) throw new Error(`Necesito el campo «${field.label}» para crear el proyecto.`);
+    return key === "status" ? "planeado" : null;
+  }
+  if (key === "costCenter") {
+    const center = assertText(value, "centro de costo", { min: 2, max: 50 });
+    if (projects.some((item) => words(item.costCenter) === words(center))) throw new Error("Ya existe un proyecto con ese centro de costo.");
+    return center;
+  }
+  if (key === "name") return assertText(value, "nombre", { min: 3, max: 180 });
+  if (key === "municipality") return assertText(value, "municipio", { min: 2, max: 120 });
+  if (key === "serviceType") return assertText(value, "tipo de servicio", { min: 2, max: 120 });
+  if (key === "clientName") return assertText(value, "cliente", { min: 2, max: 180 });
+  if (key === "notes") return assertText(value, "notas", { min: 1, max: 500 });
+  if (key === "status") {
+    const normalized = words(value);
+    if (!PROJECT_STATUSES.includes(normalized)) throw new Error(`El estado debe ser: ${PROJECT_STATUSES.join(", ")}.`);
+    return normalized;
+  }
+  if (key === "startDate" || key === "endDate") return assertDate(value, field.label.toLowerCase());
+  if (key === "powerKwp") {
+    const number = value.replace(/\s/g, "").replace(",", ".");
+    return assertMoney(number, "potencia");
+  }
+  if (key === "parentProjectId") {
+    const parent = projects.find((item) => words(item.costCenter) === words(value));
+    if (!parent) throw new Error("No encontré ese centro principal. Escribe su código exacto u «omitir».");
+    return parent.projectId;
+  }
+  return value;
+}
+
+export function prepareProjectDraft(values, projects = []) {
+  const input = {};
+  for (const field of PROJECT_DRAFT_FIELDS) {
+    const value = values[field.key];
+    if (field.key === "parentProjectId") {
+      if (value && !projects.some((project) => project.projectId === value)) throw new Error("El centro principal ya no existe. Corrige el borrador.");
+      input[field.key] = value || null;
+    } else {
+      input[field.key] = parseProjectDraftField(field.key, value ?? "", projects);
+    }
+  }
+  if (input.parentProjectId && words(projects.find((item) => item.projectId === input.parentProjectId)?.costCenter) === words(input.costCenter)) {
+    throw new Error("Un proyecto no puede ser su propio centro principal.");
+  }
+  projectInputToRecord(input, null);
+  return input;
 }
 
 export function descendantProjectIds(project, projects = []) {
