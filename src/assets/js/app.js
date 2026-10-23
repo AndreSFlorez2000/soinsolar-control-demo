@@ -226,6 +226,7 @@ async function loadReferenceData() {
 
 window.SOINSOLAR_APP_API = Object.freeze({
   gateway: ensureGateway,
+  profile: () => currentUserProfile,
   projects: () => [...currentProjects],
   periods: () => [...currentPeriods],
   monthly: () => [...allMonthlyRows],

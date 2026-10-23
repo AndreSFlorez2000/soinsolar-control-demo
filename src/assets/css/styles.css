@@ -414,7 +414,7 @@ button, input, select, textarea { font: inherit; }
   .filter-grid-finance .filter-actions, .filter-grid-reports .filter-actions { grid-column: auto; }
 }
 
-/* Asistente SOINSOLAR: consultas de solo lectura con la sesión activa */
+/* Asistente SOINSOLAR: consultas y creación guiada con la sesión activa */
 .nav-assistant-icon { display: grid; place-items: center; width: 26px; height: 26px; flex: 0 0 26px; color: #a8e5c2; font-size: 24px; line-height: 1; }
 .assistant-layout { display: grid; grid-template-columns: minmax(0, 1fr) 275px; gap: 18px; align-items: start; }
 .assistant-panel { display: flex; flex-direction: column; min-height: min(690px, 75vh); overflow: hidden; }
@@ -441,6 +441,13 @@ button, input, select, textarea { font: inherit; }
 .assistant-choice-primary { color: #fff; background: var(--navy); border-color: var(--navy); font-weight: 700; }
 .assistant-choice-primary:hover, .assistant-choice-primary:focus-visible { color: var(--navy); }
 .assistant-composer { padding: 16px 20px; border-top: 1px solid var(--border); }
+.assistant-loading { display: grid; gap: 7px; margin-bottom: 12px; color: var(--navy); font-size: 12px; font-weight: 650; }
+.assistant-loading[hidden] { display: none; }
+.assistant-loading-track { height: 5px; overflow: hidden; background: #dceaf1; border-radius: 999px; }
+.assistant-loading-track span { display: block; width: 35%; height: 100%; background: var(--blue); border-radius: inherit; animation: assistant-loading 1.2s ease-in-out infinite alternate; }
+@keyframes assistant-loading { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
+.assistant-form :disabled, .assistant-choice:disabled, .assistant-examples button:disabled { cursor: wait; opacity: .6; }
+@media (prefers-reduced-motion: reduce) { .assistant-loading-track span { animation: none; width: 100%; } }
 .assistant-form { display: flex; gap: 10px; }
 .assistant-form input { min-width: 0; }
 .assistant-composer small { display: block; margin-top: 7px; color: var(--muted); font-size: 10px; }

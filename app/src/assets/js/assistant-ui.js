@@ -8,9 +8,23 @@ const form = document.querySelector("#assistantForm");
 const input = document.querySelector("#assistantQuestion");
 const send = document.querySelector("#assistantSend");
 const messages = document.querySelector("#assistantMessages");
+const loading = document.querySelector("#assistantLoading");
+const loadingText = document.querySelector("#assistantLoadingText");
 let generation = 0;
 let busy = false;
 let draft = null;
+
+function setBusy(value, label = "Consultando datos…") {
+  busy = value;
+  send.disabled = value;
+  input.disabled = value;
+  form.setAttribute("aria-busy", String(value));
+  loading.hidden = !value;
+  loadingText.textContent = label;
+  document.querySelectorAll("#assistantView [data-assistant-prompt], #assistantView [data-assistant-query], #assistantView [data-assistant-action]")
+    .forEach((button) => { button.disabled = value; });
+  if (!value && !document.querySelector("#appView").hidden) input.focus();
+}
 
 function node(tag, className = "", value = "") {
   const item = document.createElement(tag);
@@ -394,21 +408,22 @@ function welcome() {
 async function ask(question) {
   const value = String(question ?? "").trim();
   if (!value || busy || document.querySelector("#appView").hidden) return;
-  busy = true;
-  send.disabled = true;
   input.value = "";
+  setBusy(true, draft?.mode === "review" && /^(guardar|confirmar)/i.test(value)
+    ? "Guardando proyecto…" : "Preparando respuesta…");
   const requestGeneration = generation;
   bubble("user").textContent = value;
   const reply = bubble("assistant");
   reply.textContent = "Consultando datos…";
   try {
-    const gateway = await window.SOINSOLAR_APP_API.gateway();
-    const profile = await gateway.getCurrentProfile();
+    const app = window.SOINSOLAR_APP_API;
+    const profile = app.profile();
     if (!profile?.active) throw new Error("Tu cuenta aún no tiene acceso a los proyectos.");
-    const projects = await gateway.listProjects();
+    const projects = app.projects();
     if (requestGeneration !== generation || document.querySelector("#appView").hidden) return;
     if (draft || isCreateProjectRequest(value)) {
       reply.replaceChildren();
+      const gateway = await app.gateway();
       await processDraft(value, projects, profile, gateway, reply, requestGeneration);
       messages.scrollTop = messages.scrollHeight;
       return;
@@ -420,16 +435,27 @@ async function ask(question) {
       const withActivity = full || result.intents.some((intent) =>
         ["activity", "latestPayment", "latestInvoice", "latestCost"].includes(intent));
       const ids = descendantProjectIds(result.project, projects);
-      const [contracts, monthly, movements] = await Promise.all([
-        full || result.intents.includes("contract") ? gateway.listContracts(result.project.projectId) : [],
-        full ? gateway.listMonthlyTracking({ projectId: result.project.projectId }) : [],
-        withActivity ? Promise.all(ids.map(async (projectId) => {
-          const [invoices, payments, costs] = await Promise.all([
-            gateway.listInvoices({ projectId }), gateway.listPayments({ projectId }), gateway.listCostsExpenses({ projectId })
-          ]);
-          return { invoices, payments, costs };
-        })) : []
-      ]);
+      let contracts = [];
+      let monthly = [];
+      let movements = [];
+      if (full || result.intents.includes("contract") || withActivity) {
+        const gateway = await app.gateway();
+        const needsInvoices = full || result.intents.includes("activity") || result.intents.includes("latestInvoice");
+        const needsPayments = full || result.intents.includes("activity") || result.intents.includes("latestPayment");
+        const needsCosts = full || result.intents.includes("activity") || result.intents.includes("latestCost");
+        [contracts, monthly, movements] = await Promise.all([
+          full || result.intents.includes("contract") ? gateway.listContracts(result.project.projectId) : [],
+          full ? gateway.listMonthlyTracking({ projectId: result.project.projectId }) : [],
+          withActivity ? Promise.all(ids.map(async (projectId) => {
+            const [invoices, payments, costs] = await Promise.all([
+              needsInvoices ? gateway.listInvoices({ projectId }) : [],
+              needsPayments ? gateway.listPayments({ projectId }) : [],
+              needsCosts ? gateway.listCostsExpenses({ projectId }) : []
+            ]);
+            return { invoices, payments, costs };
+          })) : []
+        ]);
+      }
       answer = buildAssistantProjectAnswer(result.project, {
         contracts, monthly, scopeProjectCount: ids.length,
         invoices: movements.flatMap((item) => item.invoices),
@@ -457,11 +483,7 @@ async function ask(question) {
       reply.textContent = error.message || "No se pudieron consultar los datos. Vuelve a intentarlo.";
     }
   } finally {
-    if (requestGeneration === generation) {
-      busy = false;
-      send.disabled = false;
-      input.focus();
-    }
+    if (requestGeneration === generation) setBusy(false);
   }
 }
 
@@ -471,6 +493,7 @@ form.addEventListener("submit", (event) => {
 });
 
 document.querySelector("#assistantView").addEventListener("click", (event) => {
+  if (busy) return;
   const action = event.target.closest("[data-assistant-action]");
   if (action) {
     const value = action.dataset.assistantAction;
@@ -500,9 +523,8 @@ document.querySelector("#assistantView").addEventListener("click", (event) => {
 
 window.addEventListener("soinsolar:logout", () => {
   generation += 1;
-  busy = false;
   draft = null;
-  send.disabled = false;
+  setBusy(false);
   input.value = "";
   welcome();
 });

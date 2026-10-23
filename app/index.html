@@ -11,7 +11,7 @@
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.7.1" />
+    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.7.2" />
   </head>
   <body>
     <section id="loginView" class="login-shell">
@@ -510,6 +510,10 @@
               <article class="panel assistant-panel" aria-label="Consultas de proyectos">
                 <div id="assistantMessages" class="assistant-messages" role="log" aria-live="polite" aria-relevant="additions text"></div>
                 <div class="assistant-composer">
+                  <div id="assistantLoading" class="assistant-loading" role="status" aria-live="polite" hidden>
+                    <span id="assistantLoadingText">Consultando datos…</span>
+                    <div class="assistant-loading-track" role="progressbar" aria-label="El asistente está procesando la solicitud"><span></span></div>
+                  </div>
                   <form id="assistantForm" class="assistant-form" autocomplete="off">
                     <label class="visually-hidden" for="assistantQuestion">Pregunta o dato del proyecto</label>
                     <input id="assistantQuestion" class="form-control" type="text" maxlength="500" placeholder="Ejemplo: ¿Cuánto recaudó CC-102? o Crear proyecto" required />
@@ -722,9 +726,9 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <script src="src/assets/js/config.js?v=1.7.1"></script>
-    <script type="module" src="src/assets/js/app.js?v=1.7.1"></script>
-    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.7.1"></script>
-    <script type="module" src="src/assets/js/assistant-ui.js?v=1.7.1"></script>
+    <script src="src/assets/js/config.js?v=1.7.2"></script>
+    <script type="module" src="src/assets/js/app.js?v=1.7.2"></script>
+    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.7.2"></script>
+    <script type="module" src="src/assets/js/assistant-ui.js?v=1.7.2"></script>
   </body>
 </html>
