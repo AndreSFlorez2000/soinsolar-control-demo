@@ -409,7 +409,7 @@ function welcome() {
 function renderQuickAnswer(target, answer) {
   if (answer.kind === "creator") {
     target.append(node("h4", "", "¿Quién es mi creador?"));
-    paragraph(target, "Mi creador para SOINSOLAR Control es Juan Andrés Flórez Ospina. El desarrollo de este asistente ha contado con apoyo de ChatGPT.");
+    paragraph(target, "Soy el asistente de SOINSOLAR Control, creado por Juan Andrés Flórez Ospina, ingeniero de sistemas.");
     return;
   }
   target.append(node("h4", "", "¿Qué puedo hacer por ti?"));
