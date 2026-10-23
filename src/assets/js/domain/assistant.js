@@ -34,6 +34,17 @@ export function isCreateProjectRequest(query) {
     && /\b(proyecto|centro de costo)\b/.test(question);
 }
 
+export function resolveAssistantQuickQuestion(query) {
+  const question = words(query);
+  if (/^(que (puedes|sabes) hacer( por mi)?|en que (me )?puedes ayudar|como (me )?puedes ayudar|cuales son tus funciones|ayuda|opciones)$/.test(question)) {
+    return { kind: "capabilities" };
+  }
+  if (/^(quien (es|fue) (tu|el) (creador|desarrollador)|quien te (creo|hizo|programo|desarrollo)|quien creo (este|el) asistente)$/.test(question)) {
+    return { kind: "creator" };
+  }
+  return null;
+}
+
 export function detectAssistantIntents(query) {
   const question = words(query);
   if (/\b(resumen|general|completo|todo|como va|situacion)\b/.test(question)) return ["full"];
@@ -62,6 +73,8 @@ export function detectAssistantIntents(query) {
 export function resolveAssistantQuestion(query, projects = []) {
   const question = words(query);
   if (!question) return { kind: "help" };
+  const quick = resolveAssistantQuickQuestion(query);
+  if (quick) return quick;
   const intents = detectAssistantIntents(query);
   const matches = projects.map((project) => ({ project, score: scoreProject(question, project) }))
     .filter((item) => item.score > 0).sort((left, right) => right.score - left.score);

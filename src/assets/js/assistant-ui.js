@@ -1,7 +1,8 @@
 import {
   buildAssistantOverview, buildAssistantProjectAnswer, descendantProjectIds, isCreateProjectRequest,
-  parseProjectDraftField, prepareProjectDraft, PROJECT_DRAFT_FIELDS, resolveAssistantQuestion
-} from "./domain/assistant.js?v=1.7.1";
+  parseProjectDraftField, prepareProjectDraft, PROJECT_DRAFT_FIELDS,
+  resolveAssistantQuestion, resolveAssistantQuickQuestion
+} from "./domain/assistant.js?v=1.7.3";
 import { formatCop } from "./domain/financial.js?v=1.1.0";
 
 const form = document.querySelector("#assistantForm");
@@ -405,6 +406,18 @@ function welcome() {
   paragraph(item, "Pregunta por un dato puntual de un proyecto o escribe «resumen general». Si tienes permiso, escribe «crear proyecto» y te guiaré hasta guardarlo.");
 }
 
+function renderQuickAnswer(target, answer) {
+  if (answer.kind === "creator") {
+    target.append(node("h4", "", "¿Quién es mi creador?"));
+    paragraph(target, "Mi creador para SOINSOLAR Control es Juan Andrés Flórez Ospina. El desarrollo de este asistente ha contado con apoyo de ChatGPT.");
+    return;
+  }
+  target.append(node("h4", "", "¿Qué puedo hacer por ti?"));
+  paragraph(target, "Puedo consultar por nombre o centro de costo el contrato, el avance de ejecución, el valor equivalente ejecutado, la facturación, el recaudo, la cartera, los costos y los movimientos recientes.");
+  paragraph(target, "También puedo mostrar un resumen general y guiarte paso a paso para crear un proyecto, revisar sus datos y guardarlo si tu cuenta tiene permiso.");
+  paragraph(target, "Prueba con «¿Cuánto recaudó CC-102?», «¿Cuál es el avance de ejecución de CC-102?» o «Crear proyecto».", "assistant-caveat");
+}
+
 async function ask(question) {
   const value = String(question ?? "").trim();
   if (!value || busy || document.querySelector("#appView").hidden) return;
@@ -419,6 +432,14 @@ async function ask(question) {
     const app = window.SOINSOLAR_APP_API;
     const profile = app.profile();
     if (!profile?.active) throw new Error("Tu cuenta aún no tiene acceso a los proyectos.");
+    const quick = resolveAssistantQuickQuestion(value);
+    if (quick) {
+      reply.replaceChildren();
+      renderQuickAnswer(reply, quick);
+      if (draft) paragraph(reply, "Tu borrador sigue abierto. Puedes continuar con el dato solicitado o escribir «cancelar».", "assistant-footnote");
+      messages.scrollTop = messages.scrollHeight;
+      return;
+    }
     const projects = app.projects();
     if (requestGeneration !== generation || document.querySelector("#appView").hidden) return;
     if (draft || isCreateProjectRequest(value)) {
