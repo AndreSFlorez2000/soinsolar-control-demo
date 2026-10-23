@@ -37,6 +37,12 @@ export function isCreateProjectRequest(query) {
 export function detectAssistantIntents(query) {
   const question = words(query);
   if (/\b(resumen|general|completo|todo|como va|situacion)\b/.test(question)) return ["full"];
+  if (/\b(cuantos proyectos|numero de proyectos|cantidad de proyectos)\b/.test(question)) return ["projectCount"];
+  if (/\b(ultimo|ultima|reciente)\b/.test(question)) {
+    if (/\b(pago|pagos|recaudo|cobro)\b/.test(question)) return ["latestPayment"];
+    if (/\b(factura|facturas|facturacion)\b/.test(question)) return ["latestInvoice"];
+    if (/\b(costo|costos|gasto|gastos)\b/.test(question)) return ["latestCost"];
+  }
   const intents = [];
   const add = (name, pattern) => { if (pattern.test(question)) intents.push(name); };
   add("executedEquivalent", /\b(equivalente|ejecutado en pesos|ejecucion en pesos|avanzado monetariamente|valor ejecutado)\b/);

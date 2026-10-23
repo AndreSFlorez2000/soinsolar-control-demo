@@ -1,7 +1,7 @@
 import {
   buildAssistantOverview, buildAssistantProjectAnswer, descendantProjectIds, isCreateProjectRequest,
   parseProjectDraftField, prepareProjectDraft, PROJECT_DRAFT_FIELDS, resolveAssistantQuestion
-} from "./domain/assistant.js?v=1.7.0";
+} from "./domain/assistant.js?v=1.7.1";
 import { formatCop } from "./domain/financial.js?v=1.1.0";
 
 const form = document.querySelector("#assistantForm");
@@ -168,8 +168,18 @@ function renderProjectFocus(target, answer, intents) {
       ? `Último: ${answer.latestCost.category} · ${formatCop(answer.latestCost.amount)} · ${date(answer.latestCost.movementDate)}` : "Sin movimientos registrados");
     activity.append(list);
   }
+  if (intents.some((intent) => ["latestPayment", "latestInvoice", "latestCost"].includes(intent))) {
+    const list = node("dl", "assistant-details");
+    if (intents.includes("latestPayment")) detail(list, "Último pago", answer.latestPayment
+      ? `${answer.latestPayment.paymentReference} · ${formatCop(answer.latestPayment.amount)} · ${date(answer.latestPayment.paymentDate)}` : "Sin pagos registrados");
+    if (intents.includes("latestInvoice")) detail(list, "Última factura", answer.latestInvoice
+      ? `${answer.latestInvoice.invoiceNumber} · ${formatCop(answer.latestInvoice.amount)} · ${date(answer.latestInvoice.issueDate)}` : "Sin facturas activas");
+    if (intents.includes("latestCost")) detail(list, "Último costo o gasto", answer.latestCost
+      ? `${answer.latestCost.category} · ${formatCop(answer.latestCost.amount)} · ${date(answer.latestCost.movementDate)}` : "Sin movimientos registrados");
+    target.append(list);
+  }
   if (answer.scopeProjectCount > 1 && intents.some((intent) =>
-    ["contract", "executedEquivalent", "billing", "collection", "receivable", "balance", "costs", "profitability", "activity"].includes(intent))) {
+    ["contract", "executedEquivalent", "billing", "collection", "receivable", "balance", "costs", "profitability", "activity", "latestPayment", "latestInvoice", "latestCost"].includes(intent))) {
     paragraph(target, `Las cifras monetarias incluyen ${answer.scopeProjectCount} centros relacionados. El avance físico corresponde a este centro.`, "assistant-footnote");
   }
 }
@@ -177,9 +187,10 @@ function renderProjectFocus(target, answer, intents) {
 function renderOverview(target, answer, intents = ["full"]) {
   const data = answer.indicators;
   target.append(node("h4", "", "Resumen general de proyectos"));
-  if (intents.length === 1 && intents[0] !== "full") {
+  if (intents.length && !intents.includes("full")) {
     const grid = node("div", "assistant-metrics");
     const mapping = {
+      projectCount: ["Proyectos registrados", String(data.projectCount)],
       contract: ["Contratos vigentes", formatCop(data.contractValue)],
       executedEquivalent: ["Equivalente monetario de ejecución", formatCop(data.executedEquivalent)],
       execution: ["Avance de ejecución promedio", percent(data.executionProgress)],
@@ -188,9 +199,11 @@ function renderOverview(target, answer, intents = ["full"]) {
       receivable: ["Cartera pendiente", formatCop(data.paymentPending)],
       costs: ["Costos y gastos", formatCop(data.costsExpenses)]
     };
-    if (mapping[intents[0]]) {
-      metric(grid, ...mapping[intents[0]]);
-      if (intents[0] === "collection") metric(grid, "Recaudo Financiero", percent(data.collectionProgress));
+    if (intents.every((intent) => mapping[intent])) {
+      for (const intent of intents) {
+        metric(grid, ...mapping[intent]);
+        if (intent === "collection") metric(grid, "Recaudo Financiero", percent(data.collectionProgress));
+      }
       target.append(grid);
       return;
     }
@@ -232,7 +245,15 @@ function renderDraftStep(target) {
 }
 
 function renderDraftReview(target, projects) {
-  const input = prepareProjectDraft(draft.values, projects);
+  let input;
+  try {
+    input = prepareProjectDraft(draft.values, projects);
+  } catch (error) {
+    draft.mode = "choose-edit";
+    paragraph(target, error.message);
+    renderDraftEdit(target);
+    return;
+  }
   target.append(node("h4", "", "Revisa el proyecto antes de guardarlo"));
   const list = node("dl", "assistant-details");
   for (const field of PROJECT_DRAFT_FIELDS) {
@@ -273,11 +294,26 @@ async function processDraft(value, projects, profile, gateway, reply, requestGen
   }
   if (draft.mode === "review") {
     if (/^(guardar|confirmar|si guardar|guardar proyecto)$/i.test(value)) {
-      const input = prepareProjectDraft(draft.values, projects);
+      let input;
+      try {
+        input = prepareProjectDraft(draft.values, projects);
+      } catch (error) {
+        draft.mode = "choose-edit";
+        paragraph(reply, error.message);
+        renderDraftEdit(reply);
+        return;
+      }
       const refreshedProfile = await gateway.getCurrentProfile();
       if (!refreshedProfile?.active || !["administrador", "gerencia"].includes(refreshedProfile.role)) throw new Error("Tu cuenta ya no tiene permiso para crear proyectos.");
       const latestProjects = await gateway.listProjects();
-      prepareProjectDraft(input, latestProjects);
+      try {
+        prepareProjectDraft(input, latestProjects);
+      } catch (error) {
+        draft.mode = "choose-edit";
+        paragraph(reply, error.message);
+        renderDraftEdit(reply);
+        return;
+      }
       if (requestGeneration !== generation || document.querySelector("#appView").hidden) return;
       const created = await gateway.createProject(input);
       draft = null;
@@ -381,7 +417,8 @@ async function ask(question) {
     let answer = result;
     if (result.kind === "project") {
       const full = result.intents.includes("full");
-      const withActivity = full || result.intents.includes("activity");
+      const withActivity = full || result.intents.some((intent) =>
+        ["activity", "latestPayment", "latestInvoice", "latestCost"].includes(intent));
       const ids = descendantProjectIds(result.project, projects);
       const [contracts, monthly, movements] = await Promise.all([
         full || result.intents.includes("contract") ? gateway.listContracts(result.project.projectId) : [],
