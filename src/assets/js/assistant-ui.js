@@ -1,8 +1,9 @@
 import {
-  buildAssistantOverview, buildAssistantProjectAnswer, descendantProjectIds, isCreateProjectRequest,
+  buildAssistantOverview, buildAssistantPeriodAnswer, buildAssistantPortfolioList, buildAssistantProjectAnswer,
+  descendantProjectIds, isCreateProjectRequest,
   parseProjectDraftField, prepareProjectDraft, PROJECT_DRAFT_FIELDS,
   resolveAssistantQuestion, resolveAssistantQuickQuestion
-} from "./domain/assistant.js?v=1.7.3";
+} from "./domain/assistant.js?v=1.10.0";
 import { formatCop } from "./domain/financial.js?v=1.1.0";
 
 const form = document.querySelector("#assistantForm");
@@ -11,9 +12,18 @@ const send = document.querySelector("#assistantSend");
 const messages = document.querySelector("#assistantMessages");
 const loading = document.querySelector("#assistantLoading");
 const loadingText = document.querySelector("#assistantLoadingText");
+const contextLabel = document.querySelector("#assistantContext");
 let generation = 0;
 let busy = false;
 let draft = null;
+let lastProjectId = null;
+let useWorkspaceContext = true;
+
+function updateContext(projects = window.SOINSOLAR_APP_API?.projects() ?? []) {
+  const app = window.SOINSOLAR_APP_API;
+  const project = projects.find((item) => item.projectId === (lastProjectId ?? (useWorkspaceContext ? app?.selectedProjectId?.() : null)));
+  contextLabel.textContent = project ? `Consultando: ${project.costCenter} · ${project.projectName}` : "Sin proyecto seleccionado";
+}
 
 function setBusy(value, label = "Consultando datos…") {
   busy = value;
@@ -22,7 +32,7 @@ function setBusy(value, label = "Consultando datos…") {
   form.setAttribute("aria-busy", String(value));
   loading.hidden = !value;
   loadingText.textContent = label;
-  document.querySelectorAll("#assistantView [data-assistant-prompt], #assistantView [data-assistant-query], #assistantView [data-assistant-action]")
+  document.querySelectorAll("#assistantView [data-assistant-prompt], #assistantView [data-assistant-query], #assistantView [data-assistant-action], #assistantView [data-assistant-control]")
     .forEach((button) => { button.disabled = value; });
   if (!value && !document.querySelector("#appView").hidden) input.focus();
 }
@@ -142,6 +152,23 @@ function renderProject(target, answer) {
     `Las cifras monetarias y los movimientos incluyen ${answer.scopeProjectCount} centros relacionados. El avance de ejecución corresponde al centro consultado.`, "assistant-footnote");
 }
 
+function renderProjectSnapshot(target, answer) {
+  const { project } = answer;
+  target.append(node("h4", "", `${project.projectName} (${project.costCenter})`));
+  paragraph(target, `Estado: ${project.status || "Sin registrar"} · ${project.municipality || "Municipio sin registrar"}`, "assistant-subtitle");
+  const grid = node("div", "assistant-metrics");
+  metric(grid, "Contrato", formatCop(project.contractValue));
+  metric(grid, "Ejecución", percent(answer.execution));
+  metric(grid, "Facturado", formatCop(project.totalInvoiced));
+  metric(grid, "Recaudado", formatCop(project.totalPaid));
+  metric(grid, "Recaudo Financiero", percent(answer.collectionPercentage));
+  metric(grid, "Cartera pendiente", formatCop(project.paymentPending));
+  target.append(grid);
+  paragraph(target, `Último avance registrado: ${month(answer.lastTracking)}. El avance físico se digita; los pagos se calculan por separado.`, "assistant-footnote");
+  const more = button(target, "Ver contrato, movimientos y detalles", "details", "assistant-choice assistant-choice-primary");
+  more.dataset.assistantQuery = `Resumen detallado ${project.costCenter}`;
+}
+
 function renderProjectFocus(target, answer, intents) {
   const { project } = answer;
   target.append(node("h4", "", `${project.projectName} (${project.costCenter})`));
@@ -152,6 +179,7 @@ function renderProjectFocus(target, answer, intents) {
       if (answer.contract?.contractNumber || project.contractNumber) metric(grid, "Número de contrato", answer.contract?.contractNumber ?? project.contractNumber);
     }
     if (intent === "execution") metric(grid, "Avance de ejecución", percent(answer.execution));
+    if (intent === "remainingExecution") metric(grid, "Ejecución por completar", percent(answer.remainingExecution));
     if (intent === "executedEquivalent") metric(grid, "Equivalente monetario de ejecución", answer.executedEquivalent === null ? "Sin registrar" : formatCop(answer.executedEquivalent));
     if (intent === "billing") {
       metric(grid, "Facturado", formatCop(project.totalInvoiced));
@@ -237,11 +265,82 @@ function renderOverview(target, answer, intents = ["full"]) {
   paragraph(target, "El avance de ejecución se registra manualmente por proyecto. El equivalente monetario no modifica la facturación ni el recaudo.", "assistant-caveat");
 }
 
+function renderPeriod(target, answer) {
+  const { project, period } = answer;
+  const periodName = period.year ? month(period) : new Intl.DateTimeFormat("es-CO", { month: "long", timeZone: "UTC" })
+    .format(new Date(Date.UTC(2026, period.month - 1, 1)));
+  target.append(node("h4", "", `${project.projectName} (${project.costCenter}) · ${periodName}`));
+  if (!period.periodId) {
+    paragraph(target, "Ese mes todavía no existe entre los periodos registrados. Créalo en Seguimiento mensual antes de registrar avances.");
+    return;
+  }
+  if (!answer.hasData) {
+    paragraph(target, "No hay seguimiento ni movimientos registrados para este proyecto en ese mes.");
+    return;
+  }
+  const grid = node("div", "assistant-metrics");
+  metric(grid, "Ejecución del mes", percent(answer.monthlyExecution));
+  metric(grid, "Ejecución acumulada", percent(answer.accumulatedExecution));
+  metric(grid, "Facturado en el mes", formatCop(answer.invoicedMonth));
+  metric(grid, "Facturado acumulado", formatCop(answer.invoicedTotal));
+  metric(grid, "Recaudado en el mes", formatCop(answer.paidMonth));
+  metric(grid, "Recaudado acumulado", formatCop(answer.paidTotal));
+  metric(grid, "Recaudo Financiero", percent(answer.collectionPercentage));
+  metric(grid, "Equivalente ejecutado", answer.accumulatedEquivalent === null ? "Sin registrar" : formatCop(answer.accumulatedEquivalent));
+  target.append(grid);
+  if (answer.monthlyExecution === null) paragraph(target, "Este mes tiene movimientos financieros, pero no tiene avance físico registrado.", "assistant-caveat");
+  if (answer.scopeProjectCount > 1) paragraph(target,
+    `La facturación y el recaudo incluyen ${answer.scopeProjectCount} centros relacionados; la ejecución corresponde al centro consultado.`, "assistant-footnote");
+}
+
+function renderPortfolio(target, answer) {
+  const titles = {
+    receivable: "Proyectos con cartera pendiente",
+    withoutExecution: "Proyectos sin avance de ejecución registrado",
+    withoutContract: "Centros sin contrato vigente",
+    "status:activo": "Proyectos activos",
+    "status:finalizado": "Proyectos finalizados",
+    "status:suspendido": "Proyectos suspendidos",
+    "status:planeado": "Proyectos planeados",
+    "status:cancelado": "Proyectos cancelados"
+  };
+  const title = titles[answer.filter] ?? "Proyectos encontrados";
+  target.append(node("h4", "", title));
+  paragraph(target, `${answer.total} resultado(s)${answer.total > answer.projects.length ? ` · se muestran los primeros ${answer.projects.length}` : ""}.`, "assistant-subtitle");
+  for (const project of answer.projects) {
+    const item = projectChoice(target, project);
+    if (answer.filter === "receivable") item.append(node("span", "assistant-choice-value", formatCop(project.paymentPending)));
+  }
+  if (answer.filter === "receivable") paragraph(target, "La cartera es lo facturado menos lo pagado. Los centros asociados se consolidan en su centro principal.", "assistant-footnote");
+}
+
+function renderGuide(target, topic) {
+  const title = topic === "access" ? "Recuperar el acceso"
+    : topic === "create" ? "Crear un proyecto" : "Porcentajes del seguimiento mensual";
+  target.append(node("h4", "", title));
+  if (topic === "access") {
+    paragraph(target, "En la pantalla de inicio selecciona «¿Olvidaste tu contraseña?», escribe tu correo y abre el enlace recibido. Después define una nueva contraseña.");
+    paragraph(target, "Si la cuenta está pendiente de aprobación, el administrador debe activarla para ver proyectos.", "assistant-footnote");
+  } else if (topic === "create") {
+    paragraph(target, "Escribe «Crear proyecto». Te pediré centro de costo, nombre, municipio y tipo de servicio; luego puedes añadir datos opcionales, revisar el borrador y confirmar.");
+    paragraph(target, "La ficha se crea al confirmar. Agrega el contrato desde la ficha y registra el avance en Seguimiento mensual.", "assistant-footnote");
+  } else {
+    const list = node("dl", "assistant-details");
+    detail(list, "Ejecución mes", "Acumulado actual − acumulado del mes anterior");
+    detail(list, "Ejecución acumulada", "Avance físico total digitado hasta ese mes");
+    detail(list, "Facturación %", "Facturado acumulado ÷ contrato × 100");
+    detail(list, "Recaudo Financiero", "Pagado acumulado ÷ contrato × 100");
+    target.append(list);
+    paragraph(target, "El administrador suma el avance realizado cada mes. Para ajustar el porcentaje general, usa «Corregir avance general» en Reportes. La ejecución no aumenta al registrar pagos.", "assistant-caveat");
+  }
+}
+
 function projectChoice(target, project, question = "") {
   const button = node("button", "assistant-choice", `${project.costCenter} · ${project.projectName}`);
   button.type = "button";
   button.dataset.assistantQuery = `${question} ${project.costCenter}`.trim();
   target.append(button);
+  return button;
 }
 
 function draftField() {
@@ -332,9 +431,11 @@ async function processDraft(value, projects, profile, gateway, reply, requestGen
       if (requestGeneration !== generation || document.querySelector("#appView").hidden) return;
       const created = await gateway.createProject(input);
       draft = null;
+      lastProjectId = created.id;
       if (requestGeneration !== generation) return;
       try {
         await window.SOINSOLAR_APP_API.reloadReferenceData();
+        updateContext();
       } catch {
         paragraph(reply, "El proyecto se guardó. Actualiza la aplicación para verlo en los demás módulos.", "assistant-footnote");
       }
@@ -403,7 +504,7 @@ function welcome() {
   messages.replaceChildren();
   const item = bubble("assistant");
   item.append(node("h4", "", "Hola, soy el asistente de SOINSOLAR"));
-  paragraph(item, "Pregunta por un dato puntual de un proyecto o escribe «resumen general». Si tienes permiso, escribe «crear proyecto» y te guiaré hasta guardarlo.");
+  paragraph(item, "Consulta un proyecto, pregunta por un mes o escribe «resumen general». Puedes continuar con preguntas como «¿y cuánto recaudó?» sin repetir el centro de costo.");
 }
 
 function renderQuickAnswer(target, answer) {
@@ -413,9 +514,10 @@ function renderQuickAnswer(target, answer) {
     return;
   }
   target.append(node("h4", "", "¿Qué puedo hacer por ti?"));
-  paragraph(target, "Puedo consultar por nombre o centro de costo el contrato, el avance de ejecución, el valor equivalente ejecutado, la facturación, el recaudo, la cartera, los costos y los movimientos recientes.");
+  paragraph(target, "Puedo consultar por nombre o centro de costo el contrato, el avance de ejecución, los avances de cada mes, la facturación, el recaudo, la cartera y los movimientos recientes.");
+  paragraph(target, "También puedo recordar el proyecto entre preguntas, listar centros con cartera o sin avance y explicarte las fórmulas del seguimiento.");
   paragraph(target, "También puedo mostrar un resumen general y guiarte paso a paso para crear un proyecto, revisar sus datos y guardarlo si tu cuenta tiene permiso.");
-  paragraph(target, "Prueba con «¿Cuánto recaudó CC-102?», «¿Cuál es el avance de ejecución de CC-102?» o «Crear proyecto».", "assistant-caveat");
+  paragraph(target, "Prueba con «¿Cuánto recaudó CC-102?», luego «¿y en septiembre?», o escribe «Crear proyecto».", "assistant-caveat");
 }
 
 async function ask(question) {
@@ -435,12 +537,14 @@ async function ask(question) {
     const quick = resolveAssistantQuickQuestion(value);
     if (quick) {
       reply.replaceChildren();
-      renderQuickAnswer(reply, quick);
+      if (quick.kind === "guide") renderGuide(reply, quick.topic);
+      else renderQuickAnswer(reply, quick);
       if (draft) paragraph(reply, "Tu borrador sigue abierto. Puedes continuar con el dato solicitado o escribir «cancelar».", "assistant-footnote");
       messages.scrollTop = messages.scrollHeight;
       return;
     }
     const projects = app.projects();
+    updateContext(projects);
     if (requestGeneration !== generation || document.querySelector("#appView").hidden) return;
     if (draft || isCreateProjectRequest(value)) {
       reply.replaceChildren();
@@ -449,24 +553,27 @@ async function ask(question) {
       messages.scrollTop = messages.scrollHeight;
       return;
     }
-    const result = resolveAssistantQuestion(value, projects);
+    const result = resolveAssistantQuestion(value, projects, {
+      projectId: lastProjectId ?? (useWorkspaceContext ? app.selectedProjectId?.() : null), periods: app.periods()
+    });
     let answer = result;
     if (result.kind === "project") {
-      const full = result.intents.includes("full");
-      const withActivity = full || result.intents.some((intent) =>
+      lastProjectId = result.project.projectId;
+      updateContext(projects);
+      const deep = result.intents.includes("full") && /\b(completo|detallado|movimientos|actividad|historial)\b/i.test(value);
+      const withActivity = deep || result.intents.some((intent) =>
         ["activity", "latestPayment", "latestInvoice", "latestCost"].includes(intent));
       const ids = descendantProjectIds(result.project, projects);
       let contracts = [];
-      let monthly = [];
+      const monthly = app.monthly().filter((row) => row.projectId === result.project.projectId);
       let movements = [];
-      if (full || result.intents.includes("contract") || withActivity) {
+      if (deep || result.intents.includes("contract") || withActivity) {
         const gateway = await app.gateway();
-        const needsInvoices = full || result.intents.includes("activity") || result.intents.includes("latestInvoice");
-        const needsPayments = full || result.intents.includes("activity") || result.intents.includes("latestPayment");
-        const needsCosts = full || result.intents.includes("activity") || result.intents.includes("latestCost");
-        [contracts, monthly, movements] = await Promise.all([
-          full || result.intents.includes("contract") ? gateway.listContracts(result.project.projectId) : [],
-          full ? gateway.listMonthlyTracking({ projectId: result.project.projectId }) : [],
+        const needsInvoices = deep || result.intents.includes("activity") || result.intents.includes("latestInvoice");
+        const needsPayments = deep || result.intents.includes("activity") || result.intents.includes("latestPayment");
+        const needsCosts = deep || result.intents.includes("activity") || result.intents.includes("latestCost");
+        [contracts, movements] = await Promise.all([
+          deep || result.intents.includes("contract") ? gateway.listContracts(result.project.projectId) : [],
           withActivity ? Promise.all(ids.map(async (projectId) => {
             const [invoices, payments, costs] = await Promise.all([
               needsInvoices ? gateway.listInvoices({ projectId }) : [],
@@ -483,13 +590,22 @@ async function ask(question) {
         payments: movements.flatMap((item) => item.payments),
         costs: movements.flatMap((item) => item.costs)
       });
-    } else if (result.kind === "overview") answer = buildAssistantOverview(projects);
+    } else if (result.kind === "period") {
+      lastProjectId = result.project.projectId;
+      updateContext(projects);
+      answer = buildAssistantPeriodAnswer(result.project, result.period, app.monthly(),
+        descendantProjectIds(result.project, projects));
+    } else if (result.kind === "portfolio") answer = buildAssistantPortfolioList(projects, result.filter);
+    else if (result.kind === "overview") answer = buildAssistantOverview(projects);
     if (requestGeneration !== generation || document.querySelector("#appView").hidden) return;
     reply.replaceChildren();
     if (answer.kind === "project") {
-      if (result.intents.includes("full")) renderProject(reply, answer);
+      if (result.intents.includes("full") && /\b(completo|detallado|movimientos|actividad|historial)\b/i.test(value)) renderProject(reply, answer);
+      else if (result.intents.includes("full")) renderProjectSnapshot(reply, answer);
       else renderProjectFocus(reply, answer, result.intents);
     }
+    else if (answer.kind === "period") renderPeriod(reply, answer);
+    else if (answer.kind === "portfolio") renderPortfolio(reply, answer);
     else if (answer.kind === "overview") renderOverview(reply, answer, result.intents);
     else if (answer.kind === "choose") {
       paragraph(reply, "Encontré varios proyectos. Selecciona el centro de costo que quieres consultar:");
@@ -519,6 +635,7 @@ document.querySelector("#assistantView").addEventListener("click", (event) => {
   if (action) {
     const value = action.dataset.assistantAction;
     if (value === "open") return;
+    if (value === "details") return ask(action.dataset.assistantQuery);
     if (!draft) return;
     if (value === "cancel") return ask("cancelar");
     if (value === "skip") return ask("omitir");
@@ -542,12 +659,52 @@ document.querySelector("#assistantView").addEventListener("click", (event) => {
   if (button) ask(button.dataset.assistantPrompt ?? button.dataset.assistantQuery);
 });
 
+document.querySelector("#assistantClear").addEventListener("click", () => {
+  generation += 1;
+  draft = null;
+  lastProjectId = null;
+  useWorkspaceContext = false;
+  input.value = "";
+  setBusy(false);
+  welcome();
+  updateContext();
+});
+
+document.querySelector("#assistantRefresh").addEventListener("click", async () => {
+  if (busy || document.querySelector("#appView").hidden) return;
+  const requestGeneration = generation;
+  const reply = bubble("assistant");
+  setBusy(true, "Actualizando información…");
+  try {
+    await window.SOINSOLAR_APP_API.reloadReferenceData();
+    if (requestGeneration !== generation || document.querySelector("#appView").hidden) return;
+    const projects = window.SOINSOLAR_APP_API.projects();
+    if (lastProjectId && !projects.some((item) => item.projectId === lastProjectId)) lastProjectId = null;
+    updateContext(projects);
+    paragraph(reply, "Datos actualizados. Ya puedes consultar los registros más recientes.");
+  } catch {
+    if (requestGeneration === generation) paragraph(reply, "No fue posible actualizar los datos. Comprueba la conexión y vuelve a intentar.");
+  } finally {
+    if (requestGeneration === generation) setBusy(false);
+  }
+});
+
+window.addEventListener("soinsolar:assistant-open", () => updateContext());
+window.addEventListener("soinsolar:project-context", (event) => {
+  if (!useWorkspaceContext) return;
+  lastProjectId = event.detail.projectId;
+  updateContext();
+});
+
 window.addEventListener("soinsolar:logout", () => {
   generation += 1;
   draft = null;
+  lastProjectId = null;
+  useWorkspaceContext = true;
   setBusy(false);
   input.value = "";
   welcome();
+  updateContext([]);
 });
 
 welcome();
