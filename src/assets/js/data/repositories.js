@@ -42,6 +42,16 @@ async function unwrap(query, context) {
   return data;
 }
 
+async function fetchAllPages(buildQuery, context) {
+  const rows = [];
+  const pageSize = 500;
+  for (let start = 0; ; start += pageSize) {
+    const page = await unwrap(buildQuery().range(start, start + pageSize - 1), context);
+    rows.push(...page);
+    if (page.length < pageSize) return rows;
+  }
+}
+
 function normalizeYear(value) {
   const year = Number(value);
   if (!Number.isInteger(year) || year < 2020 || year > 2100) {
@@ -62,10 +72,8 @@ export class ProfileRepository {
   constructor(client) { this.client = client; }
 
   async list() {
-    const rows = await unwrap(
-      this.client.from("profiles").select("*").order("full_name"),
-      "No fue posible consultar los usuarios"
-    );
+    const rows = await fetchAllPages(() => this.client.from("profiles").select("*").order("full_name").order("id"),
+      "No fue posible consultar los usuarios");
     return rows.map(normalizeProfile);
   }
 
@@ -99,27 +107,24 @@ export class ProjectRepository {
   }
 
   async list(filters = {}) {
-    let query = this.client
-      .from("cost_center_financial_summary")
-      .select("*")
-      .order("name");
-
-    if (filters.name) {
-      const term = String(filters.name).trim().replace(/[,%()]/g, "");
-      if (term) query = query.or(`name.ilike.%${term}%,client_name.ilike.%${term}%`);
-    }
-    if (filters.costCenter) query = query.ilike("cost_center", `%${String(filters.costCenter).trim()}%`);
-    if (filters.municipality) query = query.ilike("municipality", `%${String(filters.municipality).trim()}%`);
-    if (filters.status) query = query.eq("status", filters.status);
-    if (filters.serviceType) query = query.ilike("service_type", `%${String(filters.serviceType).trim()}%`);
-    if (filters.progressMin !== null && filters.progressMin !== undefined && filters.progressMin !== "") {
-      query = query.gte("financial_progress_percentage", Number(filters.progressMin));
-    }
-    if (filters.progressMax !== null && filters.progressMax !== undefined && filters.progressMax !== "") {
-      query = query.lte("financial_progress_percentage", Number(filters.progressMax));
-    }
-
-    const rows = await unwrap(query, "No fue posible consultar los proyectos");
+    const rows = await fetchAllPages(() => {
+      let query = this.client.from("cost_center_financial_summary").select("*").order("name").order("id");
+      if (filters.name) {
+        const term = String(filters.name).trim().replace(/[,%()]/g, "");
+        if (term) query = query.or(`name.ilike.%${term}%,client_name.ilike.%${term}%`);
+      }
+      if (filters.costCenter) query = query.ilike("cost_center", `%${String(filters.costCenter).trim()}%`);
+      if (filters.municipality) query = query.ilike("municipality", `%${String(filters.municipality).trim()}%`);
+      if (filters.status) query = query.eq("status", filters.status);
+      if (filters.serviceType) query = query.ilike("service_type", `%${String(filters.serviceType).trim()}%`);
+      if (filters.progressMin !== null && filters.progressMin !== undefined && filters.progressMin !== "") {
+        query = query.gte("financial_progress_percentage", Number(filters.progressMin));
+      }
+      if (filters.progressMax !== null && filters.progressMax !== undefined && filters.progressMax !== "") {
+        query = query.lte("financial_progress_percentage", Number(filters.progressMax));
+      }
+      return query;
+    }, "No fue posible consultar los proyectos");
     return rows.map(normalizeProjectSummary);
   }
 
@@ -179,12 +184,14 @@ export class ProjectRepository {
 export class ContractRepository {
   constructor(client) { this.client = client; }
 
-  async listByProject(projectId) {
-    const id = assertUuid(projectId, "proyecto");
-    const rows = await unwrap(
-      this.client.from("contracts").select("*").eq("project_id", id).order("start_date", { ascending: false }),
-      "No fue posible consultar los contratos"
-    );
+  async listByProject(projectId = null) {
+    const id = projectId ? assertUuid(projectId, "proyecto") : null;
+    const rows = await fetchAllPages(() => {
+      let query = this.client.from("contracts").select("*, projects(id, cost_center, name)")
+        .order("start_date", { ascending: false }).order("id");
+      if (id) query = query.eq("project_id", id);
+      return query;
+    }, "No fue posible consultar los contratos");
     return rows.map(normalizeContract);
   }
 
@@ -237,14 +244,9 @@ export class PeriodRepository {
   }
 
   async list() {
-    const rows = await unwrap(
-      this.client
-        .from("periods")
-        .select("*")
-        .order("year", { ascending: false })
-        .order("month", { ascending: false }),
-      "No fue posible consultar los periodos"
-    );
+    const rows = await fetchAllPages(() => this.client.from("periods").select("*")
+      .order("year", { ascending: false }).order("month", { ascending: false }).order("id"),
+    "No fue posible consultar los periodos");
     return rows.map(normalizePeriod);
   }
 
@@ -441,16 +443,18 @@ export class FinanceRepository {
   constructor(client) { this.client = client; }
 
   async listInvoices(filters = {}) {
-    let query = this.client
-      .from("invoices")
-      .select("*, projects(id, cost_center, name), periods(id, year, month, status), contracts(contract_number)")
-      .order("issue_date", { ascending: false });
-    if (filters.projectId) query = query.eq("project_id", assertUuid(filters.projectId, "proyecto"));
-    if (filters.periodId) query = query.eq("period_id", assertUuid(filters.periodId, "periodo"));
-    if (filters.status) query = query.eq("status", assertEnum(filters.status, INVOICE_STATUSES, "estado de factura"));
-    if (filters.dateFrom) query = query.gte("issue_date", assertDate(filters.dateFrom, "fecha inicial"));
-    if (filters.dateTo) query = query.lte("issue_date", assertDate(filters.dateTo, "fecha final"));
-    const rows = await unwrap(query, "No fue posible consultar las facturas");
+    const rows = await fetchAllPages(() => {
+      let query = this.client
+        .from("invoices")
+        .select("*, projects(id, cost_center, name), periods(id, year, month, status), contracts(contract_number)")
+        .order("issue_date", { ascending: false }).order("id");
+      if (filters.projectId) query = query.eq("project_id", assertUuid(filters.projectId, "proyecto"));
+      if (filters.periodId) query = query.eq("period_id", assertUuid(filters.periodId, "periodo"));
+      if (filters.status) query = query.eq("status", assertEnum(filters.status, INVOICE_STATUSES, "estado de factura"));
+      if (filters.dateFrom) query = query.gte("issue_date", assertDate(filters.dateFrom, "fecha inicial"));
+      if (filters.dateTo) query = query.lte("issue_date", assertDate(filters.dateTo, "fecha final"));
+      return query;
+    }, "No fue posible consultar las facturas");
     return rows.map(normalizeInvoice);
   }
 
@@ -477,17 +481,19 @@ export class FinanceRepository {
   }
 
   async listPayments(filters = {}) {
-    let query = this.client
-      .from("payments")
-      .select("*, projects(id, cost_center, name), periods(id, year, month, status), invoices(invoice_number)")
-      .order("payment_date", { ascending: false });
-    if (filters.invoiceId) query = query.eq("invoice_id", assertUuid(filters.invoiceId, "factura"));
-    if (filters.projectId) query = query.eq("project_id", assertUuid(filters.projectId, "proyecto"));
-    if (filters.periodId) query = query.eq("period_id", assertUuid(filters.periodId, "periodo"));
-    if (filters.status) query = query.eq("status", assertEnum(filters.status, PAYMENT_STATUSES, "estado de pago"));
-    if (filters.dateFrom) query = query.gte("payment_date", assertDate(filters.dateFrom, "fecha inicial"));
-    if (filters.dateTo) query = query.lte("payment_date", assertDate(filters.dateTo, "fecha final"));
-    const rows = await unwrap(query, "No fue posible consultar los pagos");
+    const rows = await fetchAllPages(() => {
+      let query = this.client
+        .from("payments")
+        .select("*, projects(id, cost_center, name), periods(id, year, month, status), invoices(invoice_number)")
+        .order("payment_date", { ascending: false }).order("id");
+      if (filters.invoiceId) query = query.eq("invoice_id", assertUuid(filters.invoiceId, "factura"));
+      if (filters.projectId) query = query.eq("project_id", assertUuid(filters.projectId, "proyecto"));
+      if (filters.periodId) query = query.eq("period_id", assertUuid(filters.periodId, "periodo"));
+      if (filters.status) query = query.eq("status", assertEnum(filters.status, PAYMENT_STATUSES, "estado de pago"));
+      if (filters.dateFrom) query = query.gte("payment_date", assertDate(filters.dateFrom, "fecha inicial"));
+      if (filters.dateTo) query = query.lte("payment_date", assertDate(filters.dateTo, "fecha final"));
+      return query;
+    }, "No fue posible consultar los pagos");
     return rows.map(normalizePayment);
   }
 
@@ -515,17 +521,19 @@ export class FinanceRepository {
   }
 
   async listCostsExpenses(filters = {}) {
-    let query = this.client
-      .from("costs_expenses")
-      .select("*, projects(id, cost_center, name), periods(id, year, month, status)")
-      .order("movement_date", { ascending: false });
-    if (filters.projectId) query = query.eq("project_id", assertUuid(filters.projectId, "proyecto"));
-    if (filters.type) query = query.eq("movement_type", filters.type);
-    if (filters.periodId) query = query.eq("period_id", assertUuid(filters.periodId, "periodo"));
-    if (filters.category) query = query.ilike("category", `%${String(filters.category).trim()}%`);
-    if (filters.dateFrom) query = query.gte("movement_date", filters.dateFrom);
-    if (filters.dateTo) query = query.lte("movement_date", filters.dateTo);
-    const rows = await unwrap(query, "No fue posible consultar los costos y gastos");
+    const rows = await fetchAllPages(() => {
+      let query = this.client
+        .from("costs_expenses")
+        .select("*, projects(id, cost_center, name), periods(id, year, month, status)")
+        .order("movement_date", { ascending: false }).order("id");
+      if (filters.projectId) query = query.eq("project_id", assertUuid(filters.projectId, "proyecto"));
+      if (filters.type) query = query.eq("movement_type", filters.type);
+      if (filters.periodId) query = query.eq("period_id", assertUuid(filters.periodId, "periodo"));
+      if (filters.category) query = query.ilike("category", `%${String(filters.category).trim()}%`);
+      if (filters.dateFrom) query = query.gte("movement_date", filters.dateFrom);
+      if (filters.dateTo) query = query.lte("movement_date", filters.dateTo);
+      return query;
+    }, "No fue posible consultar los costos y gastos");
     return rows.map(normalizeCostExpense);
   }
 

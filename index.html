@@ -11,7 +11,7 @@
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.10.0" />
+    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.11.0" />
   </head>
   <body>
     <section id="loginView" class="login-shell">
@@ -517,7 +517,7 @@
 
           <section id="assistantView" class="content-view" hidden>
             <div class="section-heading">
-              <div><h3>Asistente SOINSOLAR</h3><p>Consulta proyectos, meses y cartera, o crea un proyecto paso a paso.</p></div>
+              <div><h3>Asistente SOINSOLAR</h3><p>Consulta los registros del aplicativo por proyecto, mes o dato concreto.</p></div>
             </div>
             <div class="assistant-layout">
               <article class="panel assistant-panel" aria-label="Consultas de proyectos">
@@ -545,11 +545,14 @@
                   <button type="button" data-assistant-prompt="¿Cómo va CC-102?">¿Cómo va CC-102?</button>
                   <button type="button" data-assistant-prompt="¿Cuánto se ejecutó en septiembre 2026 en CC-102?">¿Cuánto se ejecutó en septiembre?</button>
                   <button type="button" data-assistant-prompt="¿Qué proyectos tienen cartera?">Proyectos con cartera</button>
+                  <button type="button" data-assistant-prompt="¿Qué facturas tiene CC-102?">Facturas del proyecto</button>
+                  <button type="button" data-assistant-prompt="¿Qué observaciones hay en septiembre de 2026 en CC-102?">Observaciones del mes</button>
+                  <button type="button" data-assistant-prompt="¿Cuál es el cliente y municipio de CC-102?">Cliente y municipio</button>
                   <button type="button" data-assistant-prompt="¿Cómo funciona el seguimiento mensual?">Porcentajes del seguimiento</button>
                   <button type="button" data-assistant-prompt="Resumen general">Resumen general</button>
                   <button type="button" data-assistant-prompt="Crear proyecto">Crear proyecto</button>
                 </div>
-                <div class="assistant-help-note"><strong>Qué puedes consultar</strong><span>Contrato, ejecución física mes a mes, facturación, recaudo, cartera, costos y movimientos recientes. El avance de ejecución lo registra el administrador y no cambia con los pagos.</span><span>La creación está disponible para cuentas activas de administrador o gerencia. Revisa el borrador antes de guardarlo.</span></div>
+                <div class="assistant-help-note"><strong>Qué puedes consultar</strong><span>Proyecto, contrato, periodos, seguimiento, facturas, pagos, costos, proveedores, observaciones e historial. Los perfiles de otros usuarios solo están disponibles para administración.</span><span>La creación está disponible para cuentas activas de administrador o gerencia. Revisa el borrador antes de guardarlo.</span></div>
               </aside>
             </div>
           </section>
@@ -745,9 +748,9 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <script src="src/assets/js/config.js?v=1.10.0"></script>
-    <script type="module" src="src/assets/js/app.js?v=1.10.0"></script>
-    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.10.0"></script>
-    <script type="module" src="src/assets/js/assistant-ui.js?v=1.10.0"></script>
+    <script src="src/assets/js/config.js?v=1.11.0"></script>
+    <script type="module" src="src/assets/js/app.js?v=1.11.0"></script>
+    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.11.0"></script>
+    <script type="module" src="src/assets/js/assistant-ui.js?v=1.11.0"></script>
   </body>
 </html>

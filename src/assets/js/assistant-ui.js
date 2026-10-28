@@ -1,9 +1,10 @@
 import {
-  buildAssistantOverview, buildAssistantPeriodAnswer, buildAssistantPortfolioList, buildAssistantProjectAnswer,
+  buildAssistantDataAnswer, buildAssistantOverview, buildAssistantPeriodAnswer, buildAssistantPeriodOverview,
+  buildAssistantPortfolioList, buildAssistantProjectAnswer, buildAssistantProjectList,
   descendantProjectIds, isCreateProjectRequest,
   parseProjectDraftField, prepareProjectDraft, PROJECT_DRAFT_FIELDS,
   resolveAssistantQuestion, resolveAssistantQuickQuestion
-} from "./domain/assistant.js?v=1.10.0";
+} from "./domain/assistant.js?v=1.11.0";
 import { formatCop } from "./domain/financial.js?v=1.1.0";
 
 const form = document.querySelector("#assistantForm");
@@ -268,7 +269,7 @@ function renderOverview(target, answer, intents = ["full"]) {
 function renderPeriod(target, answer) {
   const { project, period } = answer;
   const periodName = period.year ? month(period) : new Intl.DateTimeFormat("es-CO", { month: "long", timeZone: "UTC" })
-    .format(new Date(Date.UTC(2026, period.month - 1, 1)));
+    .format(new Date(Date.UTC(2000, period.month - 1, 1)));
   target.append(node("h4", "", `${project.projectName} (${project.costCenter}) · ${periodName}`));
   if (!period.periodId) {
     paragraph(target, "Ese mes todavía no existe entre los periodos registrados. Créalo en Seguimiento mensual antes de registrar avances.");
@@ -291,6 +292,102 @@ function renderPeriod(target, answer) {
   if (answer.monthlyExecution === null) paragraph(target, "Este mes tiene movimientos financieros, pero no tiene avance físico registrado.", "assistant-caveat");
   if (answer.scopeProjectCount > 1) paragraph(target,
     `La facturación y el recaudo incluyen ${answer.scopeProjectCount} centros relacionados; la ejecución corresponde al centro consultado.`, "assistant-footnote");
+}
+
+function renderPeriodOverview(target, answer) {
+  if (!answer.period.periodId) {
+    paragraph(target, "No hay un periodo registrado para ese mes. Puedes crearlo en Seguimiento mensual.");
+    return;
+  }
+  target.append(node("h4", "", `Todos los proyectos · ${month(answer.period)}`));
+  paragraph(target, `${answer.projectCount} centros con datos en el periodo · ${answer.trackedCount} con ejecución registrada.`, "assistant-subtitle");
+  const grid = node("div", "assistant-metrics");
+  metric(grid, "Facturado en el mes", formatCop(answer.invoiced));
+  metric(grid, "Recaudado en el mes", formatCop(answer.paid));
+  metric(grid, "Costos y gastos del mes", formatCop(answer.costs));
+  metric(grid, "Ejecución promedio registrada", percent(answer.averageExecution));
+  target.append(grid);
+  paragraph(target, "El promedio físico incluye solo los centros que registraron ejecución; los valores monetarios se suman por centro una vez.", "assistant-footnote");
+}
+
+function renderProjectList(target, answer) {
+  target.append(node("h4", "", `Proyectos · ${answer.filter.value}`));
+  paragraph(target, `${answer.total} proyecto(s) encontrados${answer.total > answer.projects.length ? ` · se muestran ${answer.projects.length}` : ""}.`, "assistant-subtitle");
+  answer.projects.forEach((project) => projectChoice(target, project));
+}
+
+function renderData(target, answer) {
+  const labels = {
+    projectField: "Dato del proyecto", contracts: "Contratos", tracking: "Seguimiento mensual",
+    invoices: "Facturas", payments: "Pagos", costs: "Costos y gastos",
+    audit: "Historial de cambios", profiles: "Usuarios", periods: "Periodos"
+  };
+  const projectName = answer.project ? ` · ${answer.project.costCenter}` : "";
+  target.append(node("h4", "", `${labels[answer.entity]}${projectName}`));
+  if (answer.entity === "projectField") {
+    const fields = {
+      clientName: "Cliente", municipality: "Municipio", serviceType: "Tipo de servicio",
+      powerKwp: "Potencia (kWp)", startDate: "Inicio del proyecto", endDate: "Finalización del proyecto",
+      notes: "Notas", parentProjectId: "Centro principal"
+    };
+    const list = node("dl", "assistant-details");
+    for (const [field, raw] of Object.entries(answer.values)) {
+      const value = field === "startDate" || field === "endDate" ? date(raw)
+        : field === "powerKwp" && raw !== null
+          ? `${Number(raw).toLocaleString("es-CO", { maximumFractionDigits: 2 })} kWp`
+          : raw || "Sin registrar";
+      detail(list, fields[field], value);
+    }
+    target.append(list);
+    return;
+  }
+  paragraph(target, `${answer.total} registro(s)${answer.period ? ` en ${month(answer.period)}` : ""}${answer.limited ? " · se muestran los primeros 20" : ""}.`, "assistant-subtitle");
+  if (!answer.total) {
+    paragraph(target, "No hay registros que coincidan con esta consulta.");
+    return;
+  }
+  if (["invoices", "payments", "costs"].includes(answer.entity)) {
+    const grid = node("div", "assistant-metrics");
+    metric(grid, "Total de registros vigentes", formatCop(answer.activeTotal));
+    target.append(grid);
+  }
+  for (const row of answer.rows) {
+    const list = node("dl", "assistant-details");
+    const scoped = row.project?.costCenter && !answer.project ? ` · ${row.project.costCenter}` : "";
+    if (answer.entity === "contracts") {
+      detail(list, `Contrato ${row.contractNumber}${scoped}`, `Valor vigente ${formatCop(row.currentValue)} · ${row.status}`);
+      detail(list, "Valor inicial / adiciones / deducciones", `${formatCop(row.initialValue)} / ${formatCop(row.additionsValue)} / ${formatCop(row.deductionsValue)}`);
+      detail(list, "Vigencia", `${date(row.startDate)} a ${row.endDate ? date(row.endDate) : "sin fecha final"}`);
+    } else if (answer.entity === "tracking") {
+      detail(list, `${month(row)} · ${row.costCenter}`, `Ejecución del mes ${percent(row.executedIncrementalPercentage)} · acumulada ${percent(row.executedCumulativePercentage)}`);
+      detail(list, "Facturado / recaudado / costos", `${formatCop(row.invoicedValue)} / ${formatCop(row.paidValue)} / ${formatCop(row.costsExpensesValue)}`);
+      detail(list, "Validación y periodo", `${row.validationStatus || "Sin registro de avance"} · ${row.periodStatus || "Sin estado"}`);
+      if (row.observations) detail(list, "Observaciones", row.observations);
+      if (row.executionIssue) detail(list, "Novedad de ejecución", row.executionIssue);
+    } else if (answer.entity === "invoices") {
+      detail(list, `Factura ${row.invoiceNumber}${scoped}`, `${formatCop(row.amount)} · ${row.status}`);
+      detail(list, "Emisión / contrato", `${date(row.issueDate)} · ${row.contract?.number ?? "Sin número"}`);
+      detail(list, "Soporte", row.supportPath ? "Registrado" : "Sin soporte");
+    } else if (answer.entity === "payments") {
+      detail(list, `Pago ${row.paymentReference}${scoped}`, `${formatCop(row.amount)} · ${row.status}`);
+      detail(list, "Fecha / factura", `${date(row.paymentDate)} · ${row.invoice?.number ?? "Sin número"}`);
+      detail(list, "Soporte", row.supportPath ? "Registrado" : "Sin soporte");
+    } else if (answer.entity === "costs") {
+      detail(list, `${row.category}${scoped}`, `${formatCop(row.amount)} · ${row.type} · ${date(row.movementDate)}`);
+      detail(list, "Descripción / proveedor", `${row.description} · ${row.supplierName || "Sin proveedor"}`);
+      detail(list, "Referencia / soporte", `${row.documentReference || "Sin referencia"} · ${row.supportPath ? "Soporte registrado" : "Sin soporte"}`);
+    } else if (answer.entity === "audit") {
+      detail(list, `${row.tableName} · ${row.action}`, date(row.changedAt));
+      detail(list, "Usuario", row.actorName || row.changedBy || "Sin identificar");
+    } else if (answer.entity === "profiles") {
+      detail(list, row.fullName, `${row.role} · ${row.active ? "activa" : "pendiente"}`);
+    } else if (answer.entity === "periods") {
+      detail(list, month(row), row.status);
+      if (row.closedAt) detail(list, "Cerrado", date(row.closedAt));
+    }
+    target.append(list);
+  }
+  if (answer.entity === "tracking") paragraph(target, "La ejecución física es manual; las cifras financieras provienen de movimientos registrados.", "assistant-footnote");
 }
 
 function renderPortfolio(target, answer) {
@@ -514,10 +611,10 @@ function renderQuickAnswer(target, answer) {
     return;
   }
   target.append(node("h4", "", "¿Qué puedo hacer por ti?"));
-  paragraph(target, "Puedo consultar por nombre o centro de costo el contrato, el avance de ejecución, los avances de cada mes, la facturación, el recaudo, la cartera y los movimientos recientes.");
-  paragraph(target, "También puedo recordar el proyecto entre preguntas, listar centros con cartera o sin avance y explicarte las fórmulas del seguimiento.");
+  paragraph(target, "Puedo consultar los datos de proyectos, contratos, periodos, seguimiento, facturas, pagos, costos y proveedores. También respondo sobre notas, fechas, potencia, observaciones y estados de validación.");
+  paragraph(target, "Recuerdo el proyecto entre preguntas, resumo sus cifras y puedo listar centros con cartera, sin avance o por municipio. Los perfiles de otros usuarios están reservados al administrador.");
   paragraph(target, "También puedo mostrar un resumen general y guiarte paso a paso para crear un proyecto, revisar sus datos y guardarlo si tu cuenta tiene permiso.");
-  paragraph(target, "Prueba con «¿Cuánto recaudó CC-102?», luego «¿y en septiembre?», o escribe «Crear proyecto».", "assistant-caveat");
+  paragraph(target, "Prueba con «¿Qué facturas tiene CC-102?», «¿Qué observaciones hay en septiembre?» o «¿Qué proyectos hay en Neiva?». También puedes escribir «Crear proyecto».", "assistant-caveat");
 }
 
 async function ask(question) {
@@ -595,7 +692,38 @@ async function ask(question) {
       updateContext(projects);
       answer = buildAssistantPeriodAnswer(result.project, result.period, app.monthly(),
         descendantProjectIds(result.project, projects));
+    } else if (result.kind === "data") {
+      if (result.project) {
+        lastProjectId = result.project.projectId;
+        updateContext(projects);
+      }
+      const entity = result.request.entity;
+      if (entity === "profiles" && profile.role !== "administrador") {
+        reply.replaceChildren();
+        paragraph(reply, "Los perfiles de otros usuarios solo están disponibles para administradores.");
+        return;
+      }
+      const gateway = ["projectField", "contracts", "invoices", "payments", "costs", "audit", "profiles"].includes(entity)
+        ? await app.gateway() : null;
+      const scope = result.project ? descendantProjectIds(result.project, projects) : [];
+      const filters = result.period?.periodId ? { periodId: result.period.periodId } : {};
+      const fetchScoped = (method) => result.project
+        ? Promise.all(scope.map((projectId) => gateway[method]({ ...filters, projectId }))).then((rows) => rows.flat())
+        : gateway[method](filters);
+      const data = { projects, periods: app.periods() };
+      if (entity === "projectField" && result.project) data.projectDetails = await gateway.getProject(result.project.projectId);
+      if (entity === "contracts") data.contracts = result.project
+        ? (await Promise.all(scope.map((id) => gateway.listContracts(id)))).flat() : await gateway.listContracts();
+      if (entity === "tracking") data.monthly = app.monthly();
+      if (entity === "invoices") data.invoices = await fetchScoped("listInvoices");
+      if (entity === "payments") data.payments = await fetchScoped("listPayments");
+      if (entity === "costs") data.costs = await fetchScoped("listCostsExpenses");
+      if (entity === "audit") [data.audit, data.profiles] = await Promise.all([gateway.listAudit({}), gateway.listProfiles()]);
+      if (entity === "profiles") data.profiles = await gateway.listProfiles();
+      answer = buildAssistantDataAnswer(result, data);
     } else if (result.kind === "portfolio") answer = buildAssistantPortfolioList(projects, result.filter);
+    else if (result.kind === "projectList") answer = buildAssistantProjectList(projects, result.filter);
+    else if (result.kind === "periodOverview") answer = buildAssistantPeriodOverview(result.period, app.monthly());
     else if (result.kind === "overview") answer = buildAssistantOverview(projects);
     if (requestGeneration !== generation || document.querySelector("#appView").hidden) return;
     reply.replaceChildren();
@@ -605,11 +733,16 @@ async function ask(question) {
       else renderProjectFocus(reply, answer, result.intents);
     }
     else if (answer.kind === "period") renderPeriod(reply, answer);
+    else if (answer.kind === "data") renderData(reply, answer);
     else if (answer.kind === "portfolio") renderPortfolio(reply, answer);
+    else if (answer.kind === "projectList") renderProjectList(reply, answer);
+    else if (answer.kind === "periodOverview") renderPeriodOverview(reply, answer);
     else if (answer.kind === "overview") renderOverview(reply, answer, result.intents);
     else if (answer.kind === "choose") {
       paragraph(reply, "Encontré varios proyectos. Selecciona el centro de costo que quieres consultar:");
       answer.projects.forEach((project) => projectChoice(reply, project, value));
+    } else if (answer.kind === "unsupported") {
+      paragraph(reply, `Encontré ${answer.project.costCenter}, pero esa pregunta no corresponde a un dato que pueda interpretar con certeza. Prueba con cliente, notas, contrato, facturas, pagos, costos o seguimiento mensual.`);
     } else {
       paragraph(reply, "No encontré un centro de costo o proyecto concreto en esa pregunta. Prueba con su nombre, código o «resumen general».");
       projects.slice(0, 3).forEach((project) => projectChoice(reply, project));

@@ -83,6 +83,49 @@ function portfolioRequest(question) {
   return status ? `status:${status.slice(0, -1)}` : null;
 }
 
+// Only business fields exposed by the application are searchable. This keeps a
+// question from turning into arbitrary SQL or an accidental privileged read.
+export function detectAssistantDataRequest(query) {
+  const question = words(query);
+  if (/\b(usuarios|cuentas|perfiles)\b/.test(question)) return { entity: "profiles" };
+  if (/\b(auditoria|historial de cambios|cambios realizados|quien (creo|modifico|registro))\b/.test(question)) return { entity: "audit" };
+  if (/\b(periodos|meses abiertos|meses cerrados|estado del periodo|periodo abierto|periodo cerrado)\b/.test(question)) return { entity: "periods" };
+  if (/\b(factura|facturas)\b/.test(question) &&
+    /\b(que|cuales|lista|listar|muestra|dame|ver|detalle|detalles|numero|numeros|fecha|fechas|estado|estados|cuanto|cuantas|valor|ultima|primera|anuladas|emitidas|registradas|soporte)\b/.test(question)) return { entity: "invoices" };
+  if (/\b(pago|pagos|abono|abonos)\b/.test(question) &&
+    /\b(que|cuales|lista|listar|muestra|dame|ver|detalle|detalles|referencia|referencias|fecha|fechas|estado|estados|cuantos|ultimo|anulados|factura|soporte)\b/.test(question)) return { entity: "payments" };
+  if (/\b(costo|costos|gasto|gastos|movimientos)\b/.test(question) &&
+    /\b(que|cuales|lista|listar|muestra|dame|ver|detalle|detalles|proveedor|proveedores|categoria|categorias|descripcion|fecha|fechas|cuantos|ultimo|referencia|soporte)\b/.test(question)) return { entity: "costs" };
+  if (/\b(observaciones|novedad|novedades|incidencia|incidencias|validacion|validado|rechazado|seguimientos|mes a mes)\b/.test(question)) return { entity: "tracking" };
+  if (/\b(contrato|contractual|adiciones|deducciones)\b/.test(question) &&
+    /\b(numero|numeros|inicial|adiciones|deducciones|estado|fecha|inicio|fin|termina|vence|vigencia|detalles|historial)\b/.test(question)) return { entity: "contracts" };
+  const fields = [
+    ["clientName", /\b(cliente|contratante)\b/],
+    ["municipality", /\b(municipio|ciudad|ubicacion|donde)\b/],
+    ["serviceType", /\b(tipo de servicio|servicio|modalidad)\b/],
+    ["powerKwp", /\b(potencia|kwp|kilovatios)\b/],
+    ["startDate", /\b(fecha de inicio|cuando (inicio|empezo)|inicio del proyecto)\b/],
+    ["endDate", /\b(fecha de fin|fecha de finalizacion|cuando termina|fin del proyecto)\b/],
+    ["notes", /\b(notas|anotaciones|comentarios del proyecto)\b/],
+    ["parentProjectId", /\b(centro principal|centro asociado|centro padre|proyecto principal)\b/]
+  ];
+  const selected = fields.filter(([, pattern]) => pattern.test(question)).map(([field]) => field);
+  return selected.length ? { entity: "projectField", field: selected[0], fields: selected } : null;
+}
+
+export function findAssistantProjectFilter(query, projects = []) {
+  const question = words(query);
+  if (!/\b(proyectos|centros)\b/.test(question)) return null;
+  // Match complete values from the records; never interpret a partial word as a filter.
+  const keys = ["municipality", "clientName", "serviceType"];
+  for (const key of keys) {
+    const value = projects.map((item) => item[key]).filter(Boolean).find((item) =>
+      words(item).length >= 3 && (` ${question} `).includes(` ${words(item)} `));
+    if (value) return { key, value };
+  }
+  return null;
+}
+
 export function detectAssistantIntents(query) {
   const question = words(query);
   if (/\b(resumen|general|completo|todo|como va|situacion)\b/.test(question)) return ["full"];
@@ -118,22 +161,44 @@ export function resolveAssistantQuestion(query, projects = [], { projectId = nul
   const portfolio = portfolioRequest(question);
   if (portfolio) return { kind: "portfolio", filter: portfolio };
   const period = findAssistantPeriod(query, periods);
+  const dataRequest = detectAssistantDataRequest(query);
+  const unsupportedQuestion = !dataRequest && intents.length === 1 && intents[0] === "full" &&
+    /\b(que|cual|cuanto|donde|quien|cuando|como|por que)\b/.test(question) &&
+    !/\b(resumen|general|completo|todo|como va|situacion|que paso)\b/.test(question);
+  const projectFilter = findAssistantProjectFilter(query, projects);
+  if (projectFilter) return { kind: "projectList", filter: projectFilter };
   const matches = projects.map((project) => ({ project, score: scoreProject(question, project) }))
     .filter((item) => item.score > 0).sort((left, right) => right.score - left.score);
   if (matches.length) {
     const best = matches[0].score;
     const choices = matches.filter((item) => item.score === best).map((item) => item.project);
     return choices.length === 1
-      ? { kind: period ? "period" : "project", project: choices[0], period, intents }
+      ? unsupportedQuestion ? { kind: "unsupported", project: choices[0] }
+        : dataRequest ? { kind: "data", project: choices[0], period, request: dataRequest, question: query }
+        : { kind: period ? "period" : "project", project: choices[0], period, intents }
       : { kind: "choose", projects: choices.slice(0, 8), intents };
   }
-  if (/\b(resumen|general|global|total|totales|todos|cuantos)\b/.test(question)) return { kind: "overview", intents };
-  const unknownCenter = /\bcc\s*\d+\b/.test(question) || question.split(" ")
-    .some((token) => /^\d{3,4}$/.test(token) && !/^(20|21)\d{2}$/.test(token));
+  const unknownCenter = /\bcc\s*\d+\b/.test(question) ||
+    (!/\b(factura|facturas|pago|pagos|contrato|referencia)\b/.test(question) && question.split(" ")
+      .some((token) => /^\d{3,4}$/.test(token) && !/^(20|21)\d{2}$/.test(token)));
+  if (unknownCenter) return { kind: "help" };
+  const explicitGlobal = /\b(general|global|todos los proyectos|todas las obras|toda la empresa)\b/.test(question);
+  if (dataRequest && (explicitGlobal || dataRequest.entity === "profiles" || dataRequest.entity === "periods")) {
+    return { kind: "data", project: null, period, request: dataRequest, question: query };
+  }
+  if (period && explicitGlobal && !dataRequest) return { kind: "periodOverview", period };
+  if (/\b(resumen|general|global|total|totales|todos|cuantos)\b/.test(question) && !dataRequest && !period) return { kind: "overview", intents };
   if (projectId && !unknownCenter) {
     const project = projects.find((item) => item.projectId === projectId);
-    if (project) return { kind: period ? "period" : "project", project, period, intents };
+    if (project) return unsupportedQuestion ? { kind: "unsupported", project }
+      : dataRequest ? { kind: "data", project, period, request: dataRequest, question: query }
+      : { kind: period ? "period" : "project", project, period, intents };
   }
+  if (dataRequest && dataRequest.entity !== "projectField") {
+    return { kind: "data", project: null, period, request: dataRequest, question: query };
+  }
+  if (period && intents.length && !dataRequest) return { kind: "periodOverview", period };
+  if (/\b(resumen|general|global|total|totales|todos|cuantos)\b/.test(question)) return { kind: "overview", intents };
   return { kind: "help" };
 }
 
@@ -294,4 +359,96 @@ export function buildAssistantPortfolioList(projects = [], filter = "receivable"
 
 export function buildAssistantOverview(projects = []) {
   return { kind: "overview", indicators: calculateDashboardIndicators(projects) };
+}
+
+export function buildAssistantProjectList(projects = [], filter) {
+  const matches = projects.filter((project) => words(project[filter.key]) === words(filter.value));
+  return { kind: "projectList", filter, total: matches.length, projects: matches.slice(0, 20) };
+}
+
+export function buildAssistantPeriodOverview(period, monthly = []) {
+  const rows = monthly.filter((row) => row.year === period.year && row.month === period.month);
+  const tracked = rows.filter((row) => row.trackingId && row.executedCumulativePercentage !== null);
+  const sum = (field) => rows.reduce((total, row) => total + Number(row[field] ?? 0), 0);
+  return { kind: "periodOverview", period, projectCount: rows.length,
+    trackedCount: tracked.length,
+    averageExecution: tracked.length ? tracked.reduce((total, row) => total + Number(row.executedCumulativePercentage), 0) / tracked.length : null,
+    invoiced: sum("invoicedValue"), paid: sum("paidValue"), costs: sum("costsExpensesValue") };
+}
+
+export function buildAssistantDataAnswer({ request, project, period, question }, {
+  projectDetails = null, projects = [], contracts = [], monthly = [], invoices = [], payments = [], costs = [],
+  audit = [], profiles = [], periods = []
+} = {}) {
+  const entity = request.entity;
+  if (entity === "projectField") {
+    const details = projectDetails ?? project;
+    const values = Object.fromEntries((request.fields ?? [request.field]).map((field) => {
+      const value = details?.[field] ?? null;
+      const parent = projects.find((item) => item.projectId === value);
+      return [field, parent?.costCenter ?? value];
+    }));
+    return { kind: "data", entity, project, field: request.field, value: values[request.field], values };
+  }
+  let rows = { contracts, tracking: monthly, invoices, payments, costs, audit, profiles, periods }[entity] ?? [];
+  if (project && entity !== "profiles" && entity !== "periods") {
+    const scope = new Set(descendantProjectIds(project, projects));
+    rows = rows.filter((row) => entity === "tracking" ? row.projectId === project.projectId
+      : entity === "audit" ? scope.has(row.projectId) : scope.has(row.projectId));
+  }
+  if (period && entity !== "profiles" && entity !== "audit" && entity !== "contracts") {
+    rows = rows.filter((row) => entity === "periods" ? row.id === period.periodId
+      : entity === "tracking" ? row.year === period.year && row.month === period.month
+        : row.periodId === period.periodId);
+  }
+  const normalized = words(question);
+  const referenceKey = { contracts: "contractNumber", invoices: "invoiceNumber", payments: "paymentReference", costs: "documentReference" }[entity];
+  if (referenceKey) {
+    const referenced = rows.filter((row) => {
+      const reference = words(row[referenceKey]);
+      return reference.length >= 3 && (` ${normalized} `).includes(` ${reference} `);
+    });
+    if (referenced.length) rows = referenced;
+  }
+  if (/\b(anuladas|anulados)\b/.test(normalized)) rows = rows.filter((row) => /^anulad/.test(row.status));
+  if (entity === "profiles" && /\b(pendientes|inactivos|inactivas|sin activar|activas|activos)\b/.test(normalized)) {
+    const active = /\b(activas|activos)\b/.test(normalized);
+    rows = rows.filter((row) => row.active === active);
+  }
+  if (entity === "audit") {
+    if (/\b(quien creo|creacion)\b/.test(normalized)) rows = rows.filter((row) => row.tableName === "projects" && row.action === "INSERT");
+    else if (/\b(quien modifico|actualizo)\b/.test(normalized)) rows = rows.filter((row) => row.action === "UPDATE");
+  }
+  if (entity === "tracking") {
+    if (/\b(observaciones)\b/.test(normalized)) rows = rows.filter((row) => row.observations);
+    if (/\b(novedad|novedades|incidencia|incidencias)\b/.test(normalized)) rows = rows.filter((row) => row.executionIssue);
+    if (/\b(rechazado|validado|pendiente)\b/.test(normalized)) {
+      const status = ["rechazado", "validado", "pendiente"].find((item) => normalized.includes(item));
+      rows = rows.filter((row) => row.validationStatus === status);
+    }
+  }
+  if (entity === "invoices" && /\b(emitidas|registradas)\b/.test(normalized)) {
+    rows = rows.filter((row) => row.status === (/\bemitidas\b/.test(normalized) ? "emitida" : "registrada"));
+  }
+  if (/\b(abiertos|abierto|cerrados|cerrado)\b/.test(normalized) && entity === "periods") {
+    const status = /\b(abiertos|abierto)\b/.test(normalized) ? "abierto" : "cerrado";
+    rows = rows.filter((row) => row.status === status);
+  }
+  if (entity === "costs") {
+    const value = rows.map((row) => row.category).find((item) => item && (` ${normalized} `).includes(` ${words(item)} `))
+      ?? rows.map((row) => row.supplierName).find((item) => item && (` ${normalized} `).includes(` ${words(item)} `));
+    if (value) rows = rows.filter((row) => words(row.category) === words(value) || words(row.supplierName) === words(value));
+  }
+  const dateKey = { contracts: "startDate", invoices: "issueDate", payments: "paymentDate", costs: "movementDate",
+    tracking: "year", audit: "changedAt", profiles: "createdAt", periods: "year" }[entity];
+  rows = [...rows].sort((a, b) => String(b[dateKey] ?? "").localeCompare(String(a[dateKey] ?? "")) ||
+    Number(b.month ?? 0) - Number(a.month ?? 0));
+  if (entity === "audit") {
+    const names = new Map(profiles.map((profile) => [profile.id, profile.fullName]));
+    rows = rows.map((row) => ({ ...row, actorName: names.get(row.changedBy) ?? null }));
+  }
+  const activeRows = rows.filter((row) => !/^anulad/.test(row.status ?? ""));
+  return { kind: "data", entity, project, period, total: rows.length, rows: rows.slice(0, 20),
+    activeTotal: activeRows.reduce((sum, row) => sum + Number(row.amount ?? 0), 0),
+    limited: rows.length > 20 };
 }
