@@ -11,7 +11,7 @@
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.8.0" />
+    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.9.0" />
   </head>
   <body>
     <section id="loginView" class="login-shell">
@@ -641,24 +641,25 @@
           <label class="span-2">Proyecto *<select id="monthlyProject" class="form-select" required></select></label>
           <label>Periodo abierto *<select id="monthlyPeriod" class="form-select" required></select></label>
           <label>Estado *<select id="monthlyValidationStatus" class="form-select" required><option value="borrador">Borrador</option><option value="pendiente">Pendiente de validación</option></select></label>
-          <label>Avance de ejecución (%) · registro manual del administrador *<input id="monthlyExecutionPercentage" class="form-control" type="number" min="0" max="100" step="0.01" required /></label>
+          <label>Avance a sumar este mes (puntos porcentuales) *<input id="monthlyExecutionPercentage" class="form-control" type="number" min="0.01" max="100" step="0.01" required placeholder="Ej. 5" /></label>
           <label>Recaudo Financiero acumulado (%) · cálculo automático<input id="monthlyFinancialPreview" class="form-control" readonly value="0%" /></label>
-          <label>Avance mes · diferencia en puntos porcentuales<input id="monthlyIncrementPreview" class="form-control" readonly value="0%" /></label>
+          <label>Avance total de este mes tras sumar<input id="monthlyIncrementPreview" class="form-control" readonly value="—" /></label>
+          <label>Avance general del proyecto tras sumar<input id="monthlyCumulativePreview" class="form-control" readonly value="—" /></label>
           <label class="span-2">Observaciones<textarea id="monthlyObservations" class="form-control" rows="3" maxlength="500"></textarea></label>
           <label class="span-2">Novedad que afecta la ejecución<textarea id="monthlyExecutionIssue" class="form-control" rows="3" maxlength="1000" placeholder="Describe el impedimento, retraso o situación que afecta este periodo"></textarea></label>
         </div>
-        <p class="dialog-note">El avance de ejecución describe el trabajo realizado y no altera facturas, pagos, costos ni rentabilidad. Su equivalente monetario es una referencia: contrato × ejecución %. El Recaudo Financiero se calcula con pagos acumulados ÷ contrato vigente.</p>
+        <p class="dialog-note">Cada registro se suma al avance del mes; lo registrado antes se conserva en el historial. Para corregir el porcentaje general, usa «Corregir avance general» en Reportes. La ejecución no altera facturas, pagos, costos ni rentabilidad.</p>
         <p id="monthlyFormMessage" class="form-message" role="alert"></p>
-        <div class="dialog-actions"><button class="btn btn-outline-secondary" type="button" data-close-dialog="monthlyDialog">Cancelar</button><button id="saveMonthlyButton" class="btn btn-primary" type="submit">Guardar seguimiento</button></div>
+        <div class="dialog-actions"><button class="btn btn-outline-secondary" type="button" data-close-dialog="monthlyDialog">Cancelar</button><button id="saveMonthlyButton" class="btn btn-primary" type="submit">Sumar avance</button></div>
       </form>
     </dialog>
 
     <dialog id="reportProgressDialog" class="app-dialog app-dialog-small">
       <form id="reportProgressForm" method="dialog" novalidate>
-        <div class="dialog-heading"><div><p class="eyebrow">Reportes gerenciales</p><h3>Actualizar avance de ejecución</h3></div><button class="dialog-close" type="button" data-close-dialog="reportProgressDialog" aria-label="Cerrar">×</button></div>
+        <div class="dialog-heading"><div><p class="eyebrow">Reportes gerenciales</p><h3>Corregir avance general</h3></div><button class="dialog-close" type="button" data-close-dialog="reportProgressDialog" aria-label="Cerrar">×</button></div>
         <p id="reportProgressContext" class="dialog-note"></p>
         <div class="form-grid">
-          <label class="span-2">Avance de ejecución (%) · registro manual *<input id="reportProgressValue" class="form-control" type="number" min="0" max="100" step="0.01" required /></label>
+          <label class="span-2">Nuevo avance general de ejecución (%) *<input id="reportProgressValue" class="form-control" type="number" min="0" max="100" step="0.01" required /></label>
           <label class="span-2">Facturación del contrato (%) · cálculo automático<input id="reportFinancialValue" class="form-control" readonly /></label>
           <label class="span-2">Novedad que afecta la ejecución<textarea id="reportExecutionIssue" class="form-control" rows="3" maxlength="1000" placeholder="Describe el impedimento o retraso de este periodo"></textarea></label>
         </div>
@@ -741,9 +742,9 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <script src="src/assets/js/config.js?v=1.8.0"></script>
-    <script type="module" src="src/assets/js/app.js?v=1.8.0"></script>
-    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.8.0"></script>
-    <script type="module" src="src/assets/js/assistant-ui.js?v=1.8.0"></script>
+    <script src="src/assets/js/config.js?v=1.9.0"></script>
+    <script type="module" src="src/assets/js/app.js?v=1.9.0"></script>
+    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.9.0"></script>
+    <script type="module" src="src/assets/js/assistant-ui.js?v=1.9.0"></script>
   </body>
 </html>
