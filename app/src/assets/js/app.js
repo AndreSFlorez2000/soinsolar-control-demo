@@ -7,6 +7,7 @@ import { costWorkbookSheets } from "./domain/cost-workbook.js?v=1.5.8";
 import { canEditExecution } from "./domain/execution.js?v=1.3.0";
 import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=1.1.0";
 import { invoicePendingAmount, isSampleProject, payableInvoicesForProject } from "./domain/payment-selection.js?v=1.5.1";
+import { forgetProject, hasProject, recallProject, rememberProject } from "./domain/project-context.js?v=1.8.0";
 import { createApplicationDataGateway } from "./services/application-data.js?v=1.5.0";
 import { getCurrentSession, isDemoMode, registerAccount, signIn, signOut } from "./services/supabase.js?v=1.4.0";
 
@@ -81,6 +82,7 @@ const monthNames = [
 
 let gateway = null;
 let selectedProjectId = null;
+let projectContextOwnerId = null;
 let currentProjects = [];
 let currentPeriods = [];
 let currentCosts = [];
@@ -103,6 +105,56 @@ let dashboardChart = null;
 let projectChart = null;
 
 const functionalViews = new Set(["dashboard", "projects", "monthly", "finance", "costs", "reports", "assistant", "history", "admin"]);
+const projectModuleFilters = ["monthlyFilterProject", "financeFilterProject", "costFilterProject", "reportFilterProject", "historyFilterProject"];
+
+function projectStorage() {
+  try { return window.localStorage; } catch { return null; }
+}
+
+function renderProjectContext() {
+  const project = currentProjects.find((item) => item.projectId === selectedProjectId);
+  const workspace = document.querySelector("#projectWorkspace");
+  workspace.hidden = !project;
+  if (!project) return;
+  document.querySelector("#projectWorkspaceName").textContent = `${project.costCenter} · ${project.projectName}`;
+  const options = [...currentProjects]
+    .sort((left, right) => String(left.costCenter).localeCompare(String(right.costCenter), "es", { numeric: true }))
+    .map((item) => `<option value="${escapeHtml(item.projectId)}">${escapeHtml(item.costCenter)} · ${escapeHtml(item.projectName)}</option>`).join("");
+  setSelectOptions(document.querySelector("#projectWorkspaceSelect"), "", options, selectedProjectId);
+}
+
+function activateProject(projectId) {
+  if (!hasProject(projectId, currentProjects)) return false;
+  selectedProjectId = projectId;
+  projectModuleFilters.forEach((id) => { document.querySelector(`#${id}`).value = projectId; });
+  rememberProject(projectStorage(), projectContextOwnerId, projectId, currentProjects);
+  renderProjectContext();
+  return true;
+}
+
+function clearProjectContext() {
+  const previousProjectId = selectedProjectId;
+  selectedProjectId = null;
+  projectModuleFilters.forEach((id) => {
+    const filter = document.querySelector(`#${id}`);
+    if (filter.value === previousProjectId) filter.value = "";
+  });
+  forgetProject(projectStorage(), projectContextOwnerId);
+  renderProjectContext();
+}
+
+function restoreProjectContext() {
+  const ownerId = currentUserProfile?.id;
+  if (projectContextOwnerId !== ownerId) {
+    projectContextOwnerId = ownerId;
+    selectedProjectId = null;
+    const storedId = recallProject(projectStorage(), ownerId, currentProjects);
+    if (storedId) { activateProject(storedId); return; }
+  } else if (selectedProjectId && !hasProject(selectedProjectId, currentProjects)) {
+    clearProjectContext();
+  }
+  renderProjectContext();
+}
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -217,6 +269,7 @@ async function loadReferenceData() {
   document.querySelector("#sidebarPeriodStatus").textContent = `${currentPeriods.length} periodo(s) registrado(s)`;
   populateProjectOptions();
   populatePeriodOptions();
+  restoreProjectContext();
   const mayEdit = canEditExecution(currentUserProfile);
   document.querySelector("#newMonthlyButton").disabled = !mayEdit;
   document.querySelector("#newMonthlyButton").title = mayEdit ? "" : "Solo el administrador puede registrar el avance de ejecución.";
@@ -288,6 +341,9 @@ function closeApp() {
   balancePayments = [];
   currentProfiles = [];
   selectedProjectId = null;
+  projectContextOwnerId = null;
+  document.querySelector("#projectWorkspace").hidden = true;
+  projectModuleFilters.forEach((id) => { document.querySelector(`#${id}`).value = ""; });
   selectedProjectMonthly = [];
   selectedProjectHistory = [];
   if (projectChart) {
@@ -719,13 +775,11 @@ async function saveProject(event) {
   setMessage(message);
   try {
     const data = await ensureGateway();
-    if (id) await data.updateProject(id, readProjectForm());
-    else await data.createProject(readProjectForm());
+    const saved = id ? await data.updateProject(id, readProjectForm()) : await data.createProject(readProjectForm());
     projectDialog.close();
     await loadReferenceData();
     renderDashboard();
-    await loadProjects();
-    setMessage(document.querySelector("#projectModuleMessage"), id ? "Proyecto actualizado correctamente." : "Proyecto creado correctamente.");
+    await openProjectDetail(saved.id);
   } catch (error) {
     setMessage(message, error.message || "No fue posible guardar el proyecto.", true);
   } finally {
@@ -840,7 +894,6 @@ function renderProjectAnalytics(project) {
 }
 
 async function openProjectDetail(projectId) {
-  selectedProjectId = projectId;
   const data = await ensureGateway();
   const [project, projectRecord, monthlyRows, auditRows] = await Promise.all([
     data.getProjectSummary(projectId),
@@ -850,6 +903,7 @@ async function openProjectDetail(projectId) {
   ]);
   selectedProjectMonthly = monthlyRows;
   selectedProjectHistory = auditRows;
+  activateProject(projectId);
 
   document.querySelector("#detailCostCenter").textContent = project.costCenter;
   document.querySelector("#detailProjectName").textContent = project.projectName;
@@ -1160,7 +1214,7 @@ function openNewMonthly(projectId = "", periodId = "") {
   populatePeriodOptions();
   const activePeriod = currentPeriods.find((period) => period.status === "abierto");
   if (activePeriod) document.querySelector("#monthlyPeriod").value = activePeriod.id;
-  if (projectId) document.querySelector("#monthlyProject").value = projectId;
+  document.querySelector("#monthlyProject").value = projectId || selectedProjectId || document.querySelector("#monthlyFilterProject").value;
   if (periodId) document.querySelector("#monthlyPeriod").value = periodId;
   setMessage(document.querySelector("#monthlyFormMessage"));
   monthlyDialog.showModal();
@@ -1208,9 +1262,11 @@ async function saveMonthly(event) {
   setBusy(button, true, "Guardando…");
   setMessage(message);
   try {
-    await (await ensureGateway()).saveMonthlyTracking({ ...readMonthlyForm(), trackingId: trackingId || null });
+    const input = readMonthlyForm();
+    await (await ensureGateway()).saveMonthlyTracking({ ...input, trackingId: trackingId || null });
     monthlyDialog.close();
     await loadReferenceData();
+    activateProject(input.projectId);
     await loadMonthlyModule();
     setMessage(document.querySelector("#monthlyModuleMessage"), trackingId ? "Seguimiento actualizado." : "Seguimiento mensual registrado.");
   } catch (error) {
@@ -1284,6 +1340,7 @@ function openNewCost() {
   document.querySelector("#costForm").reset();
   populateProjectOptions();
   populatePeriodOptions();
+  document.querySelector("#costProject").value = selectedProjectId || document.querySelector("#costFilterProject").value;
   const activePeriod = currentPeriods.find((period) => period.status === "abierto");
   if (activePeriod) {
     document.querySelector("#costPeriod").value = activePeriod.id;
@@ -1322,6 +1379,7 @@ async function saveCost(event) {
     await (await ensureGateway()).createCostExpense(input);
     costDialog.close();
     await loadReferenceData();
+    activateProject(input.projectId);
     renderDashboard();
     await loadCosts();
     setMessage(document.querySelector("#costModuleMessage"), "Movimiento registrado correctamente.");
@@ -1466,11 +1524,13 @@ function openNewInvoice(projectId = "") {
   document.querySelector("#invoiceForm").reset();
   populateProjectOptions();
   populatePeriodOptions();
-  if (projectId && currentProjects.some((project) => project.projectId === projectId && project.contractId)) {
-    document.querySelector("#invoiceProject").value = projectId;
+  const preferredProjectId = projectId || selectedProjectId || document.querySelector("#financeFilterProject").value;
+  if (currentProjects.some((project) => project.projectId === preferredProjectId && project.contractId)) {
+    document.querySelector("#invoiceProject").value = preferredProjectId;
   }
   setDefaultOpenPeriod(document.querySelector("#invoicePeriod"), document.querySelector("#invoiceDate"));
-  setMessage(document.querySelector("#invoiceFormMessage"));
+  const needsContract = preferredProjectId && currentProjects.some((project) => project.projectId === preferredProjectId && !project.contractId);
+  setMessage(document.querySelector("#invoiceFormMessage"), needsContract ? "Este proyecto todavía no tiene contrato. Regístralo desde su ficha antes de facturar." : "", Boolean(needsContract));
   invoiceDialog.showModal();
 }
 
@@ -1478,7 +1538,7 @@ function openNewPayment(invoiceId = "") {
   document.querySelector("#paymentForm").reset();
   populatePeriodOptions();
   const selectedInvoice = payableInvoices.find((invoice) => invoice.id === invoiceId);
-  populatePaymentProjectOptions(selectedInvoice?.projectId || document.querySelector("#financeFilterProject").value);
+  populatePaymentProjectOptions(selectedInvoice?.projectId || selectedProjectId || document.querySelector("#financeFilterProject").value);
   populatePaymentInvoiceOptions(invoiceId);
   setDefaultOpenPeriod(document.querySelector("#paymentPeriod"), document.querySelector("#paymentDate"));
   setMessage(document.querySelector("#paymentFormMessage"));
@@ -1506,6 +1566,7 @@ async function saveInvoice(event) {
     });
     invoiceDialog.close();
     await loadReferenceData();
+    activateProject(project.projectId);
     await loadFinance();
     setMessage(document.querySelector("#financeModuleMessage"), "Factura registrada correctamente.");
   } catch (error) {
@@ -1542,6 +1603,7 @@ async function savePayment(event) {
     });
     paymentDialog.close();
     await loadReferenceData();
+    activateProject(invoice.projectId);
     await loadFinance();
     setMessage(document.querySelector("#financeModuleMessage"), "Pago registrado correctamente.");
   } catch (error) {
@@ -1677,6 +1739,7 @@ async function saveReportProgress(event) {
     });
     saved = true;
     await loadReferenceData();
+    activateProject(project.projectId);
     await loadReports();
     updateSystemStatus();
     reportProgressDialog.close();
@@ -1952,6 +2015,22 @@ document.querySelector("#demoAccess").hidden = !isDemoMode();
 document.querySelector("#demoAccess").addEventListener("click", openApp);
 document.querySelector("#logoutButton").addEventListener("click", async () => { await signOut(); closeApp(); });
 document.querySelector("#refreshAppButton").addEventListener("click", refreshApplication);
+document.querySelector("#projectWorkspaceSelect").addEventListener("change", async (event) => {
+  const projectId = event.target.value;
+  const view = routeFromHash().view;
+  if (!activateProject(projectId)) return;
+  if (view === "detail") await openProjectDetail(projectId);
+  else await showView(view);
+});
+document.querySelector("#projectWorkspaceOpen").addEventListener("click", () => selectedProjectId && openProjectDetail(selectedProjectId));
+document.querySelector("#projectWorkspaceClear").addEventListener("click", async () => {
+  const view = routeFromHash().view;
+  clearProjectContext();
+  await showView(view === "detail" ? "projects" : view);
+});
+projectModuleFilters.forEach((id) => document.querySelector(`#${id}`).addEventListener("change", (event) => {
+  if (event.target.value) activateProject(event.target.value);
+}));
 document.querySelector("#newProjectButton").addEventListener("click", openNewProject);
 document.querySelector("#projectForm").addEventListener("submit", saveProject);
 document.querySelector("#newPeriodButton").addEventListener("click", openNewPeriod);
