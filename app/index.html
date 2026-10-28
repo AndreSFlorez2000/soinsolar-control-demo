@@ -11,7 +11,7 @@
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.7.4" />
+    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.8.0" />
   </head>
   <body>
     <section id="loginView" class="login-shell">
@@ -114,6 +114,19 @@
         </header>
 
         <div class="content-area">
+          <div id="projectWorkspace" class="project-workspace" hidden>
+            <div class="project-workspace-heading">
+              <span>PROYECTO EN TRABAJO · RECORDADO EN ESTE NAVEGADOR</span>
+              <strong id="projectWorkspaceName"></strong>
+              <small>Los módulos y formularios usarán este centro de costo. Los registros se confirman con «Guardar».</small>
+            </div>
+            <div class="project-workspace-actions">
+              <label for="projectWorkspaceSelect">Cambiar proyecto</label>
+              <select id="projectWorkspaceSelect" class="form-select" aria-label="Cambiar proyecto en trabajo"></select>
+              <button id="projectWorkspaceOpen" class="btn btn-sm btn-outline-primary" type="button">Ver ficha</button>
+              <button id="projectWorkspaceClear" class="btn btn-sm btn-outline-secondary" type="button">Salir del proyecto</button>
+            </div>
+          </div>
           <section id="dashboardView" class="content-view">
             <div class="section-heading">
               <div><h3>Indicadores generales</h3><p>Información consolidada de los proyectos autorizados.</p></div>
@@ -728,9 +741,9 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <script src="src/assets/js/config.js?v=1.7.4"></script>
-    <script type="module" src="src/assets/js/app.js?v=1.7.4"></script>
-    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.7.4"></script>
-    <script type="module" src="src/assets/js/assistant-ui.js?v=1.7.4"></script>
+    <script src="src/assets/js/config.js?v=1.8.0"></script>
+    <script type="module" src="src/assets/js/app.js?v=1.8.0"></script>
+    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.8.0"></script>
+    <script type="module" src="src/assets/js/assistant-ui.js?v=1.8.0"></script>
   </body>
 </html>
