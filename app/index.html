@@ -11,7 +11,7 @@
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.11.0" />
+    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.12.0" />
   </head>
   <body>
     <section id="loginView" class="login-shell">
@@ -538,21 +538,55 @@
               </article>
               <aside class="panel assistant-help">
                 <h4>Prueba estas consultas</h4>
-                <p>Escribe el nombre o centro de costo. Después puedes preguntar por otro mes sin repetir el proyecto.</p>
+                <p>Elige una pregunta. Se copiará al campo para que puedas cambiar «general» por un centro de costo, por ejemplo CC-102. Si la envías como está, consultarás todos los proyectos.</p>
                 <div class="assistant-examples">
-                  <button type="button" data-assistant-prompt="¿Qué puedes hacer por mí?">¿Qué puedes hacer por mí?</button>
-                  <button type="button" data-assistant-prompt="¿Quién es tu creador?">¿Quién es tu creador?</button>
-                  <button type="button" data-assistant-prompt="¿Cómo va CC-102?">¿Cómo va CC-102?</button>
-                  <button type="button" data-assistant-prompt="¿Cuánto se ejecutó en septiembre 2026 en CC-102?">¿Cuánto se ejecutó en septiembre?</button>
-                  <button type="button" data-assistant-prompt="¿Qué proyectos tienen cartera?">Proyectos con cartera</button>
-                  <button type="button" data-assistant-prompt="¿Qué facturas tiene CC-102?">Facturas del proyecto</button>
-                  <button type="button" data-assistant-prompt="¿Qué observaciones hay en septiembre de 2026 en CC-102?">Observaciones del mes</button>
-                  <button type="button" data-assistant-prompt="¿Cuál es el cliente y municipio de CC-102?">Cliente y municipio</button>
-                  <button type="button" data-assistant-prompt="¿Cómo funciona el seguimiento mensual?">Porcentajes del seguimiento</button>
-                  <button type="button" data-assistant-prompt="Resumen general">Resumen general</button>
-                  <button type="button" data-assistant-prompt="Crear proyecto">Crear proyecto</button>
+                  <details class="assistant-topic" open><summary>Resumen y proyectos</summary>
+                    <button type="button" data-assistant-prompt="¿Cómo van los proyectos en general?">Resumen general</button>
+                    <button type="button" data-assistant-prompt="¿Cuántos proyectos hay en general?">Cantidad de proyectos</button>
+                    <button type="button" data-assistant-prompt="¿Qué proyectos hay en general?">Listado de proyectos · escribe un municipio si quieres</button>
+                    <button type="button" data-assistant-prompt="¿Qué proyectos tienen cartera en general?">Proyectos con cartera</button>
+                    <button type="button" data-assistant-prompt="¿Qué proyectos están sin avance en general?">Proyectos sin avance</button>
+                    <button type="button" data-assistant-prompt="¿Qué proyectos están sin contrato en general?">Proyectos sin contrato</button>
+                    <button type="button" data-assistant-prompt="¿Qué proyectos están activos en general?">Proyectos por estado</button>
+                  </details>
+                  <details class="assistant-topic"><summary>Datos del proyecto y contrato</summary>
+                    <button type="button" data-assistant-prompt="¿Cuál es el cliente y municipio en general?">Cliente y municipio</button>
+                    <button type="button" data-assistant-prompt="¿Qué tipo de servicio y potencia tienen en general?">Servicio y potencia</button>
+                    <button type="button" data-assistant-prompt="¿Cuáles son las notas del proyecto en general?">Notas del proyecto</button>
+                    <button type="button" data-assistant-prompt="¿Cuál es el centro principal en general?">Centro principal y asociados</button>
+                    <button type="button" data-assistant-prompt="¿Cuál es la fecha de inicio y finalización del proyecto en general?">Fechas del proyecto</button>
+                    <button type="button" data-assistant-prompt="¿Cuál es el número y valor inicial del contrato en general?">Número y valor del contrato</button>
+                    <button type="button" data-assistant-prompt="¿Qué adiciones y deducciones tiene el contrato en general?">Adiciones y deducciones</button>
+                    <button type="button" data-assistant-prompt="¿Cuál es el estado y vigencia del contrato en general?">Estado y vigencia</button>
+                  </details>
+                  <details class="assistant-topic"><summary>Ejecución y seguimiento</summary>
+                    <button type="button" data-assistant-prompt="¿Cuál es el avance de ejecución en general?">Avance de ejecución</button>
+                    <button type="button" data-assistant-prompt="¿Cuánto se ejecutó en septiembre de 2026 en general?">Ejecución de un mes · edita mes y año</button>
+                    <button type="button" data-assistant-prompt="¿Qué observaciones hay en septiembre de 2026 en general?">Observaciones del mes</button>
+                    <button type="button" data-assistant-prompt="¿Qué novedades de ejecución hay en general?">Novedades de ejecución</button>
+                    <button type="button" data-assistant-prompt="¿Qué seguimientos están pendientes en general?">Estado de validación</button>
+                    <button type="button" data-assistant-prompt="¿Qué periodos están abiertos?">Periodos abiertos o cerrados</button>
+                    <button type="button" data-assistant-prompt="¿Cómo funciona el seguimiento mensual?">Porcentajes del seguimiento</button>
+                  </details>
+                  <details class="assistant-topic"><summary>Facturación, pagos y costos</summary>
+                    <button type="button" data-assistant-prompt="¿Cuánto se ha facturado en general?">Total facturado</button>
+                    <button type="button" data-assistant-prompt="¿Cuánto se ha recaudado en general?">Total recaudado</button>
+                    <button type="button" data-assistant-prompt="¿Cuánto hay en cartera en general?">Cartera pendiente</button>
+                    <button type="button" data-assistant-prompt="¿Qué facturas hay en general?">Facturas y sus estados</button>
+                    <button type="button" data-assistant-prompt="¿Qué pagos hay en general?">Pagos y referencias</button>
+                    <button type="button" data-assistant-prompt="¿Qué costos y gastos hay en general?">Costos y gastos</button>
+                    <button type="button" data-assistant-prompt="¿Qué proveedores tienen los costos en general?">Proveedores y categorías</button>
+                    <button type="button" data-assistant-prompt="¿Cuál es la rentabilidad en general?">Rentabilidad estimada</button>
+                  </details>
+                  <details class="assistant-topic"><summary>Historial y ayuda</summary>
+                    <button type="button" data-assistant-prompt="¿Qué cambios realizados hay en general?">Historial de cambios</button>
+                    <button type="button" data-assistant-prompt="¿Qué usuarios están pendientes?">Usuarios pendientes · administrador</button>
+                    <button type="button" data-assistant-prompt="¿Qué puedes hacer por mí?">Funciones del asistente</button>
+                    <button type="button" data-assistant-prompt="¿Quién es tu creador?">Creador</button>
+                    <button type="button" data-assistant-prompt="Crear proyecto">Crear proyecto paso a paso</button>
+                  </details>
                 </div>
-                <div class="assistant-help-note"><strong>Qué puedes consultar</strong><span>Proyecto, contrato, periodos, seguimiento, facturas, pagos, costos, proveedores, observaciones e historial. Los perfiles de otros usuarios solo están disponibles para administración.</span><span>La creación está disponible para cuentas activas de administrador o gerencia. Revisa el borrador antes de guardarlo.</span></div>
+                <div class="assistant-help-note"><strong>Consejo</strong><span>Reemplaza «general» por el centro de costo o el nombre del proyecto; también puedes editar el mes, año o estado. Solo al pulsar «Enviar» se hace la consulta.</span><span>Los perfiles de otros usuarios solo están disponibles para administración.</span></div>
               </aside>
             </div>
           </section>
@@ -748,9 +782,9 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <script src="src/assets/js/config.js?v=1.11.0"></script>
-    <script type="module" src="src/assets/js/app.js?v=1.11.0"></script>
-    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.11.0"></script>
-    <script type="module" src="src/assets/js/assistant-ui.js?v=1.11.0"></script>
+    <script src="src/assets/js/config.js?v=1.12.0"></script>
+    <script type="module" src="src/assets/js/app.js?v=1.12.0"></script>
+    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.12.0"></script>
+    <script type="module" src="src/assets/js/assistant-ui.js?v=1.12.0"></script>
   </body>
 </html>

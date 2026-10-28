@@ -8,7 +8,7 @@ import { canEditExecution } from "./domain/execution.js?v=1.9.0";
 import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=1.1.0";
 import { invoicePendingAmount, isSampleProject, payableInvoicesForProject } from "./domain/payment-selection.js?v=1.5.1";
 import { forgetProject, hasProject, recallProject, rememberProject } from "./domain/project-context.js?v=1.8.0";
-import { createApplicationDataGateway } from "./services/application-data.js?v=1.9.0";
+import { createApplicationDataGateway } from "./services/application-data.js?v=1.12.0";
 import { getCurrentSession, isDemoMode, registerAccount, signIn, signOut } from "./services/supabase.js?v=1.4.0";
 
 const loginView = document.querySelector("#loginView");

@@ -1,9 +1,9 @@
-import { createDataService } from "./data.js?v=1.9.0";
+import { createDataService } from "./data.js?v=1.12.0";
 import { getCurrentUser, isDemoMode, requireSupabaseClient } from "./supabase.js?v=1.4.0";
 
 export async function createApplicationDataGateway() {
   if (isDemoMode()) {
-    const { createDemoStore } = await import("../data/demo-store.js?v=1.9.0");
+    const { createDemoStore } = await import("../data/demo-store.js?v=1.12.0");
     return createDemoStore();
   }
 
@@ -23,6 +23,7 @@ export async function createApplicationDataGateway() {
     listProfiles: () => data.profiles.list(),
     updateProfile: (id, input) => data.profiles.update(id, input),
     listProjects: (filters) => data.projects.list(filters),
+    listProjectDetails: () => data.projects.listDetails(),
     getProject: (id) => data.projects.get(id),
     getProjectSummary: (id) => data.projects.getSummary(id),
     createProject: (input) => data.projects.create(input, userId),

@@ -19,8 +19,8 @@ function scoreProject(question, project) {
   const name = words(project.projectName);
   const client = words(project.clientName);
   const costCenter = words(project.costCenter);
-  if (costCenter && new RegExp(`(^| )${costCenter.replaceAll(" ", "[ -]*")}( |$)`).test(question)) return 120;
-  if (costCenter && costCenter.startsWith("cc ") && new RegExp(`(^| )${costCenter.replaceAll(" ", "")}( |$)`).test(question)) return 120;
+  if (costCenter && new RegExp(`(^| )${costCenter.replaceAll(" ", "[ -]*")}( |$)`).test(question)) return 120 + costCenter.length;
+  if (costCenter && costCenter.startsWith("cc ") && new RegExp(`(^| )${costCenter.replaceAll(" ", "")}( |$)`).test(question)) return 120 + costCenter.length;
   if (name.length > 3 && question.includes(name)) return 100;
   if (client.length > 3 && question.includes(client)) return 90;
   const tokens = new Set(question.split(" "));
@@ -80,7 +80,8 @@ function portfolioRequest(question) {
   if (/\b(sin contrato)\b/.test(question)) return "withoutContract";
   if (/\b(cartera|por cobrar|pendientes de pago)\b/.test(question)) return "receivable";
   const status = ["activos", "finalizados", "suspendidos", "planeados", "cancelados"].find((item) => question.includes(item));
-  return status ? `status:${status.slice(0, -1)}` : null;
+  if (status) return `status:${status.slice(0, -1)}`;
+  return /\b(que proyectos hay|lista de proyectos|muestra los proyectos)\b/.test(question) ? "all" : null;
 }
 
 // Only business fields exposed by the application are searchable. This keeps a
@@ -128,7 +129,7 @@ export function findAssistantProjectFilter(query, projects = []) {
 
 export function detectAssistantIntents(query) {
   const question = words(query);
-  if (/\b(resumen|general|completo|todo|como va|situacion)\b/.test(question)) return ["full"];
+  if (/\b(resumen|completo|todo|como va|situacion)\b/.test(question)) return ["full"];
   if (/\b(cuantos proyectos|numero de proyectos|cantidad de proyectos)\b/.test(question)) return ["projectCount"];
   if (/\b(ultimo|ultima|reciente)\b/.test(question)) {
     if (/\b(pago|pagos|recaudo|cobro)\b/.test(question)) return ["latestPayment"];
@@ -141,7 +142,7 @@ export function detectAssistantIntents(query) {
   add("executedEquivalent", /\b(equivalente|ejecutado en pesos|ejecucion en pesos|avanzado monetariamente|valor ejecutado)\b/);
   add("execution", /\b(avance de ejecucion|avance fisico|avance del proyecto|progreso fisico|porcentaje ejecutado|porcentaje de ejecucion|ejecucion del proyecto|cuanto se ha ejecutado)\b/);
   add("billing", /\b(facturad[oa]|facturacion|facturas|facturo|facturar)\b/);
-  add("collection", /\b(recaud[oa]|recaudo financiero|avance financiero|cobrad[oa]|pagad[oa]|pagos|recogid[oa]|recogio)\b/);
+  add("collection", /\b(recaud[oa]|recaudad[oa]s?|recaudo financiero|avance financiero|cobrad[oa]|pagad[oa]|pagos|recogid[oa]|recogio)\b/);
   add("receivable", /\b(cartera|por cobrar|pendiente de pago|deben|adeudan)\b/);
   add("balance", /\b(saldo contractual|sin facturar|resta del contrato)\b/);
   add("costs", /\b(costos|gastos|gastado)\b/);
@@ -158,15 +159,26 @@ export function resolveAssistantQuestion(query, projects = [], { projectId = nul
   const quick = resolveAssistantQuickQuestion(query);
   if (quick) return quick;
   const intents = detectAssistantIntents(query);
+  const explicitCenter = projects.find((project) => {
+    const center = words(project.costCenter);
+    return center && ((` ${question} `).includes(` ${center} `)
+      || (center.startsWith("cc ") && (` ${question} `).includes(` ${center.replaceAll(" ", "")} `)));
+  });
+  const explicitTarget = Boolean(explicitCenter || projects.some((project) => {
+    const name = words(project.projectName);
+    return name.length > 3 && (` ${question} `).includes(` ${name} `);
+  }));
+  if (/\bcc\s*\d+\b/.test(question) && !explicitCenter) return { kind: "help" };
   const portfolio = portfolioRequest(question);
-  if (portfolio) return { kind: "portfolio", filter: portfolio };
+  if (portfolio && portfolio !== "all" && !explicitTarget) return { kind: "portfolio", filter: portfolio };
+  const projectFilter = explicitTarget ? null : findAssistantProjectFilter(query, projects);
+  if (projectFilter) return { kind: "projectList", filter: projectFilter };
+  if (portfolio && !explicitTarget) return { kind: "portfolio", filter: portfolio };
   const period = findAssistantPeriod(query, periods);
   const dataRequest = detectAssistantDataRequest(query);
   const unsupportedQuestion = !dataRequest && intents.length === 1 && intents[0] === "full" &&
     /\b(que|cual|cuanto|donde|quien|cuando|como|por que)\b/.test(question) &&
     !/\b(resumen|general|completo|todo|como va|situacion|que paso)\b/.test(question);
-  const projectFilter = findAssistantProjectFilter(query, projects);
-  if (projectFilter) return { kind: "projectList", filter: projectFilter };
   const matches = projects.map((project) => ({ project, score: scoreProject(question, project) }))
     .filter((item) => item.score > 0).sort((left, right) => right.score - left.score);
   if (matches.length) {
@@ -347,14 +359,15 @@ export function buildAssistantPeriodAnswer(project, period, monthly = [], projec
 
 export function buildAssistantPortfolioList(projects = [], filter = "receivable") {
   const financial = topLevelFinancialRows(projects);
-  const rows = filter === "receivable" ? financial.filter((project) => Number(project.paymentPending) > 0)
+  const rows = filter === "all" ? projects
+    : filter === "receivable" ? financial.filter((project) => Number(project.paymentPending) > 0)
     : filter === "withoutContract" ? financial.filter((project) => Number(project.contractValue) <= 0)
     : filter === "withoutExecution" ? projects.filter((project) => project.executedProgressPercentage === null || project.executedProgressPercentage === undefined)
     : filter.startsWith("status:") ? projects.filter((project) => project.status === filter.slice(7)) : [];
   rows.sort((a, b) => filter === "receivable"
     ? Number(b.paymentPending) - Number(a.paymentPending)
     : String(a.costCenter).localeCompare(String(b.costCenter), "es", { numeric: true }));
-  return { kind: "portfolio", filter, total: rows.length, projects: rows.slice(0, 10) };
+  return { kind: "portfolio", filter, total: rows.length, projects: rows.slice(0, 20) };
 }
 
 export function buildAssistantOverview(projects = []) {
@@ -382,13 +395,22 @@ export function buildAssistantDataAnswer({ request, project, period, question },
 } = {}) {
   const entity = request.entity;
   if (entity === "projectField") {
-    const details = projectDetails ?? project;
-    const values = Object.fromEntries((request.fields ?? [request.field]).map((field) => {
+    const fields = request.fields ?? [request.field];
+    const valueFor = (details) => Object.fromEntries(fields.map((field) => {
       const value = details?.[field] ?? null;
       const parent = projects.find((item) => item.projectId === value);
       return [field, parent?.costCenter ?? value];
     }));
-    return { kind: "data", entity, project, field: request.field, value: values[request.field], values };
+    if (project) {
+      const values = valueFor(projectDetails ?? project);
+      return { kind: "data", entity, project, field: request.field, value: values[request.field], values };
+    }
+    const details = Array.isArray(projectDetails) ? projectDetails : projects;
+    const rows = details.map((item) => ({
+      project: projects.find((summary) => summary.projectId === item.id || summary.projectId === item.projectId) ?? item,
+      values: valueFor(item)
+    }));
+    return { kind: "data", entity, project: null, rows: rows.slice(0, 20), total: rows.length, limited: rows.length > 20 };
   }
   let rows = { contracts, tracking: monthly, invoices, payments, costs, audit, profiles, periods }[entity] ?? [];
   if (project && entity !== "profiles" && entity !== "periods") {
@@ -422,8 +444,9 @@ export function buildAssistantDataAnswer({ request, project, period, question },
   if (entity === "tracking") {
     if (/\b(observaciones)\b/.test(normalized)) rows = rows.filter((row) => row.observations);
     if (/\b(novedad|novedades|incidencia|incidencias)\b/.test(normalized)) rows = rows.filter((row) => row.executionIssue);
-    if (/\b(rechazado|validado|pendiente)\b/.test(normalized)) {
-      const status = ["rechazado", "validado", "pendiente"].find((item) => normalized.includes(item));
+    if (/\b(rechazados?|validados?|pendientes?)\b/.test(normalized)) {
+      const status = /\brechazados?\b/.test(normalized) ? "rechazado"
+        : /\bvalidados?\b/.test(normalized) ? "validado" : "pendiente";
       rows = rows.filter((row) => row.validationStatus === status);
     }
   }

@@ -4,7 +4,7 @@ import {
   descendantProjectIds, isCreateProjectRequest,
   parseProjectDraftField, prepareProjectDraft, PROJECT_DRAFT_FIELDS,
   resolveAssistantQuestion, resolveAssistantQuickQuestion
-} from "./domain/assistant.js?v=1.11.0";
+} from "./domain/assistant.js?v=1.12.0";
 import { formatCop } from "./domain/financial.js?v=1.1.0";
 
 const form = document.querySelector("#assistantForm");
@@ -241,7 +241,8 @@ function renderOverview(target, answer, intents = ["full"]) {
       billing: ["Facturado", formatCop(data.invoiced)],
       collection: ["Pagado / recaudado", formatCop(data.paid)],
       receivable: ["Cartera pendiente", formatCop(data.paymentPending)],
-      costs: ["Costos y gastos", formatCop(data.costsExpenses)]
+      costs: ["Costos y gastos", formatCop(data.costsExpenses)],
+      profitability: ["Contrato menos costos y gastos", formatCop(data.profitability)]
     };
     if (intents.every((intent) => mapping[intent])) {
       for (const intent of intents) {
@@ -330,15 +331,23 @@ function renderData(target, answer) {
       powerKwp: "Potencia (kWp)", startDate: "Inicio del proyecto", endDate: "Finalización del proyecto",
       notes: "Notas", parentProjectId: "Centro principal"
     };
-    const list = node("dl", "assistant-details");
-    for (const [field, raw] of Object.entries(answer.values)) {
-      const value = field === "startDate" || field === "endDate" ? date(raw)
-        : field === "powerKwp" && raw !== null
-          ? `${Number(raw).toLocaleString("es-CO", { maximumFractionDigits: 2 })} kWp`
-          : raw || "Sin registrar";
-      detail(list, fields[field], value);
+    const showFields = (values, project = null) => {
+      const list = node("dl", "assistant-details");
+      if (project) detail(list, "Proyecto", `${project.costCenter} · ${project.projectName ?? project.name}`);
+      for (const [field, raw] of Object.entries(values)) {
+        const value = field === "startDate" || field === "endDate" ? date(raw)
+          : field === "powerKwp" && raw !== null
+            ? `${Number(raw).toLocaleString("es-CO", { maximumFractionDigits: 2 })} kWp`
+            : raw || "Sin registrar";
+        detail(list, fields[field], value);
+      }
+      target.append(list);
+    };
+    if (answer.project) showFields(answer.values);
+    else {
+      paragraph(target, `${answer.total} proyectos${answer.limited ? " · se muestran los primeros 20" : ""}.`, "assistant-subtitle");
+      answer.rows.forEach((row) => showFields(row.values, row.project));
     }
-    target.append(list);
     return;
   }
   paragraph(target, `${answer.total} registro(s)${answer.period ? ` en ${month(answer.period)}` : ""}${answer.limited ? " · se muestran los primeros 20" : ""}.`, "assistant-subtitle");
@@ -392,6 +401,7 @@ function renderData(target, answer) {
 
 function renderPortfolio(target, answer) {
   const titles = {
+    all: "Proyectos registrados",
     receivable: "Proyectos con cartera pendiente",
     withoutExecution: "Proyectos sin avance de ejecución registrado",
     withoutContract: "Centros sin contrato vigente",
@@ -711,7 +721,8 @@ async function ask(question) {
         ? Promise.all(scope.map((projectId) => gateway[method]({ ...filters, projectId }))).then((rows) => rows.flat())
         : gateway[method](filters);
       const data = { projects, periods: app.periods() };
-      if (entity === "projectField" && result.project) data.projectDetails = await gateway.getProject(result.project.projectId);
+      if (entity === "projectField") data.projectDetails = result.project
+        ? await gateway.getProject(result.project.projectId) : await gateway.listProjectDetails();
       if (entity === "contracts") data.contracts = result.project
         ? (await Promise.all(scope.map((id) => gateway.listContracts(id)))).flat() : await gateway.listContracts();
       if (entity === "tracking") data.monthly = app.monthly();
@@ -789,7 +800,15 @@ document.querySelector("#assistantView").addEventListener("click", (event) => {
     }
   }
   const button = event.target.closest("[data-assistant-prompt], [data-assistant-query]");
-  if (button) ask(button.dataset.assistantPrompt ?? button.dataset.assistantQuery);
+  if (button?.dataset.assistantPrompt !== undefined) {
+    input.value = button.dataset.assistantPrompt;
+    input.focus();
+    const start = input.value.toLocaleLowerCase("es").lastIndexOf("general");
+    if (start >= 0) input.setSelectionRange(start, start + "general".length);
+    else input.setSelectionRange(input.value.length, input.value.length);
+    return;
+  }
+  if (button) ask(button.dataset.assistantQuery);
 });
 
 document.querySelector("#assistantClear").addEventListener("click", () => {

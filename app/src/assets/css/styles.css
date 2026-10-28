@@ -468,13 +468,16 @@ button, input, select, textarea { font: inherit; }
 .assistant-form { display: flex; gap: 10px; }
 .assistant-form input { min-width: 0; }
 .assistant-composer small { display: block; margin-top: 7px; color: var(--muted); font-size: 10px; }
-.assistant-help { padding: 22px; }
+.assistant-help { padding: 22px; max-height: min(790px, 82vh); overflow-y: auto; }
 .assistant-help h4 { font-size: 15px; }
 .assistant-help p, .assistant-help-note span { display: block; margin: 10px 0 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.assistant-topic { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 11px; }
+.assistant-topic summary { color: var(--navy); cursor: pointer; font-size: 12px; font-weight: 700; }
+.assistant-topic summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
 .assistant-help-note { margin-top: 25px; padding-top: 17px; border-top: 1px solid var(--border); }
 .assistant-help-note strong { font-size: 12px; }
 @media (max-width: 1200px) { .assistant-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 900px) { .assistant-layout { grid-template-columns: 1fr; } .assistant-panel { min-height: 550px; } }
+@media (max-width: 900px) { .assistant-layout { grid-template-columns: 1fr; } .assistant-panel { min-height: 550px; } .assistant-help { max-height: none; } }
 @media (max-width: 760px) { .assistant-toolbar { align-items: flex-start; flex-direction: column; } }
 @media (max-width: 600px) {
   .assistant-messages { padding: 12px; }

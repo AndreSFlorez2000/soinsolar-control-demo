@@ -128,6 +128,12 @@ export class ProjectRepository {
     return rows.map(normalizeProjectSummary);
   }
 
+  async listDetails() {
+    const rows = await fetchAllPages(() => this.client.from("projects").select("*")
+      .order("cost_center").order("id"), "No fue posible consultar los datos de proyectos");
+    return rows.map(normalizeProject);
+  }
+
   async get(projectId) {
     const id = assertUuid(projectId, "proyecto");
     const row = await unwrap(
