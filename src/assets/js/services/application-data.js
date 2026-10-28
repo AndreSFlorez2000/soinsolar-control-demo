@@ -1,9 +1,9 @@
-import { createDataService } from "./data.js?v=1.5.0";
+import { createDataService } from "./data.js?v=1.9.0";
 import { getCurrentUser, isDemoMode, requireSupabaseClient } from "./supabase.js?v=1.4.0";
 
 export async function createApplicationDataGateway() {
   if (isDemoMode()) {
-    const { createDemoStore } = await import("../data/demo-store.js?v=1.5.0");
+    const { createDemoStore } = await import("../data/demo-store.js?v=1.9.0");
     return createDemoStore();
   }
 
@@ -37,6 +37,7 @@ export async function createApplicationDataGateway() {
     reopenPeriod: (id) => data.periods.reopen(id),
     listMonthlyTracking: (filters) => data.monthlyTracking.list(filters),
     saveMonthlyTracking: (input) => data.monthlyTracking.save(input, userId),
+    applyExecutionProgress: (input) => data.monthlyTracking.applyExecutionProgress(input),
     validateMonthlyTracking: (id) => data.monthlyTracking.validate(id, userId),
     listInvoices: (filters) => data.finance.listInvoices(filters),
     createInvoice: (input) => data.finance.createInvoice(input, userId),
