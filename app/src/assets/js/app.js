@@ -4,11 +4,11 @@ import { buildManagementReport, buildMonthlyExecutionReport } from "./domain/rep
 import { managementSummarySheet, monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.5.9";
 import { createXlsx } from "./domain/xlsx-export.js?v=1.5.8";
 import { costWorkbookSheets } from "./domain/cost-workbook.js?v=1.5.8";
-import { canEditExecution } from "./domain/execution.js?v=1.3.0";
+import { canEditExecution } from "./domain/execution.js?v=1.9.0";
 import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=1.1.0";
 import { invoicePendingAmount, isSampleProject, payableInvoicesForProject } from "./domain/payment-selection.js?v=1.5.1";
 import { forgetProject, hasProject, recallProject, rememberProject } from "./domain/project-context.js?v=1.8.0";
-import { createApplicationDataGateway } from "./services/application-data.js?v=1.5.0";
+import { createApplicationDataGateway } from "./services/application-data.js?v=1.9.0";
 import { getCurrentSession, isDemoMode, registerAccount, signIn, signOut } from "./services/supabase.js?v=1.4.0";
 
 const loginView = document.querySelector("#loginView");
@@ -1092,8 +1092,8 @@ function renderMonthly() {
     const canValidate = !locked && tracking.trackingId && tracking.validationStatus !== "validado";
     const mayEdit = canEditExecution(currentUserProfile);
     const actions = tracking.trackingId
-      ? `${mayEdit && !locked ? `<button class="table-action" data-action="edit-monthly" data-tracking-id="${tracking.trackingId}">Editar</button>` : ""}${canValidate ? `<button class="table-action success" data-action="validate-monthly" data-tracking-id="${tracking.trackingId}">Validar</button>` : ""}`
-      : mayEdit && !locked ? `<button class="table-action" data-action="new-monthly-preset" data-project-id="${tracking.projectId}" data-period-id="${tracking.periodId}">Completar</button>` : "";
+      ? `${mayEdit && !locked ? `<button class="table-action" data-action="edit-monthly" data-tracking-id="${tracking.trackingId}">Sumar avance</button>` : ""}${canValidate ? `<button class="table-action success" data-action="validate-monthly" data-tracking-id="${tracking.trackingId}">Validar</button>` : ""}`
+      : mayEdit && !locked ? `<button class="table-action" data-action="new-monthly-preset" data-project-id="${tracking.projectId}" data-period-id="${tracking.periodId}">Registrar avance</button>` : "";
     const periodAction = locked && mayEdit
       ? `<button class="table-action" data-action="reopen-period" data-period-id="${tracking.periodId}">Reabrir para corregir</button>` : "";
     return `<tr>
@@ -1209,7 +1209,7 @@ function openNewMonthly(projectId = "", periodId = "") {
   if (!canEditExecution(currentUserProfile)) return;
   document.querySelector("#monthlyForm").reset();
   document.querySelector("#monthlyTrackingId").value = "";
-  document.querySelector("#monthlyDialogTitle").textContent = "Registrar seguimiento";
+  document.querySelector("#monthlyDialogTitle").textContent = "Sumar avance de ejecución";
   populateProjectOptions();
   populatePeriodOptions();
   const activePeriod = currentPeriods.find((period) => period.status === "abierto");
@@ -1231,10 +1231,10 @@ function openEditMonthly(trackingId) {
   document.querySelector("#monthlyProject").value = tracking.projectId;
   document.querySelector("#monthlyPeriod").value = tracking.periodId;
   document.querySelector("#monthlyValidationStatus").value = tracking.validationStatus === "validado" ? "pendiente" : tracking.validationStatus;
-  document.querySelector("#monthlyExecutionPercentage").value = tracking.executedCumulativePercentage;
-  document.querySelector("#monthlyObservations").value = tracking.observations || "";
+  document.querySelector("#monthlyExecutionPercentage").value = "";
+  document.querySelector("#monthlyObservations").value = "";
   document.querySelector("#monthlyExecutionIssue").value = tracking.executionIssue || "";
-  document.querySelector("#monthlyDialogTitle").textContent = "Editar seguimiento";
+  document.querySelector("#monthlyDialogTitle").textContent = "Sumar avance al mes";
   setMessage(document.querySelector("#monthlyFormMessage"));
   monthlyDialog.showModal();
 }
@@ -1246,7 +1246,8 @@ function readMonthlyForm() {
     projectId,
     contractId: project?.contractId ?? "",
     periodId: document.querySelector("#monthlyPeriod").value,
-    executedCumulativePercentage: document.querySelector("#monthlyExecutionPercentage").value,
+    value: document.querySelector("#monthlyExecutionPercentage").value,
+    mode: "add",
     validationStatus: document.querySelector("#monthlyValidationStatus").value,
     observations: document.querySelector("#monthlyObservations").value,
     executionIssue: document.querySelector("#monthlyExecutionIssue").value
@@ -1258,17 +1259,19 @@ async function saveMonthly(event) {
   if (!canEditExecution(currentUserProfile)) return setMessage(document.querySelector("#monthlyFormMessage"), "Solo un administrador puede registrar el avance de ejecución.", true);
   const button = document.querySelector("#saveMonthlyButton");
   const message = document.querySelector("#monthlyFormMessage");
-  const trackingId = document.querySelector("#monthlyTrackingId").value;
+  if (!document.querySelector("#monthlyExecutionPercentage").checkValidity()) {
+    return setMessage(message, "Digita el avance que se sumará este mes (mayor que cero, máximo 100, con hasta dos decimales).", true);
+  }
   setBusy(button, true, "Guardando…");
   setMessage(message);
   try {
     const input = readMonthlyForm();
-    await (await ensureGateway()).saveMonthlyTracking({ ...input, trackingId: trackingId || null });
+    await (await ensureGateway()).applyExecutionProgress(input);
     monthlyDialog.close();
     await loadReferenceData();
     activateProject(input.projectId);
     await loadMonthlyModule();
-    setMessage(document.querySelector("#monthlyModuleMessage"), trackingId ? "Seguimiento actualizado." : "Seguimiento mensual registrado.");
+    setMessage(document.querySelector("#monthlyModuleMessage"), `Se sumó ${formatPercent(Number(input.value))} al avance de ejecución del mes. El total del proyecto se actualizó.`);
   } catch (error) {
     setMessage(message, error.message || "No fue posible guardar el seguimiento.", true);
   } finally {
@@ -1655,7 +1658,7 @@ function renderReports() {
     <td>${formatCop(row.costsExpenses)}</td><td>${formatCop(row.profitability)}</td><td>${formatCop(row.contractualBalance)}</td><td>${formatCop(row.paymentPending)}</td>
     <td><strong>${formatPercent(row.financialProgress)}</strong></td>
     <td>${canEditExecution(currentUserProfile)
-      ? `<button class="table-action" type="button" data-action="edit-report-progress" data-project-id="${escapeHtml(row.projectId)}" aria-label="Actualizar avance de ejecución de ${escapeHtml(row.projectName)}">Editar avance</button>`
+      ? `<button class="table-action" type="button" data-action="edit-report-progress" data-project-id="${escapeHtml(row.projectId)}" aria-label="Corregir avance general de ${escapeHtml(row.projectName)}">Corregir avance general</button>`
       : "Solo administrador"}</td>
   </tr>`).join("");
   document.querySelector("#reportEmpty").hidden = currentReport.rows.length > 0;
@@ -1686,7 +1689,8 @@ function openReportProgressEditor(projectId) {
   setMessage(message);
   if (!canEditExecution(currentUserProfile)) return setMessage(message, "Solo un administrador puede registrar el avance de ejecución.", true);
   const project = currentProjects.find((item) => item.projectId === projectId);
-  const period = currentPeriods.find((item) => item.status === "abierto");
+  const period = [...currentPeriods].filter((item) => item.status === "abierto")
+    .sort((a, b) => b.year - a.year || b.month - a.month)[0];
   if (!project) return setMessage(message, "No se encontró el proyecto seleccionado.", true);
   if (!period) return setMessage(message, "Abre un periodo en Seguimiento mensual para actualizar el avance de ejecución.", true);
 
@@ -1702,7 +1706,7 @@ function openReportProgressEditor(projectId) {
   document.querySelector("#reportProgressValue").value = existing?.executedCumulativePercentage ?? latest?.executedCumulativePercentage ?? "";
   document.querySelector("#reportExecutionIssue").value = existing?.executionIssue ?? "";
   document.querySelector("#reportFinancialValue").value = formatPercent(project.financialProgressPercentage);
-  const detail = "Registra el estado del trabajo realizado. El porcentaje no depende del contrato, las facturas ni los pagos; no modifica ninguna cifra financiera.";
+  const detail = "Corrige el porcentaje general del proyecto. La diferencia se reflejará en este mes y en los acumulados posteriores. No cambia contratos, facturas ni pagos.";
   document.querySelector("#reportProgressNote").textContent = existing?.validationStatus === "validado"
     ? `${detail} Al guardar, el seguimiento volverá a estar pendiente de validación.`
     : detail;
@@ -1728,11 +1732,12 @@ async function saveReportProgress(event) {
   setMessage(message);
   let saved = false;
   try {
-    await (await ensureGateway()).saveMonthlyTracking({
+    await (await ensureGateway()).applyExecutionProgress({
       projectId: project.projectId,
       contractId: project.contractId,
       periodId: reportProgressPeriodId,
-      executedCumulativePercentage: input.value,
+      value: input.value,
+      mode: "set",
       validationStatus: existing?.validationStatus === "borrador" ? "borrador" : "pendiente",
       observations: existing?.observations ?? "",
       executionIssue: document.querySelector("#reportExecutionIssue").value
