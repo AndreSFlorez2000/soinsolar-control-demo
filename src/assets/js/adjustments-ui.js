@@ -1,4 +1,4 @@
-import { incrementalExecutionPercent } from "./domain/execution.js?v=1.4.1";
+import { planExecutionChange } from "./domain/execution.js?v=1.9.0";
 import { parseCostCsv, resolveCostImportRows } from "./domain/cost-import.js?v=1.5.8";
 import { buildMonthlyExecutionReport } from "./domain/reports.js?v=1.5.8";
 import { monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.5.8";
@@ -17,24 +17,14 @@ function periodBefore(candidate, target) {
   return candidate.year < target.year || (candidate.year === target.year && candidate.month < target.month);
 }
 
-function previousExecution(projectId, periodId, trackingId = "") {
-  const periods = api().periods();
-  const target = periods.find((item) => item.id === periodId);
-  if (!target) return 0;
-  return api().monthly()
-    .filter((row) => row.projectId === projectId && row.trackingId !== trackingId && row.executedCumulativePercentage !== null)
-    .filter((row) => periodBefore(row, target))
-    .sort((a, b) => b.year - a.year || b.month - a.month)[0]?.executedCumulativePercentage ?? 0;
-}
-
 function updateExecutionPreview() {
-  const cumulativeInput = document.querySelector("#monthlyExecutionPercentage");
+  const addedInput = document.querySelector("#monthlyExecutionPercentage");
   const preview = document.querySelector("#monthlyIncrementPreview");
+  const totalPreview = document.querySelector("#monthlyCumulativePreview");
   const financialPreview = document.querySelector("#monthlyFinancialPreview");
-  if (!cumulativeInput || !preview) return;
+  if (!addedInput || !preview || !totalPreview) return;
   const projectId = document.querySelector("#monthlyProject")?.value ?? "";
   const periodId = document.querySelector("#monthlyPeriod")?.value ?? "";
-  const trackingId = document.querySelector("#monthlyTrackingId")?.value ?? "";
   const project = api().projects().find((item) => item.projectId === projectId);
   const target = api().periods().find((item) => item.id === periodId);
   const collected = api().monthly()
@@ -44,13 +34,16 @@ function updateExecutionPreview() {
     financialPreview.value = Number(project?.contractValue ?? 0) > 0
       ? formatPercent(collected / Number(project.contractValue) * 100) : "Sin contrato";
   }
-  const cumulative = Number(cumulativeInput.value || 0);
-  const previous = previousExecution(projectId, periodId, trackingId);
+  if (!target) { preview.value = "—"; totalPreview.value = "—"; return; }
   try {
-    const incremental = incrementalExecutionPercent(cumulative, previous);
-    preview.value = formatPercent(incremental);
+    const change = planExecutionChange(api().monthly().filter((row) => row.projectId === projectId && row.trackingId), {
+      year: target.year, month: target.month, value: addedInput.value || 0, mode: "add"
+    });
+    preview.value = formatPercent(change.monthlyTotal);
+    totalPreview.value = formatPercent(change.projectTotal);
   } catch (error) {
-    preview.value = error.message;
+    preview.value = addedInput.value ? error.message : "—";
+    totalPreview.value = addedInput.value ? error.message : "—";
   }
 }
 
