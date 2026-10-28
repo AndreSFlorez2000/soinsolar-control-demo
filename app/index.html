@@ -11,7 +11,7 @@
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.9.0" />
+    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.10.0" />
   </head>
   <body>
     <section id="loginView" class="login-shell">
@@ -517,10 +517,11 @@
 
           <section id="assistantView" class="content-view" hidden>
             <div class="section-heading">
-              <div><h3>Asistente SOINSOLAR</h3><p>Consulta un dato puntual o crea un proyecto paso a paso.</p></div>
+              <div><h3>Asistente SOINSOLAR</h3><p>Consulta proyectos, meses y cartera, o crea un proyecto paso a paso.</p></div>
             </div>
             <div class="assistant-layout">
               <article class="panel assistant-panel" aria-label="Consultas de proyectos">
+                <div class="assistant-toolbar"><span id="assistantContext" role="status">Sin proyecto seleccionado</span><div><button id="assistantRefresh" type="button" data-assistant-control>Actualizar datos</button><button id="assistantClear" type="button" data-assistant-control>Limpiar conversación</button></div></div>
                 <div id="assistantMessages" class="assistant-messages" role="log" aria-live="polite" aria-relevant="additions text"></div>
                 <div class="assistant-composer">
                   <div id="assistantLoading" class="assistant-loading" role="status" aria-live="polite" hidden>
@@ -529,24 +530,26 @@
                   </div>
                   <form id="assistantForm" class="assistant-form" autocomplete="off">
                     <label class="visually-hidden" for="assistantQuestion">Pregunta o dato del proyecto</label>
-                    <input id="assistantQuestion" class="form-control" type="text" maxlength="500" placeholder="Ejemplo: ¿Cuánto recaudó CC-102? o Crear proyecto" required />
+                    <input id="assistantQuestion" class="form-control" type="text" maxlength="500" placeholder="Ej.: ¿Cuánto ejecutó CC-102 en septiembre?" required />
                     <button id="assistantSend" class="btn btn-primary" type="submit">Enviar</button>
                   </form>
-                  <small>Respuestas basadas en tus registros. Para crear un proyecto debes revisar y confirmar el borrador.</small>
+                  <small>Usa los datos de tu sesión. Las preguntas siguientes conservan el último proyecto consultado; puedes actualizar los datos cuando lo necesites.</small>
                 </div>
               </article>
               <aside class="panel assistant-help">
                 <h4>Prueba estas consultas</h4>
-                <p>Escribe el nombre o centro de costo. Para crear un proyecto, sigue las preguntas y revisa los datos antes de guardarlo.</p>
+                <p>Escribe el nombre o centro de costo. Después puedes preguntar por otro mes sin repetir el proyecto.</p>
                 <div class="assistant-examples">
                   <button type="button" data-assistant-prompt="¿Qué puedes hacer por mí?">¿Qué puedes hacer por mí?</button>
                   <button type="button" data-assistant-prompt="¿Quién es tu creador?">¿Quién es tu creador?</button>
-                  <button type="button" data-assistant-prompt="¿Cómo va Samuel Charri?">¿Cómo va Samuel Charri?</button>
-                  <button type="button" data-assistant-prompt="¿Cuánto recaudó CC-102?">¿Cuánto recaudó CC-102?</button>
+                  <button type="button" data-assistant-prompt="¿Cómo va CC-102?">¿Cómo va CC-102?</button>
+                  <button type="button" data-assistant-prompt="¿Cuánto se ejecutó en septiembre 2026 en CC-102?">¿Cuánto se ejecutó en septiembre?</button>
+                  <button type="button" data-assistant-prompt="¿Qué proyectos tienen cartera?">Proyectos con cartera</button>
+                  <button type="button" data-assistant-prompt="¿Cómo funciona el seguimiento mensual?">Porcentajes del seguimiento</button>
                   <button type="button" data-assistant-prompt="Resumen general">Resumen general</button>
                   <button type="button" data-assistant-prompt="Crear proyecto">Crear proyecto</button>
                 </div>
-                <div class="assistant-help-note"><strong>Qué puedes consultar</strong><span>Contrato, ejecución física, valor equivalente, facturación, recaudo, cartera, costos y movimientos recientes. El avance de ejecución lo registra el administrador y no cambia con los pagos.</span><span>La creación está disponible para cuentas activas de administrador o gerencia. El contrato se agrega después en la ficha del proyecto.</span></div>
+                <div class="assistant-help-note"><strong>Qué puedes consultar</strong><span>Contrato, ejecución física mes a mes, facturación, recaudo, cartera, costos y movimientos recientes. El avance de ejecución lo registra el administrador y no cambia con los pagos.</span><span>La creación está disponible para cuentas activas de administrador o gerencia. Revisa el borrador antes de guardarlo.</span></div>
               </aside>
             </div>
           </section>
@@ -742,9 +745,9 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <script src="src/assets/js/config.js?v=1.9.0"></script>
-    <script type="module" src="src/assets/js/app.js?v=1.9.0"></script>
-    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.9.0"></script>
-    <script type="module" src="src/assets/js/assistant-ui.js?v=1.9.0"></script>
+    <script src="src/assets/js/config.js?v=1.10.0"></script>
+    <script type="module" src="src/assets/js/app.js?v=1.10.0"></script>
+    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.10.0"></script>
+    <script type="module" src="src/assets/js/assistant-ui.js?v=1.10.0"></script>
   </body>
 </html>
