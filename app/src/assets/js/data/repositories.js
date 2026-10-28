@@ -375,6 +375,26 @@ export class MonthlyTrackingRepository {
     );
   }
 
+  async applyExecutionProgress(input) {
+    const projectId = assertUuid(input.projectId, "proyecto");
+    const periodId = assertUuid(input.periodId, "periodo");
+    const value = Number(input.value);
+    if (!Number.isFinite(value)) throw new DataAccessError("Digita un porcentaje de ejecución válido.");
+    const mode = input.mode === "set" ? "set" : "add";
+    return unwrap(
+      this.client.rpc("apply_execution_progress", {
+        p_project_id: projectId,
+        p_period_id: periodId,
+        p_value: value,
+        p_mode: mode,
+        p_observations: input.observations?.trim() || null,
+        p_execution_issue: input.executionIssue?.trim() || null,
+        p_validation_status: input.validationStatus ?? "pendiente"
+      }),
+      "No fue posible registrar el avance de ejecución"
+    );
+  }
+
   async validate(trackingId, userId) {
     const id = assertUuid(trackingId, "seguimiento");
     const user = assertUuid(userId, "usuario");
