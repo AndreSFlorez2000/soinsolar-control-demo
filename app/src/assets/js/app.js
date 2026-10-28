@@ -129,6 +129,7 @@ function activateProject(projectId) {
   projectModuleFilters.forEach((id) => { document.querySelector(`#${id}`).value = projectId; });
   rememberProject(projectStorage(), projectContextOwnerId, projectId, currentProjects);
   renderProjectContext();
+  window.dispatchEvent(new CustomEvent("soinsolar:project-context", { detail: { projectId } }));
   return true;
 }
 
@@ -141,6 +142,7 @@ function clearProjectContext() {
   });
   forgetProject(projectStorage(), projectContextOwnerId);
   renderProjectContext();
+  window.dispatchEvent(new CustomEvent("soinsolar:project-context", { detail: { projectId: null } }));
 }
 
 function restoreProjectContext() {
@@ -284,6 +286,7 @@ window.SOINSOLAR_APP_API = Object.freeze({
   periods: () => [...currentPeriods],
   monthly: () => [...allMonthlyRows],
   visibleMonthly: () => [...currentMonthly],
+  selectedProjectId: () => selectedProjectId,
   reloadReferenceData: loadReferenceData
 });
 
@@ -381,6 +384,7 @@ async function showView(requestedView) {
   };
   Object.values(visible).forEach((element) => { element.hidden = true; });
   visible[view].hidden = false;
+  if (view === "assistant") window.dispatchEvent(new Event("soinsolar:assistant-open"));
   title.textContent = viewLabels[view];
   breadcrumb.textContent = view === "detail" ? "PROYECTOS / DETALLE" : viewLabels[view].toUpperCase();
   history.replaceState({}, "", view === "detail" ? `#detail/${encodeURIComponent(selectedProjectId)}` : `#${view}`);
