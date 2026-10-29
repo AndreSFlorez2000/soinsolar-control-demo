@@ -11,7 +11,7 @@
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.12.0" />
+    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.13.0" />
   </head>
   <body>
     <section id="loginView" class="login-shell">
@@ -129,51 +129,67 @@
           </div>
           <section id="dashboardView" class="content-view">
             <div class="section-heading">
-              <div><h3>Indicadores generales</h3><p>Información consolidada de los proyectos autorizados.</p></div>
+              <div><h3>Inicio</h3><p>Una lectura rápida del contrato, la ejecución y el recaudo de tus proyectos.</p></div>
               <button id="exportDashboardButton" class="btn btn-outline-primary" type="button">Exportar resumen CSV</button>
             </div>
 
-            <div class="kpi-grid">
-              <article class="kpi-card accent-blue"><span>Valor contractual vigente</span><strong id="contractValue">$0</strong><small id="activeProjectKpi">0 proyectos activos</small></article>
-              <article class="kpi-card accent-green"><span>Total facturado</span><strong id="invoicedValue">$0</strong><small id="invoicedRatioText">0 % del valor contractual</small></article>
-              <article class="kpi-card accent-gold"><span>Total pagado</span><strong id="paidValue">$0</strong><small id="receivableValue">$0 por cobrar</small></article>
-              <article class="kpi-card accent-red"><span>Costos y gastos</span><strong id="costValue">$0</strong><small id="costRatio">0 % del contrato</small></article>
+            <div class="kpi-grid dashboard-primary-grid" aria-label="Indicadores principales">
+              <article class="kpi-card accent-blue"><div class="dashboard-card-heading"><span>Valor contractual vigente</span><button class="dashboard-info-button" type="button" data-dashboard-info="contract" aria-label="Qué es el valor contractual vigente" aria-expanded="false">i</button></div><strong id="contractValue">$0</strong><small id="activeProjectKpi">0 proyectos activos</small></article>
+              <article class="kpi-card accent-blue"><div class="dashboard-card-heading"><span>Avance de ejecución</span><button class="dashboard-info-button" type="button" data-dashboard-info="execution" aria-label="Qué es el avance de ejecución" aria-expanded="false">i</button></div><strong id="globalExecutionValue">Sin registrar</strong><small>Promedio de proyectos con avance registrado</small></article>
+              <article class="kpi-card accent-green"><div class="dashboard-card-heading"><span>Recaudo financiero</span><button class="dashboard-info-button" type="button" data-dashboard-info="collection" aria-label="Qué es el recaudo financiero" aria-expanded="false">i</button></div><strong id="paidValue">$0</strong><small><span id="globalProgressValue">0 %</span> del valor contractual</small></article>
             </div>
 
-            <div class="dashboard-secondary-grid">
-              <article class="mini-kpi"><span>Saldo contractual</span><strong id="contractualBalanceValue">$0</strong></article>
-              <article class="mini-kpi"><span>Pago pendiente</span><strong id="paymentPendingValue">$0</strong></article>
-              <article class="mini-kpi"><span>Promedio de avance de proyectos</span><strong id="globalExecutionValue">—</strong></article>
-              <article class="mini-kpi"><span>Valor equivalente ejecutado</span><strong id="globalExecutedEquivalent">$0</strong></article>
-              <article class="mini-kpi"><span>Recaudo Financiero global</span><strong id="globalProgressValue">0 %</strong></article>
-              <article class="mini-kpi"><span>Proyectos registrados</span><strong id="projectCountValue">0</strong></article>
-            </div>
-
-            <article class="panel projects-table-panel execution-panel">
-              <div class="panel-heading"><div><h4>Ejecución por proyecto</h4><small>El avance de ejecución se registra manualmente; el valor equivalente es una referencia del contrato, no una factura.</small></div><button class="link-button" type="button" data-view="projects">Ver proyectos</button></div>
-              <div class="table-responsive">
-                <table class="table align-middle mb-0">
-                  <thead><tr><th>Centro de costo / Proyecto</th><th>Avance de ejecución</th><th>Equivalente ejecutado</th><th>Contrato</th><th>Facturado</th><th>Recaudado</th><th>Recaudo Financiero</th><th></th></tr></thead>
-                  <tbody id="projectRows"></tbody>
-                </table>
+            <div class="dashboard-customize-heading">
+              <div><h4>Mi tablero</h4><small id="dashboardLayoutHint">Organiza indicadores y gráficos para tu cuenta.</small></div>
+              <div class="dashboard-customize-actions">
+                <button id="dashboardOrganizeButton" class="btn btn-outline-secondary btn-sm" type="button" aria-pressed="false">Organizar</button>
+                <button id="dashboardAddButton" class="btn btn-primary btn-sm" type="button" aria-expanded="false" aria-controls="dashboardBuilder">+ Añadir al tablero</button>
               </div>
-              <div id="dashboardProjectsEmpty" class="inline-empty" hidden>No hay proyectos registrados.</div>
-            </article>
+            </div>
 
-            <div class="dashboard-grid">
-              <article class="panel chart-panel">
-                <div class="panel-heading"><div><h4>Comportamiento mensual</h4><small id="monthlySeriesDescription">Sin periodos con movimientos</small></div></div>
-                <canvas id="monthlyChart" aria-label="Facturación, pagos y costos por mes"></canvas>
-                <div id="chartFallback" class="chart-fallback" aria-live="polite"></div>
+            <div id="dashboardBuilder" class="panel dashboard-builder" hidden>
+              <div class="dashboard-builder-top"><h4>Añadir al tablero</h4><button id="dashboardBuilderClose" type="button" class="dashboard-info-button" aria-label="Cerrar menú">×</button></div>
+              <div class="dashboard-builder-kinds" role="group" aria-label="Qué quieres añadir">
+                <button type="button" class="btn btn-sm btn-outline-primary" data-dashboard-kind="chart" aria-pressed="true">Gráfico</button>
+                <button type="button" class="btn btn-sm btn-outline-primary" data-dashboard-kind="indicator" aria-pressed="false">Indicador</button>
+                <button type="button" class="btn btn-sm btn-outline-primary" data-dashboard-kind="section" aria-pressed="false">Sección</button>
+              </div>
+              <div class="dashboard-builder-fields">
+                <label>Dato que quieres ver<select id="dashboardMetricSelect" class="form-select"></select></label>
+                <label id="dashboardTypeField">Tipo de gráfico<select id="dashboardTypeSelect" class="form-select"></select></label>
+                <label id="dashboardProjectField" hidden>Proyecto<select id="dashboardProjectSelect" class="form-select"></select></label>
+                <button id="dashboardConfirmAdd" class="btn btn-primary" type="button">Añadir</button>
+              </div>
+              <small>La vista se guarda en este navegador para tu cuenta; los datos siguen viniendo del sistema.</small>
+            </div>
+            <p id="dashboardLayoutMessage" class="dashboard-layout-message" role="status" aria-live="polite"></p>
+
+            <div id="dashboardExtraIndicators" class="dashboard-extra-indicators" hidden>
+              <article class="kpi-card dashboard-optional-kpi" data-dashboard-indicator="invoiced" hidden><div class="dashboard-card-heading"><span>Total facturado</span><button class="dashboard-info-button" type="button" data-dashboard-info="invoiced" aria-label="Qué es el total facturado" aria-expanded="false">i</button></div><strong id="invoicedValue">$0</strong><small id="invoicedRatioText">0 % del valor contractual</small><button class="dashboard-remove-button" type="button" data-dashboard-remove="indicator" data-dashboard-key="invoiced">Quitar</button></article>
+              <article class="kpi-card dashboard-optional-kpi" data-dashboard-indicator="costs" hidden><div class="dashboard-card-heading"><span>Costos y gastos</span><button class="dashboard-info-button" type="button" data-dashboard-info="costs" aria-label="Qué son los costos y gastos" aria-expanded="false">i</button></div><strong id="costValue">$0</strong><small id="costRatio">0 % del contrato</small><button class="dashboard-remove-button" type="button" data-dashboard-remove="indicator" data-dashboard-key="costs">Quitar</button></article>
+              <article class="kpi-card dashboard-optional-kpi" data-dashboard-indicator="balance" hidden><div class="dashboard-card-heading"><span>Saldo contractual</span><button class="dashboard-info-button" type="button" data-dashboard-info="balance" aria-label="Qué es el saldo contractual" aria-expanded="false">i</button></div><strong id="contractualBalanceValue">$0</strong><button class="dashboard-remove-button" type="button" data-dashboard-remove="indicator" data-dashboard-key="balance">Quitar</button></article>
+              <article class="kpi-card dashboard-optional-kpi" data-dashboard-indicator="portfolio" hidden><div class="dashboard-card-heading"><span>Cartera pendiente</span><button class="dashboard-info-button" type="button" data-dashboard-info="portfolio" aria-label="Qué es la cartera pendiente" aria-expanded="false">i</button></div><strong id="paymentPendingValue">$0</strong><small id="receivableValue">$0 por cobrar</small><button class="dashboard-remove-button" type="button" data-dashboard-remove="indicator" data-dashboard-key="portfolio">Quitar</button></article>
+              <article class="kpi-card dashboard-optional-kpi" data-dashboard-indicator="equivalent" hidden><div class="dashboard-card-heading"><span>Valor equivalente ejecutado</span><button class="dashboard-info-button" type="button" data-dashboard-info="equivalent" aria-label="Qué es el valor equivalente ejecutado" aria-expanded="false">i</button></div><strong id="globalExecutedEquivalent">$0</strong><button class="dashboard-remove-button" type="button" data-dashboard-remove="indicator" data-dashboard-key="equivalent">Quitar</button></article>
+              <article class="kpi-card dashboard-optional-kpi" data-dashboard-indicator="profit" hidden><div class="dashboard-card-heading"><span>Rentabilidad estimada</span><button class="dashboard-info-button" type="button" data-dashboard-info="profit" aria-label="Qué es la rentabilidad estimada" aria-expanded="false">i</button></div><strong id="dashboardProfitabilityValue">$0</strong><button class="dashboard-remove-button" type="button" data-dashboard-remove="indicator" data-dashboard-key="profit">Quitar</button></article>
+              <article class="kpi-card dashboard-optional-kpi" data-dashboard-indicator="count" hidden><div class="dashboard-card-heading"><span>Proyectos registrados</span><button class="dashboard-info-button" type="button" data-dashboard-info="count" aria-label="Qué cuenta proyectos registrados" aria-expanded="false">i</button></div><strong id="projectCountValue">0</strong><button class="dashboard-remove-button" type="button" data-dashboard-remove="indicator" data-dashboard-key="count">Quitar</button></article>
+            </div>
+
+            <div id="dashboardWidgetGrid" class="dashboard-widget-grid" aria-label="Gráficos del tablero"></div>
+
+            <div id="dashboardExtraSections" class="dashboard-extra-sections" hidden>
+              <article id="dashboardProjectTable" class="panel projects-table-panel execution-panel dashboard-section-card" data-dashboard-section="projects" hidden>
+                <div class="panel-heading"><div><h4>Detalle por proyecto <button class="dashboard-info-button" type="button" data-dashboard-info="projects" aria-label="Qué muestra la tabla de proyectos" aria-expanded="false">i</button></h4><small>Contrato, avance de ejecución, facturación y recaudo por centro de costo.</small></div><div class="dashboard-section-actions"><button class="link-button" type="button" data-view="projects">Ver proyectos</button><button class="dashboard-remove-button" type="button" data-dashboard-remove="section" data-dashboard-key="projects">Quitar</button></div></div>
+                <div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Centro de costo / Proyecto</th><th>Avance de ejecución</th><th>Equivalente ejecutado</th><th>Contrato</th><th>Facturado</th><th>Recaudado</th><th>Recaudo Financiero</th><th></th></tr></thead><tbody id="projectRows"></tbody></table></div>
+                <div id="dashboardProjectsEmpty" class="inline-empty" hidden>No hay proyectos registrados.</div>
               </article>
-              <article class="panel status-panel">
-                <h4>Estado de los proyectos</h4>
+              <article id="dashboardStatusPanel" class="panel status-panel dashboard-section-card" data-dashboard-section="status" hidden>
+                <div class="dashboard-section-actions"><h4>Estado de los proyectos <button class="dashboard-info-button" type="button" data-dashboard-info="status" aria-label="Qué muestra el estado de proyectos" aria-expanded="false">i</button></h4><button class="dashboard-remove-button" type="button" data-dashboard-remove="section" data-dashboard-key="status">Quitar</button></div>
                 <div id="projectStatusStats" class="project-status-stats"></div>
-                <h4 class="dashboard-alert-title">Alertas generales</h4>
+                <h4 class="dashboard-alert-title">Alertas generales <button class="dashboard-info-button" type="button" data-dashboard-info="alerts" aria-label="Qué significan las alertas generales" aria-expanded="false">i</button></h4>
                 <div id="dashboardAlerts" aria-live="polite"></div>
               </article>
             </div>
-
+            <div id="dashboardInfoPopup" class="dashboard-info-popup" role="note" hidden></div>
           </section>
 
           <section id="detailView" class="content-view" hidden>
@@ -783,8 +799,9 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="src/assets/js/config.js?v=1.12.0"></script>
-    <script type="module" src="src/assets/js/app.js?v=1.12.0"></script>
-    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.12.0"></script>
-    <script type="module" src="src/assets/js/assistant-ui.js?v=1.12.0"></script>
+    <script type="module" src="src/assets/js/app.js?v=1.13.0"></script>
+    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.13.0"></script>
+    <script type="module" src="src/assets/js/assistant-ui.js?v=1.13.0"></script>
   </body>
 </html>
+

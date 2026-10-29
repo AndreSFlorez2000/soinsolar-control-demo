@@ -1,4 +1,5 @@
-import { buildMonthlySeries, calculateDashboardIndicators } from "./domain/dashboard.js?v=1.5.9";
+import { calculateDashboardIndicators } from "./domain/dashboard.js?v=1.5.9";
+import { createDashboardUI } from "./dashboard-ui.js?v=1.13.0";
 import { calculateProjectIndicators } from "./domain/project-analytics.js?v=1.4.1";
 import { buildManagementReport, buildMonthlyExecutionReport } from "./domain/reports.js?v=1.5.8";
 import { managementSummarySheet, monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.5.9";
@@ -101,8 +102,11 @@ let reportProgressProjectId = null;
 let reportProgressPeriodId = null;
 let selectedProjectMonthly = [];
 let selectedProjectHistory = [];
-let dashboardChart = null;
 let projectChart = null;
+const dashboardUI = createDashboardUI(dashboardView, {
+  formatCop,
+  onProjectOpen: (projectId) => openProjectDetail(projectId)
+});
 
 const functionalViews = new Set(["dashboard", "projects", "monthly", "finance", "costs", "reports", "assistant", "history", "admin"]);
 const projectModuleFilters = ["monthlyFilterProject", "financeFilterProject", "costFilterProject", "reportFilterProject", "historyFilterProject"];
@@ -329,6 +333,7 @@ async function openApp() {
 
 function closeApp() {
   window.dispatchEvent(new Event("soinsolar:logout"));
+  dashboardUI.close();
   appView.hidden = true;
   pendingView.hidden = true;
   loginView.hidden = false;
@@ -435,6 +440,7 @@ function renderDashboard() {
   document.querySelector("#globalExecutedEquivalent").textContent = formatCop(indicators.executedEquivalent);
   document.querySelector("#globalProgressValue").textContent = formatPercent(indicators.collectionProgress);
   document.querySelector("#globalExecutionValue").textContent = formatExecutionPercent(indicators.executionProgress);
+  document.querySelector("#dashboardProfitabilityValue").textContent = formatCop(indicators.profitability);
   document.querySelector("#projectCountValue").textContent = indicators.projectCount;
 
   renderProjectStatusStats(indicators);
@@ -452,7 +458,8 @@ function renderDashboard() {
         <td>${project.contractValue > 0 ? formatPercent(project.totalPaid / project.contractValue * 100) : "—"}</td>
         <td><button class="open-project" type="button" data-action="open-project" data-project-id="${project.projectId}">Abrir</button></td>
       </tr>`).join("");
-  renderChart();
+  dashboardUI.setOwner(currentUserProfile?.id);
+  dashboardUI.render({ projects: currentProjects, monthly: allMonthlyRows });
 }
 
 
@@ -490,69 +497,6 @@ function renderDashboardAlerts(indicators) {
       ).join("")
     : '<div class="dashboard-ok">No hay alertas generales con la información disponible.</div>';
 }
-
-function renderChart() {
-  const canvas = document.querySelector("#monthlyChart");
-  const fallback = document.querySelector("#chartFallback");
-  const series = buildMonthlySeries(currentMonthly, 6);
-  document.querySelector("#monthlySeriesDescription").textContent = series.length
-    ? `Últimos ${series.length} periodo(s) con movimientos`
-    : "Sin periodos con movimientos";
-
-  if (dashboardChart) {
-    dashboardChart.destroy();
-    dashboardChart = null;
-  }
-
-  if (!series.length) {
-    canvas.hidden = true;
-    fallback.style.display = "grid";
-    fallback.innerHTML = '<div class="chart-empty">No existen movimientos mensuales para representar.</div>';
-    return;
-  }
-
-  const labels = series.map((row) => `${monthNames[row.month - 1].slice(0, 3)} ${row.year}`);
-  const invoiced = series.map((row) => row.invoiced / 1000000);
-  const paid = series.map((row) => row.paid / 1000000);
-  const costs = series.map((row) => row.costsExpenses / 1000000);
-
-  if (!window.Chart) {
-    canvas.hidden = true;
-    fallback.style.display = "flex";
-    const maximum = Math.max(...invoiced, ...paid, ...costs, 1);
-    fallback.innerHTML = labels.map((label, index) => `
-      <div class="month">
-        <span style="height:${Math.max(3, invoiced[index] / maximum * 100)}%;background:#337fbc"></span>
-        <span style="height:${Math.max(3, paid[index] / maximum * 100)}%;background:#2f8f59"></span>
-        <span style="height:${Math.max(3, costs[index] / maximum * 100)}%;background:#edaf25"></span>
-        <label>${escapeHtml(label)}</label>
-      </div>`).join("");
-    return;
-  }
-
-  fallback.style.display = "none";
-  fallback.innerHTML = "";
-  canvas.hidden = false;
-  dashboardChart = new window.Chart(canvas, {
-    type: "bar",
-    data: { labels, datasets: [
-      { label: "Facturación", data: invoiced, backgroundColor: "#337fbc", borderRadius: 4 },
-      { label: "Pagos", data: paid, backgroundColor: "#2f8f59", borderRadius: 4 },
-      { label: "Costos y gastos", data: costs, backgroundColor: "#edaf25", borderRadius: 4 }
-    ] },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { position: "bottom", labels: { usePointStyle: true, boxWidth: 7 } } },
-      scales: {
-        x: { grid: { display: false } },
-        y: { beginAtZero: true, ticks: { callback: (value) => `$${value} M` }, grid: { color: "#edf2f6" } }
-      }
-    }
-  });
-}
-
-
 
 function exportDashboard() {
   const indicators = calculateDashboardIndicators(currentProjects);
@@ -2153,3 +2097,4 @@ if (!isDemoMode() && new URLSearchParams(location.search).get("recovery") !== "1
     if (session) openApp();
   }).catch(() => setMessage(document.querySelector("#loginMessage"), "La sesión expiró. Inicia sesión nuevamente.", true));
 }
+
