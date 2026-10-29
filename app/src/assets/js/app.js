@@ -10,7 +10,7 @@ import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=
 import { invoicePendingAmount, isSampleProject, payableInvoicesForProject } from "./domain/payment-selection.js?v=1.5.1";
 import { forgetProject, hasProject, recallProject, rememberProject } from "./domain/project-context.js?v=1.8.0";
 import { createApplicationDataGateway } from "./services/application-data.js?v=1.12.0";
-import { getCurrentSession, isDemoMode, registerAccount, signIn, signOut } from "./services/supabase.js?v=1.4.0";
+import { getCurrentSession, isDemoMode, registerAccount, signIn, signOut } from "./services/supabase.js?v=1.13.1";
 
 const loginView = document.querySelector("#loginView");
 const pendingView = document.querySelector("#pendingView");
@@ -1966,7 +1966,23 @@ document.querySelector("#clearGlobalSearch").addEventListener("click", () => {
 
 document.querySelector("#demoAccess").hidden = !isDemoMode();
 document.querySelector("#demoAccess").addEventListener("click", openApp);
-document.querySelector("#logoutButton").addEventListener("click", async () => { await signOut(); closeApp(); });
+document.querySelector("#logoutButton").addEventListener("click", async (event) => {
+  const button = event.currentTarget;
+  const label = button.querySelector("span");
+  button.disabled = true;
+  button.setAttribute("aria-busy", "true");
+  if (label) label.textContent = "Cerrando sesión…";
+  try {
+    await signOut();
+    closeApp();
+  } catch {
+    window.alert("No fue posible cerrar la sesión. Inténtalo de nuevo.");
+  } finally {
+    if (label) label.textContent = "Cerrar sesión";
+    button.disabled = false;
+    button.removeAttribute("aria-busy");
+  }
+});
 document.querySelector("#refreshAppButton").addEventListener("click", refreshApplication);
 document.querySelector("#projectWorkspaceSelect").addEventListener("change", async (event) => {
   const projectId = event.target.value;

@@ -1,4 +1,4 @@
-import { installAuthSecurityUi } from "./auth-ui.js?v=1.4.0";
+import { installAuthSecurityUi } from "./auth-ui.js?v=1.13.1";
 
 const config = window.SOINSOLAR_CONFIG ?? { demoMode: false };
 

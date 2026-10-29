@@ -6,10 +6,11 @@ function setMessage(element, message = "", isError = false) {
 
 function setBusy(button, busy, busyText) {
   if (busy) {
-    button.dataset.originalText = button.textContent;
+    button.dataset.originalMarkup = button.innerHTML;
     button.textContent = busyText;
-  } else if (button.dataset.originalText) {
-    button.textContent = button.dataset.originalText;
+  } else if (button.dataset.originalMarkup) {
+    button.innerHTML = button.dataset.originalMarkup;
+    delete button.dataset.originalMarkup;
   }
   button.disabled = busy;
 }
@@ -38,10 +39,10 @@ function authDialogMarkup() {
     <div id="passwordRecoveryPanel">
       <form id="passwordRecoveryForm" method="dialog" novalidate>
         <div class="dialog-heading">
-          <div><p class="eyebrow">Seguridad de la cuenta</p><h3>Recuperar contraseña</h3></div>
+          <div><p class="eyebrow">Seguridad de la cuenta</p><h3 id="passwordRecoveryTitle">Recuperar contraseña</h3></div>
           <button class="dialog-close" type="button" data-auth-close aria-label="Cerrar">×</button>
         </div>
-        <p class="dialog-note">Enviaremos un enlace de verificación al correo institucional. El enlace permite definir una contraseña nueva sin revelar la anterior.</p>
+        <p id="passwordRecoveryIntro" class="dialog-note">Escribe tu correo institucional. Te enviaremos un enlace para crear una contraseña nueva.</p>
         <div class="form-grid">
           <label class="span-2">Correo institucional *
             <input id="passwordRecoveryEmail" class="form-control" type="email" autocomplete="email" required />
@@ -50,7 +51,7 @@ function authDialogMarkup() {
         <p id="passwordRecoveryMessage" class="form-message" role="status" aria-live="polite"></p>
         <div class="dialog-actions">
           <button class="btn btn-outline-secondary" type="button" data-auth-close>Cancelar</button>
-          <button id="sendPasswordRecoveryButton" class="btn btn-primary" type="submit">Enviar enlace seguro</button>
+          <button id="sendPasswordRecoveryButton" class="btn btn-primary" type="submit">Enviar enlace al correo</button>
         </div>
       </form>
     </div>
@@ -95,17 +96,18 @@ export function installAuthSecurityUi({
 
   const forgotButton = document.createElement("button");
   forgotButton.id = "forgotPasswordButton";
-  forgotButton.className = "btn btn-link btn-sm px-0 mb-2";
+  forgotButton.className = "btn login-help-action";
   forgotButton.type = "button";
-  forgotButton.textContent = "¿Olvidaste tu contraseña?";
+  forgotButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="8" cy="15" r="3"/><path d="M11 15h10m-3 0v3m-4-3v2M8 12V8a5 5 0 0 1 9-3"/></svg><span>¿Olvidaste tu contraseña?</span>';
   forgotButton.hidden = !enabled;
   passwordInput.insertAdjacentElement("afterend", forgotButton);
 
   const changeButton = document.createElement("button");
   changeButton.id = "changePasswordButton";
-  changeButton.className = "btn btn-sm btn-outline-primary";
+  changeButton.className = "btn account-action account-action-password";
   changeButton.type = "button";
-  changeButton.textContent = "Cambiar contraseña";
+  changeButton.title = "Recibe un enlace en tu correo para cambiar la contraseña";
+  changeButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 4v3"/></svg><span>Cambiar contraseña</span>';
   changeButton.hidden = !enabled;
   logoutButton.insertAdjacentElement("beforebegin", changeButton);
 
@@ -123,13 +125,18 @@ export function installAuthSecurityUi({
   const recoveryMessage = dialog.querySelector("#passwordRecoveryMessage");
   const updateMessage = dialog.querySelector("#passwordUpdateMessage");
 
-  function openRecovery(email = "") {
+  function openRecovery(email = "", fromAccount = false) {
     recoveryPanel.hidden = false;
     updatePanel.hidden = true;
     recoveryEmail.value = email;
+    recoveryEmail.readOnly = fromAccount;
+    dialog.querySelector("#passwordRecoveryTitle").textContent = fromAccount ? "Cambiar contraseña" : "Recuperar contraseña";
+    dialog.querySelector("#passwordRecoveryIntro").textContent = fromAccount
+      ? "Te enviaremos un enlace al correo de tu cuenta. Ábrelo para crear la contraseña nueva."
+      : "Escribe tu correo institucional. Te enviaremos un enlace para crear una contraseña nueva.";
     setMessage(recoveryMessage);
     showDialog(dialog);
-    recoveryEmail.focus();
+    (fromAccount ? dialog.querySelector("#sendPasswordRecoveryButton") : recoveryEmail).focus();
   }
 
   function openPasswordUpdate() {
@@ -148,7 +155,7 @@ export function installAuthSecurityUi({
   changeButton.addEventListener("click", async () => {
     try {
       setBusy(changeButton, true, "Consultando…");
-      openRecovery(await getCurrentUserEmail());
+      openRecovery(await getCurrentUserEmail(), true);
     } catch {
       window.alert("No fue posible identificar el correo de la sesión.");
     } finally {

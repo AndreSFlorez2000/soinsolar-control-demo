@@ -550,3 +550,48 @@ button, input, select, textarea { font: inherit; }
 }
 @media(prefers-reduced-motion: reduce) { #dashboardView .dashboard-widget canvas { animation: none !important; } }
 
+/* Acciones de cuenta y filtros: jerarquía y ayuda visibles en cada módulo. */
+.topbar { flex-wrap: wrap; }
+.topbar-actions { flex: 1 1 750px; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
+.account-controls { display: flex; align-items: center; gap: 8px; padding-left: 13px; border-left: 1px solid var(--border); }
+.account-controls .user-chip { min-width: 0; max-width: 180px; margin-right: 4px; }
+.account-controls .user-chip > span:last-child { min-width: 0; }
+.account-controls .user-chip strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-action { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 40px; padding: 8px 12px; border-radius: 10px; font-size: 12px; font-weight: 700; line-height: 1.2; white-space: nowrap; box-shadow: 0 2px 5px rgba(11, 45, 82, .06); transition: background-color .16s ease, border-color .16s ease, box-shadow .16s ease, transform .16s ease; }
+.account-action svg, .login-help-action svg { width: 17px; height: 17px; flex: 0 0 17px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.account-action-password { color: var(--navy); background: #edf6fc; border: 1px solid #b9d9ed; }
+.account-action-password:hover { color: #fff; background: var(--blue); border-color: var(--blue); box-shadow: 0 4px 11px rgba(51, 127, 188, .2); transform: translateY(-1px); }
+.account-action-logout { color: #a33b3b; background: #fff3f2; border: 1px solid #ecc9c4; }
+.account-action-logout:hover { color: #fff; background: #a33b3b; border-color: #a33b3b; box-shadow: 0 4px 11px rgba(163, 59, 59, .18); transform: translateY(-1px); }
+.account-action:focus-visible, .login-help-action:focus-visible { outline: 3px solid #7db7e0; outline-offset: 2px; }
+.account-action:disabled { opacity: .65; cursor: progress; transform: none; }
+.login-help-action { display: flex; align-items: center; justify-content: center; gap: 7px; width: fit-content; margin: -5px 0 16px auto; padding: 7px 10px; color: var(--navy); background: #edf6fc; border: 1px solid #c8dfee; border-radius: 8px; font-size: 12px; font-weight: 700; }
+.login-help-action:hover { color: #fff; background: var(--blue); border-color: var(--blue); }
+#passwordRecoveryEmail[readonly] { background: #f2f6f9; color: var(--navy); font-weight: 650; }
+.filter-panel { border-color: #cbdde9; }
+.filter-panel-heading { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 17px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+.filter-panel-heading::before { content: ""; width: 38px; height: 38px; flex: 0 0 38px; background: #e9f4fb url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23337fbc' stroke-width='1.8' stroke-linejoin='round'%3E%3Cpath d='M4 5h16l-6.5 8v5l-3 1v-6z'/%3E%3C/svg%3E") center / 21px no-repeat; border-radius: 10px; }
+.filter-panel-heading > div { flex: 1; min-width: 0; }
+.filter-panel-heading h4 { margin: 0; color: var(--navy); font-size: 16px; font-weight: 750; }
+.filter-panel-heading p { margin: 3px 0 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.filter-panel-tip { padding: 5px 9px; color: #315a78; background: #f3f8fb; border: 1px solid #d7e6f0; border-radius: 999px; font-size: 11px; font-weight: 700; }
+.filter-grid label { color: var(--text); font-size: 12px; }
+.filter-grid .form-control, .filter-grid .form-select { min-height: 43px; font-size: 13px; }
+.filter-actions .btn { min-height: 42px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+
+@media (max-width: 1500px) {
+  .topbar-actions { flex-basis: 100%; justify-content: flex-start; }
+  .global-search { width: min(340px, 100%); }
+  .account-controls { margin-left: auto; }
+}
+@media (max-width: 760px) {
+  .topbar-actions { flex-direction: row; align-items: stretch; }
+  .global-search { width: 100%; }
+  .account-controls { width: 100%; margin-left: 0; padding: 11px 0 0; border-left: 0; border-top: 1px solid var(--border); flex-wrap: wrap; }
+  .account-controls .user-chip { display: flex; max-width: none; width: 100%; }
+  .account-action { flex: 1 1 150px; }
+  .filter-panel-heading { flex-wrap: wrap; }
+  .filter-panel-tip { margin-left: 50px; }
+}
+@media (prefers-reduced-motion: reduce) { .account-action { transition: none; } }
+
