@@ -1,4 +1,4 @@
-import { calculateDashboardIndicators } from "./domain/dashboard.js?v=1.5.9";
+import { buildMonthlySeries, calculateDashboardIndicators } from "./domain/dashboard.js?v=1.5.9";
 import { createDashboardUI } from "./dashboard-ui.js?v=1.13.0";
 import { calculateProjectIndicators } from "./domain/project-analytics.js?v=1.4.1";
 import { buildManagementReport, buildMonthlyExecutionReport } from "./domain/reports.js?v=1.5.8";
@@ -1044,6 +1044,7 @@ function renderMonthly() {
       : mayEdit && !locked ? `<button class="table-action" data-action="new-monthly-preset" data-project-id="${tracking.projectId}" data-period-id="${tracking.periodId}">Registrar avance</button>` : "";
     const periodAction = locked && mayEdit
       ? `<button class="table-action" data-action="reopen-period" data-period-id="${tracking.periodId}">Reabrir para corregir</button>` : "";
+    const openAction = `<button class="table-action" type="button" data-action="open-project" data-project-id="${escapeHtml(tracking.projectId)}">Abrir ficha</button>`;
     return `<tr>
       <td><strong>${escapeHtml(`${monthNames[tracking.month - 1]} ${tracking.year}`)}</strong><br><small>${capitalize(tracking.periodStatus)}</small></td>
       <td>${tracking.monthlyProgressPercentage == null ? "—" : formatPercent(tracking.monthlyProgressPercentage)}</td>
@@ -1058,7 +1059,7 @@ function renderMonthly() {
       <td>${formatCop(tracking.costsExpensesValue)}</td>
       <td>${tracking.executionIssue ? escapeHtml(tracking.executionIssue) : "—"}</td>
       <td><span class="validation-badge ${escapeHtml(tracking.validationStatus || "borrador")}">${escapeHtml(tracking.validationStatus || "sin registro")}</span></td>
-      <td><span class="table-actions">${actions || periodAction || "—"}</span></td>
+      <td><span class="table-actions">${openAction}${actions || periodAction}</span></td>
     </tr>`;
     }).join("");
   }).join("");
