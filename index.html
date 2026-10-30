@@ -11,7 +11,7 @@
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.15.1" />
+    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.16.0" />
   </head>
   <body>
     <section id="loginView" class="login-shell">
@@ -100,13 +100,7 @@
               </button>
             </div>
           </div>
-          <div class="topbar-context" aria-label="Periodo y actualización">
-            <div class="topbar-period">
-              <label for="activePeriodSelect">Ir al seguimiento de</label>
-              <select id="activePeriodSelect" class="form-select" aria-label="Elegir mes para abrir seguimiento mensual">
-                <option value="" disabled selected>Sin periodos registrados</option>
-              </select>
-            </div>
+          <div class="topbar-context" aria-label="Estado y actualización">
             <div class="topbar-system">
               <div class="system-status" aria-label="Estado del sistema">
                 <span id="systemModeBadge" class="system-mode-badge">Cargando</span>
@@ -349,9 +343,13 @@
                   </div>
                   <div id="globalSearchResults" class="global-search-results" role="list" hidden></div>
                 </div>
+                <input id="projectImportFile" type="file" accept=".csv,.xlsx,.xls" hidden />
+                <button id="projectTemplateButton" class="btn btn-outline-primary" type="button">Descargar formato</button>
+                <button id="projectImportButton" class="btn btn-outline-primary" type="button" hidden>Importar proyectos</button>
                 <button id="newProjectButton" class="btn btn-primary" type="button">Nuevo proyecto</button>
               </div>
             </div>
+            <p id="projectImportMessage" class="module-message module-message-block" role="status" aria-live="polite"></p>
 
             <div class="cost-summary-grid project-overview-grid" aria-label="Resumen de proyectos">
               <article class="mini-kpi"><span>Total de proyectos</span><strong id="projectTotalCount">0</strong></article>
@@ -404,8 +402,8 @@
               <p class="cost-import-hint">El archivo conserva las 58 columnas de cada fila. Los importes contables se muestran por clase y centro de costo; el recaudo, la ejecución y la rentabilidad solo cambian cuando se validen las reglas para evitar contar dos veces movimientos contables y registros manuales.</p>
               <div id="accountingMessage" class="module-message module-message-block" role="status" aria-live="polite"></div>
               <div class="cost-summary-grid">
-                <article class="mini-kpi"><span>Filas originales</span><strong id="accountingRowCount">0</strong></article>
-                <article class="mini-kpi"><span>Centros de costo</span><strong id="accountingCenterCount">0</strong></article>
+                <article class="mini-kpi"><span>Filas contables en vista</span><strong id="accountingRowCount">0</strong></article>
+                <article class="mini-kpi"><span>Centros en vista</span><strong id="accountingCenterCount">0</strong></article>
                 <article class="mini-kpi"><span>Centros con ficha de proyecto</span><strong id="accountingLinkedCount">0</strong></article>
                 <article class="mini-kpi"><span>Pendientes de ficha</span><strong id="accountingPendingCount">0</strong></article>
               </div>
@@ -417,7 +415,7 @@
                   <article class="mini-kpi"><span>Costos de producción · clase 7</span><strong id="accountingProductionCosts">$0</strong></article>
                   <article class="mini-kpi"><span>Registros contables de clases 5, 6 y 7</span><strong id="accountingCostLines">0</strong></article>
                 </div>
-                <p id="accountingCenterHelp" class="accounting-center-help">Selecciona un centro para ver sus movimientos y sus registros manuales. Un centro sin ficha conserva sus datos contables.</p>
+                <div class="accounting-overview-heading"><p id="accountingCenterHelp" class="accounting-center-help">Selecciona un centro para ver sus movimientos y sus registros manuales.</p><button id="accountingShowAll" type="button" class="btn btn-outline-secondary btn-sm" hidden>Ver todos los centros</button></div>
                 <div class="table-responsive accounting-cost-table"><table class="table align-middle mb-0"><thead><tr><th>Centro de costo</th><th>Proyecto</th><th>Registros 5/6/7</th><th class="text-end">Gastos 5</th><th class="text-end">Costo ventas 6</th><th class="text-end">Costo producción 7</th><th class="text-end">Manual</th><th>Ver</th></tr></thead><tbody id="accountingCostRows"></tbody></table></div>
               </article>
               <article class="panel filter-panel" aria-labelledby="accountingFiltersTitle">
@@ -739,6 +737,17 @@
       </form>
     </dialog>
 
+    <dialog id="projectImportDialog" class="app-dialog project-import-dialog" aria-labelledby="projectImportTitle">
+      <div class="history-dialog-content">
+        <div class="dialog-heading"><div><p class="eyebrow">Importación de proyectos</p><h3 id="projectImportTitle">Revisar antes de guardar</h3></div><button id="projectImportClose" class="dialog-close" type="button" aria-label="Cerrar">×</button></div>
+        <p id="projectImportSummary" class="dialog-note"></p>
+        <p class="dialog-note">Se crean fichas nuevas por centro de costo. Las existentes se identifican y se muestran como omitidas; este cargador no importa contratos, avances ni movimientos. No se descartan columnas con datos desconocidos.</p>
+        <div class="table-responsive project-import-preview"><table class="table align-middle mb-0"><thead><tr><th>Fila</th><th>Centro de costo</th><th>Proyecto</th><th>Municipio</th><th>Servicio</th><th>Estado</th></tr></thead><tbody id="projectImportRows"></tbody></table></div>
+        <p id="projectImportPreviewMessage" class="form-message" role="alert"></p>
+        <div class="dialog-actions"><button id="projectImportCancel" class="btn btn-outline-secondary" type="button">Cancelar</button><button id="projectImportSave" class="btn btn-primary" type="button">Guardar proyectos</button></div>
+      </div>
+    </dialog>
+
     <dialog id="costDialog" class="app-dialog">
       <form id="costForm" method="dialog" novalidate>
         <div class="dialog-heading"><div><p class="eyebrow">Costos y gastos</p><h3>Nuevo movimiento</h3></div><button class="dialog-close" type="button" data-close-dialog="costDialog" aria-label="Cerrar">×</button></div>
@@ -882,10 +891,11 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="src/assets/js/config.js?v=1.12.0"></script>
-    <script type="module" src="src/assets/js/app.js?v=1.15.1"></script>
-    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.15.1"></script>
-    <script type="module" src="src/assets/js/accounting-ui.js?v=1.15.1"></script>
-    <script type="module" src="src/assets/js/assistant-ui.js?v=1.15.1"></script>
+    <script type="module" src="src/assets/js/app.js?v=1.16.0"></script>
+    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.16.0"></script>
+    <script type="module" src="src/assets/js/accounting-ui.js?v=1.16.0"></script>
+    <script type="module" src="src/assets/js/project-import-ui.js?v=1.16.0"></script>
+    <script type="module" src="src/assets/js/assistant-ui.js?v=1.16.0"></script>
   </body>
 </html>
 

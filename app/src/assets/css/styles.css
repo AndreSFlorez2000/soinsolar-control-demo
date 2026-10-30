@@ -52,9 +52,7 @@ button, input, select, textarea { font: inherit; }
 .topbar-primary { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 22px; padding: 18px 32px; }
 .topbar-title { min-width: 0; }
 .topbar-context { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px 20px; padding: 11px 32px; background: #f5f9fc; border-top: 1px solid var(--border); }
-.topbar-period, .topbar-system { display: flex; align-items: center; gap: 12px; }
-.topbar-period label { color: var(--navy); font-size: 12px; font-weight: 700; white-space: nowrap; }
-.topbar-period .form-select { width: clamp(175px, 20vw, 240px); min-height: 39px; border-color: #cbdde9; background-color: #fff; font-size: 12px; }
+.topbar-system { display: flex; align-items: center; gap: 12px; margin-left: auto; }
 .topbar-system .btn { min-height: 39px; white-space: nowrap; }
 .user-chip { display: flex; align-items: center; gap: 10px; }
 .user-chip > span:last-child { display: grid; }
@@ -155,6 +153,8 @@ button, input, select, textarea { font: inherit; }
 .accounting-project-link { display: block; width: fit-content; margin-top: 6px; }
 .accounting-center-help, .accounting-reconciliation { color: var(--muted); font-size: 12px; }
 .accounting-center-help { margin-top: 14px !important; }
+.accounting-overview-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.accounting-overview-heading .btn { margin-top: 10px; }
 .accounting-reconciliation { margin: 12px 0 0; }
 .accounting-center-panel { margin: 18px 0; padding: 18px 20px; }
 .accounting-center-panel h4 { margin: 0 0 12px; font-size: 15px; }
@@ -310,6 +310,9 @@ button, input, select, textarea { font: inherit; }
 /* Búsqueda rápida en Proyectos y filtros visibles */
 #projectsView > .section-heading { flex-wrap: wrap; }
 .project-heading-actions { display: flex; align-items: end; flex-wrap: wrap; gap: 10px; }
+.project-import-dialog { width: min(900px, calc(100% - 24px)); }
+.project-import-preview { max-height: 330px; overflow: auto; margin: 16px 0; }
+.project-import-preview .table { min-width: 690px; }
 .global-search { position: relative; width: min(360px, 100%); }
 .global-search label { display: block; margin-bottom: 5px; color: var(--navy); font-size: 11px; font-weight: 700; }
 .global-search-control { position: relative; }
@@ -609,8 +612,6 @@ button, input, select, textarea { font: inherit; }
 @media (max-width: 760px) {
   .topbar-primary { flex-wrap: wrap; padding: 16px; }
   .topbar-context { flex-direction: column; align-items: stretch; gap: 12px; padding: 12px 16px; }
-  .topbar-period { display: grid; gap: 5px; }
-  .topbar-period .form-select { width: 100%; }
   .topbar-system { justify-content: space-between; }
   .system-status { display: grid; }
   .account-controls { width: 100%; margin-left: 0; padding: 11px 0 0; border-left: 0; border-top: 1px solid var(--border); flex-wrap: wrap; }

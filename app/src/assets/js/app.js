@@ -9,7 +9,7 @@ import { canEditExecution } from "./domain/execution.js?v=1.9.0";
 import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=1.1.0";
 import { invoicePendingAmount, isSampleProject, payableInvoicesForProject } from "./domain/payment-selection.js?v=1.5.1";
 import { forgetProject, hasProject, recallProject, rememberProject } from "./domain/project-context.js?v=1.8.0";
-import { createApplicationDataGateway } from "./services/application-data.js?v=1.14.0";
+import { createApplicationDataGateway } from "./services/application-data.js?v=1.16.0";
 import { getCurrentSession, isDemoMode, registerAccount, signIn, signOut } from "./services/supabase.js?v=1.13.1";
 
 const loginView = document.querySelector("#loginView");
@@ -293,7 +293,8 @@ window.SOINSOLAR_APP_API = Object.freeze({
   monthly: () => [...allMonthlyRows],
   visibleMonthly: () => [...currentMonthly],
   selectedProjectId: () => selectedProjectId,
-  reloadReferenceData: loadReferenceData
+  reloadReferenceData: loadReferenceData,
+  refresh: refreshApplication
 });
 
 function routeFromHash() {
@@ -399,7 +400,10 @@ async function showView(requestedView) {
   history.replaceState({}, "", view === "detail" ? `#detail/${encodeURIComponent(selectedProjectId)}` : `#${view}`);
 
   if (view === "dashboard") renderDashboard();
-  if (view === "projects") await loadProjects();
+  if (view === "projects") {
+    await loadProjects();
+    document.dispatchEvent(new Event("soinsolar:projects-open"));
+  }
   if (view === "monthly") await loadMonthlyModule();
   if (view === "finance") await loadFinance();
   if (view === "costs") {
@@ -985,9 +989,6 @@ function populatePeriodOptions() {
   setSelectOptions(document.querySelector("#paymentPeriod"), '<option value="">Selecciona un periodo abierto</option>', openOptions);
 
   const activePeriod = currentPeriods.find((period) => period.status === "abierto") ?? currentPeriods[0];
-  const activeSelect = document.querySelector("#activePeriodSelect");
-  setSelectOptions(activeSelect, '<option value="" disabled>Sin periodos registrados</option>', allOptions, activePeriod?.id ?? "");
-  activeSelect.disabled = currentPeriods.length === 0;
   if (activePeriod) {
     document.querySelector(".period-card strong").textContent = periodLabel(activePeriod).replace(" · Cerrado", "");
     document.querySelector(".period-card span").innerHTML = activePeriod.status === "abierto"
@@ -2059,17 +2060,15 @@ document.querySelector("#costFilters").addEventListener("submit", (event) => {
 });
 document.querySelector("#clearCostFilters").addEventListener("click", () => {
   document.querySelector("#costFilters").reset(); pendingCostCenter = null;
-  document.dispatchEvent(new CustomEvent("soinsolar:manual-cost-filter-applied", { detail: { projectId: "" } }));
-  loadCosts({});
+  const projectId = selectedProjectId || "";
+  document.querySelector("#costFilterProject").value = projectId;
+  document.dispatchEvent(new CustomEvent("soinsolar:manual-cost-filter-applied", { detail: { projectId } }));
+  loadCosts();
 });
 document.querySelector("#reportFilters").addEventListener("submit", (event) => { event.preventDefault(); loadReports(); });
 document.querySelector("#clearReportFilters").addEventListener("click", () => { document.querySelector("#reportFilters").reset(); loadReports(); });
 document.querySelector("#historyFilters").addEventListener("submit", (event) => { event.preventDefault(); loadHistory(); });
 document.querySelector("#clearHistoryFilters").addEventListener("click", () => { document.querySelector("#historyFilters").reset(); loadHistory({}); });
-document.querySelector("#activePeriodSelect").addEventListener("change", (event) => {
-  document.querySelector("#monthlyFilterPeriod").value = event.target.value;
-  showView("monthly");
-});
 
 document.addEventListener("click", async (event) => {
   const filterRemoval = event.target.closest("[data-filter-target]");

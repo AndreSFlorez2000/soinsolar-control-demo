@@ -22,7 +22,7 @@ import {
   INVOICE_STATUSES,
   PAYMENT_STATUSES,
   VALIDATION_STATUSES
-} from "./models.js?v=1.5.0";
+} from "./models.js?v=1.16.0";
 
 export class DataAccessError extends Error {
   constructor(message, cause = null) {
@@ -165,6 +165,21 @@ export class ProjectRepository {
       "No fue posible crear el proyecto"
     );
     return normalizeProject(row);
+  }
+
+  async createMany(inputs, userId) {
+    if (!Array.isArray(inputs) || !inputs.length || inputs.length > 1000) {
+      throw new DataAccessError("Importa entre 1 y 1.000 proyectos nuevos por archivo.");
+    }
+    const user = userId ? assertUuid(userId, "usuario") : null;
+    const records = inputs.map((input) => ({
+      id: assertUuid(input.id, "proyecto"),
+      ...projectInputToRecord(input, user),
+      created_by: user
+    }));
+    // Una sola inserción: si cualquier fila infringe la base, ninguna se guarda.
+    await unwrap(this.client.from("projects").insert(records), "No fue posible importar los proyectos");
+    return records.length;
   }
 
   async update(projectId, input, userId) {

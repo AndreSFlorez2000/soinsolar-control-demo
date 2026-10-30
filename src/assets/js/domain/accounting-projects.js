@@ -54,3 +54,7 @@ export function projectAccountingCenters(centers = [], classes = [], projects = 
     };
   }).sort((a, b) => a.costCenter.localeCompare(b.costCenter, "es", { numeric: true }));
 }
+
+export function scopeAccountingCenters(rows = [], code = "") {
+  return code ? rows.filter((row) => row.costCenter === code) : rows;
+}

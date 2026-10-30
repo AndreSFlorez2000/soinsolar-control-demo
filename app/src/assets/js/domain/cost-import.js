@@ -7,7 +7,7 @@ function normalizeHeader(value) {
     .replace(/^_+|_+$/g, "");
 }
 
-export function parseCostCsv(text) {
+export function parseCostCsv(text, { strictColumns = false } = {}) {
   const source = String(text ?? "").replace(/^\uFEFF/, "");
   const firstLine = source.split(/\r?\n/, 1)[0] ?? "";
   const separator = (firstLine.match(/;/g) ?? []).length > (firstLine.match(/,/g) ?? []).length ? ";" : ",";
@@ -42,6 +42,9 @@ export function parseCostCsv(text) {
   row.push(field);
   if (row.some((value) => value.trim())) records.push(row);
   const [headers = [], ...values] = records;
+  if (strictColumns && values.some((columns) => columns.slice(headers.length).some((value) => value.trim()))) {
+    throw new Error("El CSV tiene datos después de la última columna del encabezado. Corrige el archivo antes de importarlo.");
+  }
   return values.map((columns) => Object.fromEntries(headers.map((header, index) => [header, columns[index] ?? ""])));
 }
 

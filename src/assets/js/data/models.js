@@ -345,7 +345,7 @@ export function projectInputToRecord(input, userId) {
     power_kwp:
       input.powerKwp === null || input.powerKwp === undefined
         ? null
-        : assertMoney(input.powerKwp, "potencia"),
+        : assertPower(input.powerKwp),
     status: assertEnum(input.status ?? "planeado", PROJECT_STATUSES, "estado"),
     parent_project_id: input.parentProjectId ? assertUuid(input.parentProjectId, "centro de costo principal") : null,
     start_date: startDate,
@@ -353,6 +353,11 @@ export function projectInputToRecord(input, userId) {
     notes: input.notes?.trim() || null,
     updated_by: userId ? assertUuid(userId, "usuario") : null
   };
+}
+
+function assertPower(value) {
+  assertMoney(value, "potencia");
+  return Math.round((Number(value) + Number.EPSILON) * 1000) / 1000;
 }
 
 export function costExpenseInputToRecord(input, userId) {
