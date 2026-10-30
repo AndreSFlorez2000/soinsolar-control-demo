@@ -88,6 +88,7 @@ let projectContextOwnerId = null;
 let currentProjects = [];
 let currentPeriods = [];
 let currentCosts = [];
+let pendingCostCenter = null;
 let currentMonthly = [];
 let allMonthlyRows = [];
 let currentAudit = [];
@@ -341,6 +342,7 @@ function closeApp() {
   gateway = null;
   currentUserProfile = null;
   currentProjects = [];
+  pendingCostCenter = null;
   currentPeriods = [];
   currentMonthly = [];
   allMonthlyRows = [];
@@ -1265,6 +1267,7 @@ async function loadCosts(filters) {
   try {
     const appliedFilters = filters ?? costFilters();
     renderActiveFilters("#costActiveFilters", [
+      ["Centro pendiente:", pendingCostCenter || "", "costFilterProject"],
       ["Proyecto:", appliedFilters.projectId ? selectedOptionText("#costFilterProject") : "", "costFilterProject"],
       ["Periodo:", appliedFilters.periodId ? selectedOptionText("#costFilterPeriod") : "", "costFilterPeriod"],
       ["Tipo:", appliedFilters.type ? capitalize(appliedFilters.type) : "", "costFilterType"],
@@ -1272,9 +1275,11 @@ async function loadCosts(filters) {
       ["Desde:", appliedFilters.dateFrom ? formatDate(appliedFilters.dateFrom) : "", "costFilterFrom"],
       ["Hasta:", appliedFilters.dateTo ? formatDate(appliedFilters.dateTo) : "", "costFilterTo"]
     ], "costFilters");
-    currentCosts = await (await ensureGateway()).listCostsExpenses(appliedFilters);
+    currentCosts = pendingCostCenter ? [] : await (await ensureGateway()).listCostsExpenses(appliedFilters);
     renderCosts();
-    setMessage(message, currentCosts.length ? "Consulta actualizada." : "");
+    setMessage(message, pendingCostCenter
+      ? `CC ${pendingCostCenter}: los movimientos contables están arriba. Para añadir registros manuales, primero carga la ficha de este proyecto.`
+      : currentCosts.length ? "Consulta actualizada." : "");
   } catch (error) {
     setMessage(message, error.message || "No fue posible consultar los costos y gastos.", true);
   }
@@ -1338,6 +1343,7 @@ async function saveCost(event) {
     activateProject(input.projectId);
     renderDashboard();
     await loadCosts();
+    document.dispatchEvent(new Event("soinsolar:costs-manual-updated"));
     setMessage(document.querySelector("#costModuleMessage"), "Movimiento registrado correctamente.");
   } catch (error) {
     setMessage(message, error.message || "No fue posible registrar el movimiento.", true);
@@ -2036,8 +2042,25 @@ document.querySelector("#monthlyFilters").addEventListener("submit", (event) => 
 document.querySelector("#clearMonthlyFilters").addEventListener("click", () => { document.querySelector("#monthlyFilters").reset(); loadMonthlyModule({}); });
 document.querySelector("#financeFilters").addEventListener("submit", (event) => { event.preventDefault(); loadFinance(); });
 document.querySelector("#clearFinanceFilters").addEventListener("click", () => { document.querySelector("#financeFilters").reset(); loadFinance({}); });
-document.querySelector("#costFilters").addEventListener("submit", (event) => { event.preventDefault(); loadCosts(); });
-document.querySelector("#clearCostFilters").addEventListener("click", () => { document.querySelector("#costFilters").reset(); loadCosts({}); });
+document.addEventListener("soinsolar:accounting-center-selected", (event) => {
+  const { centerCode, projectId } = event.detail;
+  pendingCostCenter = centerCode && !projectId ? centerCode : null;
+  if (projectId) activateProject(projectId);
+  else if (centerCode) clearProjectContext();
+  document.querySelector("#costFilterProject").value = projectId || "";
+  loadCosts();
+});
+document.querySelector("#costFilters").addEventListener("submit", (event) => {
+  event.preventDefault(); pendingCostCenter = null;
+  const projectId = document.querySelector("#costFilterProject").value;
+  document.dispatchEvent(new CustomEvent("soinsolar:manual-cost-filter-applied", { detail: { projectId } }));
+  loadCosts();
+});
+document.querySelector("#clearCostFilters").addEventListener("click", () => {
+  document.querySelector("#costFilters").reset(); pendingCostCenter = null;
+  document.dispatchEvent(new CustomEvent("soinsolar:manual-cost-filter-applied", { detail: { projectId: "" } }));
+  loadCosts({});
+});
 document.querySelector("#reportFilters").addEventListener("submit", (event) => { event.preventDefault(); loadReports(); });
 document.querySelector("#clearReportFilters").addEventListener("click", () => { document.querySelector("#reportFilters").reset(); loadReports(); });
 document.querySelector("#historyFilters").addEventListener("submit", (event) => { event.preventDefault(); loadHistory(); });

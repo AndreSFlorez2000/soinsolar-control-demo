@@ -51,7 +51,8 @@ export class AccountingRepository {
   async listEntries(importId, filters = {}, page = 0, pageSize = 100) {
     let query = this.client.from("accounting_entries").select("*", { count: "exact" })
       .eq("import_id", importId).order("row_number");
-    if (filters.costCenter) query = query.eq("cost_center", filters.costCenter);
+    if (filters.costCenters?.length) query = query.in("cost_center", filters.costCenters);
+    else if (filters.costCenter) query = query.eq("cost_center", filters.costCenter);
     if (filters.account) query = query.ilike("account_code", `${String(filters.account).replace(/[%_]/g, "")}%`);
     if (filters.dateFrom) query = query.gte("movement_date", filters.dateFrom);
     if (filters.dateTo) query = query.lte("movement_date", filters.dateTo);

@@ -135,12 +135,22 @@ button, input, select, textarea { font: inherit; }
 .heading-actions, .filter-actions, .dialog-actions { display: flex; align-items: center; gap: 10px; }
 .heading-actions { flex-wrap: wrap; justify-content: flex-end; }
 .cost-import-hint { margin: -6px 0 18px; color: var(--muted); font-size: 12px; }
-.accounting-section { margin-top: 38px; padding-top: 25px; border-top: 1px solid var(--border); }
+.accounting-section { margin-top: 10px; }
+.manual-cost-section { margin-top: 30px; padding-top: 24px; border-top: 1px solid var(--border); }
 .accounting-section .filter-panel { margin-top: 18px; }
 .accounting-class-panel { padding: 18px 20px; margin-top: 18px; }
 .accounting-class-panel h4 { font-size: 16px; margin: 0 0 5px; }
 .accounting-class-panel p { margin: 0; color: var(--muted); font-size: 12px; }
-.accounting-cost-table { max-height: 330px; overflow-y: auto; margin-top: 16px; }
+.accounting-cost-table { max-height: 520px; overflow: auto; margin-top: 16px; }
+.accounting-cost-table td { min-width: 90px; vertical-align: top; }
+.accounting-cost-table td:first-child { min-width: 110px; }
+.accounting-cost-table td:nth-child(2) { min-width: 185px; }
+.accounting-cost-table td:last-child { min-width: 115px; }
+.accounting-selected-row { background: #edf6f2; }
+.accounting-project-link { display: block; width: fit-content; margin-top: 6px; }
+.accounting-center-help, .accounting-reconciliation { color: var(--muted); font-size: 12px; }
+.accounting-center-help { margin-top: 14px !important; }
+.accounting-reconciliation { margin: 12px 0 0; }
 .accounting-center-panel { margin: 18px 0; padding: 18px 20px; }
 .accounting-center-panel h4 { margin: 0 0 12px; font-size: 15px; }
 .accounting-center-list { display: flex; flex-wrap: wrap; gap: 8px; max-height: 190px; overflow-y: auto; }

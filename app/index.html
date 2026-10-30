@@ -11,7 +11,7 @@
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.14.0" />
+    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.15.0" />
   </head>
   <body>
     <section id="loginView" class="login-shell">
@@ -384,11 +384,68 @@
 
           <section id="costsView" class="content-view" hidden>
             <div class="section-heading">
-              <div><h3>Costos y gastos</h3><p>Registros manuales por proyecto y clasificación contable del archivo CSV.</p></div>
-              <div class="heading-actions"><input id="costImportFile" type="file" accept=".csv,.xlsx,.xls" hidden /><button id="downloadCostTemplateButton" class="btn btn-outline-primary" type="button">Descargar formato</button><button id="importCostsButton" class="btn btn-outline-primary" type="button">Importar Excel/CSV</button><button id="exportCostsButton" class="btn btn-outline-primary" type="button">Exportar Excel</button><button id="newCostButton" class="btn btn-primary" type="button">Nuevo movimiento</button></div>
+              <div><h3>Costos y gastos por centro de costo</h3><p>Consulta los movimientos de cada centro. El nombre del proyecto aparecerá cuando se cargue su ficha.</p></div>
             </div>
-            <p class="cost-import-hint">Registros manuales: completa la hoja “Costos y gastos” del formato y luego pulsa “Importar Excel/CSV”. El periodo de cada fecha debe estar abierto. Para el auxiliar original utiliza el cargador de abajo.</p>
 
+            <section class="accounting-section" aria-labelledby="accountingTitle">
+              <div class="section-heading">
+                <div><h3 id="accountingTitle">Centros de costo y movimientos contables</h3><p>Los centros del auxiliar corresponden a esta misma gestión de proyectos. Las fichas que faltan se asociarán por código cuando se cargue el Excel de proyectos.</p></div>
+                <div class="heading-actions"><input id="accountingFile" type="file" accept=".csv,.xlsx,.xls" hidden /><button id="accountingImportButton" class="btn btn-primary" type="button" hidden>Subir CSV del auxiliar</button><button id="accountingExportButton" class="btn btn-outline-primary" type="button">Descargar filas originales</button></div>
+              </div>
+              <p class="cost-import-hint">El archivo conserva las 58 columnas de cada fila. Los importes contables se muestran por clase y centro de costo; el recaudo, la ejecución y la rentabilidad solo cambian cuando se validen las reglas para evitar contar dos veces movimientos contables y registros manuales.</p>
+              <div id="accountingMessage" class="module-message module-message-block" role="status" aria-live="polite"></div>
+              <div class="cost-summary-grid">
+                <article class="mini-kpi"><span>Filas originales</span><strong id="accountingRowCount">0</strong></article>
+                <article class="mini-kpi"><span>Centros de costo</span><strong id="accountingCenterCount">0</strong></article>
+                <article class="mini-kpi"><span>Centros con ficha de proyecto</span><strong id="accountingLinkedCount">0</strong></article>
+                <article class="mini-kpi"><span>Pendientes de ficha</span><strong id="accountingPendingCount">0</strong></article>
+              </div>
+              <article class="panel accounting-class-panel" aria-labelledby="accountingClassTitle">
+                <div><h4 id="accountingClassTitle">Costos y gastos de los centros</h4><p>Los valores del auxiliar son débito menos crédito. Las clases 5, 6 y 7 se muestran por separado; los movimientos manuales se identifican en su propia columna para evitar duplicarlos.</p></div>
+                <div class="cost-summary-grid">
+                  <article class="mini-kpi"><span>Gastos · clase 5</span><strong id="accountingExpenses">$0</strong></article>
+                  <article class="mini-kpi"><span>Costos de ventas · clase 6</span><strong id="accountingSalesCosts">$0</strong></article>
+                  <article class="mini-kpi"><span>Costos de producción · clase 7</span><strong id="accountingProductionCosts">$0</strong></article>
+                  <article class="mini-kpi"><span>Registros contables de clases 5, 6 y 7</span><strong id="accountingCostLines">0</strong></article>
+                </div>
+                <p id="accountingCenterHelp" class="accounting-center-help">Selecciona un centro para ver sus movimientos y sus registros manuales. Un centro sin ficha conserva sus datos contables.</p>
+                <div class="table-responsive accounting-cost-table"><table class="table align-middle mb-0"><thead><tr><th>Centro de costo</th><th>Proyecto</th><th>Registros 5/6/7</th><th class="text-end">Gastos 5</th><th class="text-end">Costo ventas 6</th><th class="text-end">Costo producción 7</th><th class="text-end">Manual</th><th>Ver</th></tr></thead><tbody id="accountingCostRows"></tbody></table></div>
+              </article>
+              <article class="panel filter-panel" aria-labelledby="accountingFiltersTitle">
+                <div class="filter-panel-heading"><div><h4 id="accountingFiltersTitle">Buscar en el auxiliar</h4><p>Filtra por archivo, centro de costo, cuenta, fecha, tercero o documento.</p></div><span class="filter-panel-tip">Opcional</span></div>
+                <form id="accountingFilters" class="filter-grid filter-grid-costs">
+                  <label>Archivo<select id="accountingBatch" class="form-select"></select></label>
+                  <label>Centro de costo<select id="accountingCenter" class="form-select"><option value="">Todos</option></select></label>
+                  <label>Subcuenta<input id="accountingAccount" class="form-control" type="search" placeholder="Ej. 5105" /></label>
+                  <label>Proveedor / tercero<input id="accountingParty" class="form-control" type="search" list="accountingPartyOptions" placeholder="Nombre o NIT" /><datalist id="accountingPartyOptions"></datalist></label>
+                  <label>Detalle, tercero o documento<input id="accountingSearch" class="form-control" type="search" placeholder="Buscar texto" /></label>
+                  <label>Desde<input id="accountingFrom" class="form-control" type="date" /></label>
+                  <label>Hasta<input id="accountingTo" class="form-control" type="date" /></label>
+                  <div class="filter-actions"><button class="btn btn-primary" type="submit">Consultar</button><button id="accountingClear" class="btn btn-outline-secondary" type="button">Limpiar</button></div>
+                </form>
+              </article>
+              <article class="panel data-panel accounting-center-panel">
+                <h4>Acceso rápido por centro de costo</h4>
+                <div id="accountingCenterList" class="accounting-center-list"></div>
+              </article>
+              <article class="panel data-panel">
+                <div class="table-responsive"><table class="table align-middle mb-0">
+                  <thead><tr><th>Fila</th><th>Fecha</th><th>CC</th><th>Subcuenta</th><th>Tercero</th><th>Documento</th><th>Detalle</th><th class="text-end">Débito</th><th class="text-end">Crédito</th><th>Original</th></tr></thead>
+                  <tbody id="accountingRows"></tbody>
+                </table></div>
+                <div id="accountingEmpty" class="inline-empty" hidden>No hay movimientos contables para esta consulta.</div>
+                <p id="accountingReconciliation" class="accounting-reconciliation"></p>
+                <div class="accounting-pager"><span id="accountingPageStatus"></span><div><button id="accountingPrevious" class="btn btn-outline-secondary" type="button">Anterior</button> <button id="accountingNext" class="btn btn-outline-secondary" type="button">Siguiente</button></div></div>
+              </article>
+              <dialog id="accountingDetailDialog" class="app-dialog"><div class="history-dialog-content"><div class="dialog-heading"><div><p class="eyebrow">Auxiliar contable</p><h3 id="accountingDetailTitle">Fila original</h3></div><button class="dialog-close" type="button" id="accountingCloseDetail" aria-label="Cerrar">×</button></div><div id="accountingDetail" class="accounting-detail"></div></div></dialog>
+            </section>
+
+            <section class="manual-cost-section" aria-labelledby="manualCostTitle">
+              <div class="section-heading">
+                <div><h3 id="manualCostTitle">Registros adicionales del aplicativo</h3><p>Movimientos cargados o digitados por proyecto. Se muestran aparte de las clases contables para facilitar su conciliación.</p></div>
+                <div class="heading-actions"><input id="costImportFile" type="file" accept=".csv,.xlsx,.xls" hidden /><button id="downloadCostTemplateButton" class="btn btn-outline-primary" type="button">Descargar formato</button><button id="importCostsButton" class="btn btn-outline-primary" type="button">Importar Excel/CSV</button><button id="exportCostsButton" class="btn btn-outline-primary" type="button">Exportar Excel</button><button id="newCostButton" class="btn btn-primary" type="button">Nuevo movimiento</button></div>
+              </div>
+              <p class="cost-import-hint">Para estos registros usa la hoja “Costos y gastos” del formato o “Nuevo movimiento”. Cada registro manual requiere una ficha de proyecto y un periodo abierto.</p>
             <article class="panel filter-panel" aria-labelledby="costFiltersTitle">
               <div class="filter-panel-heading"><div><h4 id="costFiltersTitle">Filtros de costos y gastos</h4><p>Selecciona el proyecto, periodo o fechas que quieras consultar.</p></div><span class="filter-panel-tip">Opcional</span></div>
               <form id="costFilters" class="filter-grid filter-grid-costs" autocomplete="off">
@@ -420,57 +477,9 @@
               </div>
               <div id="costsEmpty" class="inline-empty" hidden>No se encontraron movimientos con los filtros seleccionados.</div>
             </article>
-
-            <section class="accounting-section" aria-labelledby="accountingTitle">
-              <div class="section-heading">
-                <div><h3 id="accountingTitle">Auxiliar contable original</h3><p>Todos los movimientos del archivo, organizados por centro de costo y subcuenta. Incluye centros que aún no son proyectos en SOINSOLAR.</p></div>
-                <div class="heading-actions"><input id="accountingFile" type="file" accept=".csv,.xlsx,.xls" hidden /><button id="accountingImportButton" class="btn btn-primary" type="button" hidden>Subir CSV del auxiliar</button><button id="accountingExportButton" class="btn btn-outline-primary" type="button">Descargar filas originales</button></div>
-              </div>
-              <p class="cost-import-hint">Sube el CSV original separado por comas sin modificarlo. Los débitos y créditos son movimientos contables; no se suman al recaudo ni a la ejecución. Cada fila conserva sus 58 campos originales.</p>
-              <div id="accountingMessage" class="module-message module-message-block" role="status" aria-live="polite"></div>
-              <div class="cost-summary-grid">
-                <article class="mini-kpi"><span>Filas originales</span><strong id="accountingRowCount">0</strong></article>
-                <article class="mini-kpi"><span>Centros de costo</span><strong id="accountingCenterCount">0</strong></article>
-                <article class="mini-kpi"><span>Total débitos del archivo</span><strong id="accountingDebits">$0</strong></article>
-                <article class="mini-kpi"><span>Total créditos del archivo</span><strong id="accountingCredits">$0</strong></article>
-              </div>
-              <article class="panel accounting-class-panel" aria-labelledby="accountingClassTitle">
-                <div><h4 id="accountingClassTitle">Costos y gastos detectados en el CSV</h4><p>Saldo neto del movimiento (débito menos crédito) por clase contable. Las clases se presentan por separado para conservar la trazabilidad.</p></div>
-                <div class="cost-summary-grid">
-                  <article class="mini-kpi"><span>Gastos · clase 5</span><strong id="accountingExpenses">$0</strong></article>
-                  <article class="mini-kpi"><span>Costos de ventas · clase 6</span><strong id="accountingSalesCosts">$0</strong></article>
-                  <article class="mini-kpi"><span>Costos de producción · clase 7</span><strong id="accountingProductionCosts">$0</strong></article>
-                  <article class="mini-kpi"><span>Asientos de costos y gastos</span><strong id="accountingCostLines">0</strong></article>
-                </div>
-                <div class="table-responsive accounting-cost-table"><table class="table align-middle mb-0"><thead><tr><th>Centro de costo</th><th>Asientos 5/6/7</th><th class="text-end">Gastos 5</th><th class="text-end">Costo ventas 6</th><th class="text-end">Costo producción 7</th></tr></thead><tbody id="accountingCostRows"></tbody></table></div>
-              </article>
-              <article class="panel filter-panel" aria-labelledby="accountingFiltersTitle">
-                <div class="filter-panel-heading"><div><h4 id="accountingFiltersTitle">Buscar en el auxiliar</h4><p>Filtra por archivo, centro de costo, cuenta, fecha, tercero o documento.</p></div><span class="filter-panel-tip">Opcional</span></div>
-                <form id="accountingFilters" class="filter-grid filter-grid-costs">
-                  <label>Archivo<select id="accountingBatch" class="form-select"></select></label>
-                  <label>Centro de costo<select id="accountingCenter" class="form-select"><option value="">Todos</option></select></label>
-                  <label>Subcuenta<input id="accountingAccount" class="form-control" type="search" placeholder="Ej. 5105" /></label>
-                  <label>Proveedor / tercero<input id="accountingParty" class="form-control" type="search" list="accountingPartyOptions" placeholder="Nombre o NIT" /><datalist id="accountingPartyOptions"></datalist></label>
-                  <label>Detalle, tercero o documento<input id="accountingSearch" class="form-control" type="search" placeholder="Buscar texto" /></label>
-                  <label>Desde<input id="accountingFrom" class="form-control" type="date" /></label>
-                  <label>Hasta<input id="accountingTo" class="form-control" type="date" /></label>
-                  <div class="filter-actions"><button class="btn btn-primary" type="submit">Consultar</button><button id="accountingClear" class="btn btn-outline-secondary" type="button">Limpiar</button></div>
-                </form>
-              </article>
-              <article class="panel data-panel accounting-center-panel">
-                <h4>Centros de costo del archivo</h4>
-                <div id="accountingCenterList" class="accounting-center-list"></div>
-              </article>
-              <article class="panel data-panel">
-                <div class="table-responsive"><table class="table align-middle mb-0">
-                  <thead><tr><th>Fila</th><th>Fecha</th><th>CC</th><th>Subcuenta</th><th>Tercero</th><th>Documento</th><th>Detalle</th><th class="text-end">Débito</th><th class="text-end">Crédito</th><th>Original</th></tr></thead>
-                  <tbody id="accountingRows"></tbody>
-                </table></div>
-                <div id="accountingEmpty" class="inline-empty" hidden>No hay filas para esta consulta.</div>
-                <div class="accounting-pager"><span id="accountingPageStatus"></span><div><button id="accountingPrevious" class="btn btn-outline-secondary" type="button">Anterior</button> <button id="accountingNext" class="btn btn-outline-secondary" type="button">Siguiente</button></div></div>
-              </article>
-              <dialog id="accountingDetailDialog" class="app-dialog"><div class="history-dialog-content"><div class="dialog-heading"><div><p class="eyebrow">Auxiliar contable</p><h3 id="accountingDetailTitle">Fila original</h3></div><button class="dialog-close" type="button" id="accountingCloseDetail" aria-label="Cerrar">×</button></div><div id="accountingDetail" class="accounting-detail"></div></div></dialog>
             </section>
+
+
           </section>
 
           <section id="historyView" class="content-view" hidden>
@@ -864,10 +873,10 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="src/assets/js/config.js?v=1.12.0"></script>
-    <script type="module" src="src/assets/js/app.js?v=1.14.0"></script>
-    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.14.0"></script>
-    <script type="module" src="src/assets/js/accounting-ui.js?v=1.14.0"></script>
-    <script type="module" src="src/assets/js/assistant-ui.js?v=1.14.0"></script>
+    <script type="module" src="src/assets/js/app.js?v=1.15.0"></script>
+    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.15.0"></script>
+    <script type="module" src="src/assets/js/accounting-ui.js?v=1.15.0"></script>
+    <script type="module" src="src/assets/js/assistant-ui.js?v=1.15.0"></script>
   </body>
 </html>
 
