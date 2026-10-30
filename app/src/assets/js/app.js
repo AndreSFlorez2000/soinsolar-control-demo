@@ -392,6 +392,7 @@ async function showView(requestedView) {
   };
   Object.values(visible).forEach((element) => { element.hidden = true; });
   visible[view].hidden = false;
+  if (view !== "projects") closeGlobalSearch();
   if (view === "assistant") window.dispatchEvent(new Event("soinsolar:assistant-open"));
   title.textContent = viewLabels[view];
   breadcrumb.textContent = view === "detail" ? "PROYECTOS / DETALLE" : viewLabels[view].toUpperCase();

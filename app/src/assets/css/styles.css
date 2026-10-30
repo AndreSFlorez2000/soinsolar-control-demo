@@ -47,10 +47,15 @@ button, input, select, textarea { font: inherit; }
 .period-card i { display: inline-block; width: 7px; height: 7px; margin-right: 5px; border-radius: 50%; background: #3cc774; }
 
 .main-area { min-width: 0; }
-.topbar { min-height: 85px; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 15px 32px; background: #fff; border-bottom: 1px solid var(--border); }
+.topbar { background: #fff; border-bottom: 1px solid var(--border); }
 .topbar h2 { margin: 0; font-size: 22px; font-weight: 750; }
-.topbar-actions { display: flex; align-items: center; gap: 14px; }
-.topbar-actions .form-select { min-width: 145px; border-color: var(--border); }
+.topbar-primary { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 22px; padding: 18px 32px; }
+.topbar-title { min-width: 0; }
+.topbar-context { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px 20px; padding: 11px 32px; background: #f5f9fc; border-top: 1px solid var(--border); }
+.topbar-period, .topbar-system { display: flex; align-items: center; gap: 12px; }
+.topbar-period label { color: var(--navy); font-size: 12px; font-weight: 700; white-space: nowrap; }
+.topbar-period .form-select { width: clamp(175px, 20vw, 240px); min-height: 39px; border-color: #cbdde9; background-color: #fff; font-size: 12px; }
+.topbar-system .btn { min-height: 39px; white-space: nowrap; }
 .user-chip { display: flex; align-items: center; gap: 10px; }
 .user-chip > span:last-child { display: grid; }
 .user-chip strong { font-size: 12px; }
@@ -254,9 +259,6 @@ button, input, select, textarea { font: inherit; }
   .sidebar { position: relative; height: auto; padding-bottom: 12px; }
   .side-nav { grid-template-columns: 1fr 1fr; }
   .period-card { margin-top: 20px; }
-  .topbar { align-items: flex-start; padding: 18px; }
-  .topbar-actions { align-items: stretch; flex-direction: column; }
-  .user-chip { display: none; }
   .content-area { padding: 20px 16px; }
   .project-workspace-actions .form-select { width: 100%; }
   .kpi-grid, .project-kpis, .summary-grid { grid-template-columns: 1fr; }
@@ -305,8 +307,11 @@ button, input, select, textarea { font: inherit; }
 }
 
 
-/* Actividad 16: búsqueda global y filtros visibles */
-.global-search { position: relative; width: min(340px, 30vw); }
+/* Búsqueda rápida en Proyectos y filtros visibles */
+#projectsView > .section-heading { flex-wrap: wrap; }
+.project-heading-actions { display: flex; align-items: end; flex-wrap: wrap; gap: 10px; }
+.global-search { position: relative; width: min(360px, 100%); }
+.global-search label { display: block; margin-bottom: 5px; color: var(--navy); font-size: 11px; font-weight: 700; }
 .global-search-control { position: relative; }
 .global-search-control .form-control { min-height: 42px; padding-right: 38px; border-color: var(--border); font-size: 12px; }
 .global-search-clear { position: absolute; top: 50%; right: 7px; width: 28px; height: 28px; padding: 0; transform: translateY(-50%); color: var(--muted); background: transparent; border: 0; border-radius: 50%; font-size: 20px; line-height: 1; }
@@ -323,12 +328,11 @@ button, input, select, textarea { font: inherit; }
 .active-filter-chip { padding: 5px 9px; color: var(--navy); background: #e9f3fb; border: 1px solid #cfe3f2; border-radius: 999px; font-size: 10px; }
 .active-filter-chip strong { font-weight: 750; }
 
-@media (max-width: 1050px) {
-  .global-search { width: min(300px, 36vw); }
-}
 @media (max-width: 760px) {
   .global-search { width: 100%; }
   .global-search-results { width: 100%; max-width: none; }
+  .project-heading-actions { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr); }
+  .project-heading-actions .btn { width: 100%; }
 }
 
 
@@ -400,15 +404,11 @@ button, input, select, textarea { font: inherit; }
 .project-history-panel .panel-heading { align-items: flex-start; }
 .project-history-panel .table td:last-child { min-width: 240px; }
 @media (max-width: 1120px) {
-  .system-status { display: none; }
 }
 @media (max-width: 1050px) {
   .project-analytics-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 760px) {
-  .topbar { flex-direction: column; }
-  .topbar-actions { width: 100%; }
-  #refreshAppButton, #activePeriodSelect { width: 100%; }
   .project-history-panel .panel-heading { flex-direction: column; }
 }
 
@@ -580,8 +580,6 @@ button, input, select, textarea { font: inherit; }
 @media(prefers-reduced-motion: reduce) { #dashboardView .dashboard-widget canvas { animation: none !important; } }
 
 /* Acciones de cuenta y filtros: jerarquía y ayuda visibles en cada módulo. */
-.topbar { flex-wrap: wrap; }
-.topbar-actions { flex: 1 1 750px; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
 .account-controls { display: flex; align-items: center; gap: 8px; padding-left: 13px; border-left: 1px solid var(--border); }
 .account-controls .user-chip { min-width: 0; max-width: 180px; margin-right: 4px; }
 .account-controls .user-chip > span:last-child { min-width: 0; }
@@ -608,14 +606,13 @@ button, input, select, textarea { font: inherit; }
 .filter-grid .form-control, .filter-grid .form-select { min-height: 43px; font-size: 13px; }
 .filter-actions .btn { min-height: 42px; font-size: 12px; font-weight: 700; white-space: nowrap; }
 
-@media (max-width: 1500px) {
-  .topbar-actions { flex-basis: 100%; justify-content: flex-start; }
-  .global-search { width: min(340px, 100%); }
-  .account-controls { margin-left: auto; }
-}
 @media (max-width: 760px) {
-  .topbar-actions { flex-direction: row; align-items: stretch; }
-  .global-search { width: 100%; }
+  .topbar-primary { flex-wrap: wrap; padding: 16px; }
+  .topbar-context { flex-direction: column; align-items: stretch; gap: 12px; padding: 12px 16px; }
+  .topbar-period { display: grid; gap: 5px; }
+  .topbar-period .form-select { width: 100%; }
+  .topbar-system { justify-content: space-between; }
+  .system-status { display: grid; }
   .account-controls { width: 100%; margin-left: 0; padding: 11px 0 0; border-left: 0; border-top: 1px solid var(--border); flex-wrap: wrap; }
   .account-controls .user-chip { display: flex; max-width: none; width: 100%; }
   .account-action { flex: 1 1 150px; }

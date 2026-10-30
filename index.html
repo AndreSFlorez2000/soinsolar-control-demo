@@ -11,7 +11,7 @@
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.15.0" />
+    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.15.1" />
   </head>
   <body>
     <section id="loginView" class="login-shell">
@@ -84,27 +84,11 @@
 
       <main class="main-area">
         <header class="topbar">
-          <div>
-            <p class="eyebrow mb-1">SOINSOLAR / <span id="breadcrumb">INICIO</span></p>
-            <h2 id="pageTitle">Resumen general</h2>
-          </div>
-          <div class="topbar-actions">
-            <div class="global-search">
-              <label class="visually-hidden" for="globalSearchInput">Buscar un proyecto</label>
-              <div class="global-search-control">
-                <input id="globalSearchInput" class="form-control" type="search" autocomplete="off" placeholder="Buscar proyecto o centro de costo" aria-controls="globalSearchResults" aria-expanded="false" />
-                <button id="clearGlobalSearch" class="global-search-clear" type="button" aria-label="Limpiar búsqueda" hidden>×</button>
-              </div>
-              <div id="globalSearchResults" class="global-search-results" role="list" hidden></div>
+          <div class="topbar-primary">
+            <div class="topbar-title">
+              <p class="eyebrow mb-1">SOINSOLAR / <span id="breadcrumb">INICIO</span></p>
+              <h2 id="pageTitle">Resumen general</h2>
             </div>
-            <div class="system-status" aria-label="Estado del sistema">
-              <span id="systemModeBadge" class="system-mode-badge">Cargando</span>
-              <small id="lastSyncLabel">Sin actualizar</small>
-            </div>
-            <button id="refreshAppButton" class="btn btn-sm btn-outline-primary" type="button">Actualizar</button>
-            <select id="activePeriodSelect" class="form-select" aria-label="Periodo activo">
-              <option value="" disabled selected>Sin periodos registrados</option>
-            </select>
             <div class="account-controls" role="group" aria-label="Opciones de tu cuenta">
               <div class="user-chip">
                 <span id="currentUserAvatar" class="avatar">US</span>
@@ -114,6 +98,21 @@
                 <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4M14 16l4-4-4-4m4 4H8" /></svg>
                 <span>Cerrar sesión</span>
               </button>
+            </div>
+          </div>
+          <div class="topbar-context" aria-label="Periodo y actualización">
+            <div class="topbar-period">
+              <label for="activePeriodSelect">Ir al seguimiento de</label>
+              <select id="activePeriodSelect" class="form-select" aria-label="Elegir mes para abrir seguimiento mensual">
+                <option value="" disabled selected>Sin periodos registrados</option>
+              </select>
+            </div>
+            <div class="topbar-system">
+              <div class="system-status" aria-label="Estado del sistema">
+                <span id="systemModeBadge" class="system-mode-badge">Cargando</span>
+                <small id="lastSyncLabel">Sin actualizar</small>
+              </div>
+              <button id="refreshAppButton" class="btn btn-sm btn-outline-primary" type="button">Actualizar datos</button>
             </div>
           </div>
         </header>
@@ -341,7 +340,17 @@
           <section id="projectsView" class="content-view" hidden>
             <div class="section-heading">
               <div><h3>Proyectos</h3><p>Registro y consulta centralizada por centro de costo.</p></div>
-              <button id="newProjectButton" class="btn btn-primary">Nuevo proyecto</button>
+              <div class="project-heading-actions">
+                <div class="global-search">
+                  <label for="globalSearchInput">Buscar y abrir un proyecto</label>
+                  <div class="global-search-control">
+                    <input id="globalSearchInput" class="form-control" type="search" autocomplete="off" placeholder="Nombre o centro de costo" aria-controls="globalSearchResults" aria-expanded="false" />
+                    <button id="clearGlobalSearch" class="global-search-clear" type="button" aria-label="Limpiar búsqueda" hidden>×</button>
+                  </div>
+                  <div id="globalSearchResults" class="global-search-results" role="list" hidden></div>
+                </div>
+                <button id="newProjectButton" class="btn btn-primary" type="button">Nuevo proyecto</button>
+              </div>
             </div>
 
             <div class="cost-summary-grid project-overview-grid" aria-label="Resumen de proyectos">
@@ -873,10 +882,10 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="src/assets/js/config.js?v=1.12.0"></script>
-    <script type="module" src="src/assets/js/app.js?v=1.15.0"></script>
-    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.15.0"></script>
-    <script type="module" src="src/assets/js/accounting-ui.js?v=1.15.0"></script>
-    <script type="module" src="src/assets/js/assistant-ui.js?v=1.15.0"></script>
+    <script type="module" src="src/assets/js/app.js?v=1.15.1"></script>
+    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.15.1"></script>
+    <script type="module" src="src/assets/js/accounting-ui.js?v=1.15.1"></script>
+    <script type="module" src="src/assets/js/assistant-ui.js?v=1.15.1"></script>
   </body>
 </html>
 
