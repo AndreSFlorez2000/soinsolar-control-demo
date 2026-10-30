@@ -1,5 +1,5 @@
 import { AUXILIARY_COLUMNS, auxiliaryCsv, normalizeAuxiliaryRows, parseAuxiliaryCsv } from "./domain/accounting-auxiliary.js?v=1.14.0";
-import { centerKey, projectAccountingCenters, scopeAccountingCenters } from "./domain/accounting-projects.js?v=1.16.0";
+import { accountingCenterForProject, centerKey, projectAccountingCenters, scopeAccountingCenters } from "./domain/accounting-projects.js?v=1.16.1";
 
 const $ = (selector) => document.querySelector(selector);
 const cop = (value) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 2 }).format(Number(value ?? 0));
@@ -26,12 +26,11 @@ function filters() {
   };
 }
 
-function renderCenters() {
+function renderCenters(preferred = $("#accountingCenter").value) {
   const select = $("#accountingCenter");
-  const previous = select.value;
   select.innerHTML = `<option value="">Todos los centros (${number(projectCenters.length)})</option>`
     + projectCenters.map((row) => `<option value="${escapeHtml(row.costCenter)}">${escapeHtml(row.costCenter || "Sin CC")} · ${escapeHtml(row.project?.projectName || "Ficha pendiente")}</option>`).join("");
-  select.value = projectCenters.some((row) => row.costCenter === previous) ? previous : "";
+  select.value = projectCenters.some((row) => row.costCenter === preferred) ? preferred : "";
   $("#accountingCenterList").innerHTML = scopeAccountingCenters(projectCenters, select.value).map((row) => `<button type="button" class="accounting-center-chip ${row.costCenter === select.value ? "selected" : ""}" data-center="${escapeHtml(row.costCenter)}"><strong>${escapeHtml(row.costCenter || "Sin CC")}</strong><span>${escapeHtml(row.project?.projectName || "Ficha pendiente")} · ${number(row.sourceRows)} filas</span></button>`).join("");
 }
 
@@ -46,18 +45,21 @@ function renderAccountingCosts() {
   const rows = scopeAccountingCenters(projectCenters, selectedCode);
   const sum = (key) => rows.reduce((total, row) => total + Number(row[key] ?? 0), 0);
   $("#accountingRowCount").textContent = number(sum("sourceRows"));
-  $("#accountingCenterCount").textContent = number(rows.filter((row) => row.sourceRows > 0).length);
+  $("#accountingCenterCount").textContent = number(rows.length);
+  $("#costScopeBadge").textContent = selectedCode ? rows[0]?.project ? "Proyecto activo" : "Centro contable" : "Vista general";
+  $("#costScopeDescription").textContent = selectedCode
+    ? `${selectedCode}${rows[0]?.project ? ` · ${rows[0].project.projectName}` : " · Sin ficha de proyecto"}. Se muestran únicamente los movimientos de este centro.`
+    : `Se muestran los ${number(projectCenters.length)} centros de costo disponibles (del archivo seleccionado y de las fichas registradas). Elige uno en los filtros para trabajar sobre él.`;
   $("#accountingCenterHelp").textContent = selectedCode
-    ? `Mostrando solo ${selectedCode}${rows[0]?.project ? ` · ${rows[0].project.projectName}` : ""}. Los demás centros no se incluyen en estos totales.`
-    : "Vista general por centro de costo. Selecciona uno para ver sus movimientos y registros adicionales.";
+    ? "Estos totales corresponden solamente al centro seleccionado. Los registros manuales se muestran por separado."
+    : "Estos totales incluyen todos los centros. Selecciona uno para ver sus movimientos y registros adicionales.";
   $("#accountingShowAll").hidden = !selectedCode;
   $("#accountingExpenses").textContent = cop(sum("expenses"));
   $("#accountingSalesCosts").textContent = cop(sum("salesCosts"));
   $("#accountingProductionCosts").textContent = cop(sum("productionCosts"));
   $("#accountingCostLines").textContent = number(sum("classifiedLines"));
-  const fromFile = rows.filter((row) => row.sourceRows > 0);
-  $("#accountingLinkedCount").textContent = number(fromFile.filter((row) => row.project).length);
-  $("#accountingPendingCount").textContent = number(fromFile.filter((row) => !row.project).length);
+  $("#accountingLinkedCount").textContent = number(rows.filter((row) => row.project).length);
+  $("#accountingPendingCount").textContent = number(rows.filter((row) => !row.project && row.sourceRows > 0).length);
   $("#accountingCostRows").innerHTML = rows.map((row) => `
     <tr class="${row.costCenter === $("#accountingCenter").value ? "accounting-selected-row" : ""}">
       <td><strong>${escapeHtml(row.costCenter || "Sin CC")}</strong>${row.codes.length > 1 ? `<small class="accounting-muted">También: ${escapeHtml(row.codes.filter((code) => code !== row.costCenter).join(", "))}</small>` : ""}</td>
@@ -110,15 +112,10 @@ async function loadBatch() {
   centers = centerRows; parties = partyRows;
   projectCenters = projectAccountingCenters(centers, costRows, window.SOINSOLAR_APP_API.projects(), manualRows);
   const activeProject = window.SOINSOLAR_APP_API.projects().find((item) => item.projectId === window.SOINSOLAR_APP_API.selectedProjectId());
-  const activeCenter = projectCenters.find((row) => activeProject && row.key === centerKey(activeProject.costCenter));
-  const preferredCenter = activeCenter?.costCenter ?? $("#accountingCenter").value;
+  const preferredCenter = accountingCenterForProject(projectCenters, activeProject);
   $("#accountingExportButton").disabled = !batch || batch.status !== "complete";
-  renderCenters();
-  if (projectCenters.some((row) => row.costCenter === preferredCenter)) {
-    if ($("#accountingCenter").value !== preferredCenter) $("#accountingParty").value = "";
-    $("#accountingCenter").value = preferredCenter;
-    renderCenters();
-  }
+  if (displayedCenter !== preferredCenter) $("#accountingParty").value = "";
+  renderCenters(preferredCenter);
   renderPartyOptions();
   displayedCenter = $("#accountingCenter").value;
   renderAccountingCosts();
@@ -244,7 +241,11 @@ function wire() {
   $("#accountingBatch").addEventListener("change", () => loadBatch().catch((error) => message(error.message, true)));
   $("#accountingCenter").addEventListener("change", (event) => selectCenter(event.target.value));
   $("#accountingFilters").addEventListener("submit", (event) => { event.preventDefault(); page = 0; loadPage().catch((error) => message(error.message, true)); });
-  $("#accountingShowAll").addEventListener("click", () => selectCenter(""));
+  $("#accountingShowAll").addEventListener("click", () => {
+    for (const id of ["accountingAccount", "accountingParty", "accountingSearch", "accountingFrom", "accountingTo"]) $("#" + id).value = "";
+    $("#costFilters").reset();
+    selectCenter("");
+  });
   $("#accountingClear").addEventListener("click", () => {
     for (const id of ["accountingAccount", "accountingParty", "accountingSearch", "accountingFrom", "accountingTo"]) $("#" + id).value = "";
     const projectId = window.SOINSOLAR_APP_API.selectedProjectId();

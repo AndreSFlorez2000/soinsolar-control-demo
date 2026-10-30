@@ -138,6 +138,11 @@ button, input, select, textarea { font: inherit; }
 .heading-actions, .filter-actions, .dialog-actions { display: flex; align-items: center; gap: 10px; }
 .heading-actions { flex-wrap: wrap; justify-content: flex-end; }
 .cost-import-hint { margin: -6px 0 18px; color: var(--muted); font-size: 12px; }
+.cost-scope-banner { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 14px 18px; border: 1px solid #bddceb; border-left: 4px solid var(--blue); border-radius: 10px; background: #f0f8fc; }
+.cost-scope-banner > div { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; min-width: 0; }
+.cost-scope-badge { padding: 5px 9px; border-radius: 7px; color: #175b83; background: #d9eef8; font-size: 12px; white-space: nowrap; }
+.cost-scope-banner span { color: var(--text); font-size: 12px; }
+.cost-scope-banner .btn { white-space: nowrap; }
 .accounting-section { margin-top: 10px; }
 .manual-cost-section { margin-top: 30px; padding-top: 24px; border-top: 1px solid var(--border); }
 .accounting-section .filter-panel { margin-top: 18px; }
@@ -153,8 +158,6 @@ button, input, select, textarea { font: inherit; }
 .accounting-project-link { display: block; width: fit-content; margin-top: 6px; }
 .accounting-center-help, .accounting-reconciliation { color: var(--muted); font-size: 12px; }
 .accounting-center-help { margin-top: 14px !important; }
-.accounting-overview-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
-.accounting-overview-heading .btn { margin-top: 10px; }
 .accounting-reconciliation { margin: 12px 0 0; }
 .accounting-center-panel { margin: 18px 0; padding: 18px 20px; }
 .accounting-center-panel h4 { margin: 0 0 12px; font-size: 15px; }

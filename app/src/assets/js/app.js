@@ -132,6 +132,7 @@ function renderProjectContext() {
 function activateProject(projectId) {
   if (!hasProject(projectId, currentProjects)) return false;
   selectedProjectId = projectId;
+  pendingCostCenter = null;
   projectModuleFilters.forEach((id) => { document.querySelector(`#${id}`).value = projectId; });
   rememberProject(projectStorage(), projectContextOwnerId, projectId, currentProjects);
   renderProjectContext();
@@ -142,6 +143,7 @@ function activateProject(projectId) {
 function clearProjectContext() {
   const previousProjectId = selectedProjectId;
   selectedProjectId = null;
+  pendingCostCenter = null;
   projectModuleFilters.forEach((id) => {
     const filter = document.querySelector(`#${id}`);
     if (filter.value === previousProjectId) filter.value = "";
@@ -2008,6 +2010,10 @@ document.querySelector("#projectWorkspaceOpen").addEventListener("click", () => 
 document.querySelector("#projectWorkspaceClear").addEventListener("click", async () => {
   const view = routeFromHash().view;
   clearProjectContext();
+  document.querySelector("#costFilters").reset();
+  for (const id of ["accountingCenter", "accountingAccount", "accountingParty", "accountingSearch", "accountingFrom", "accountingTo"]) {
+    document.querySelector(`#${id}`).value = "";
+  }
   await showView(view === "detail" ? "projects" : view);
 });
 projectModuleFilters.forEach((id) => document.querySelector(`#${id}`).addEventListener("change", (event) => {
@@ -2046,15 +2052,19 @@ document.querySelector("#financeFilters").addEventListener("submit", (event) => 
 document.querySelector("#clearFinanceFilters").addEventListener("click", () => { document.querySelector("#financeFilters").reset(); loadFinance({}); });
 document.addEventListener("soinsolar:accounting-center-selected", (event) => {
   const { centerCode, projectId } = event.detail;
-  pendingCostCenter = centerCode && !projectId ? centerCode : null;
   if (projectId) activateProject(projectId);
-  else if (centerCode) clearProjectContext();
+  else if (centerCode) {
+    clearProjectContext();
+    pendingCostCenter = centerCode;
+  } else if (selectedProjectId) clearProjectContext();
+  else pendingCostCenter = null;
   document.querySelector("#costFilterProject").value = projectId || "";
   loadCosts();
 });
 document.querySelector("#costFilters").addEventListener("submit", (event) => {
   event.preventDefault(); pendingCostCenter = null;
   const projectId = document.querySelector("#costFilterProject").value;
+  if (!projectId && selectedProjectId) clearProjectContext();
   document.dispatchEvent(new CustomEvent("soinsolar:manual-cost-filter-applied", { detail: { projectId } }));
   loadCosts();
 });

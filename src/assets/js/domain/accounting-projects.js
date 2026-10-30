@@ -58,3 +58,9 @@ export function projectAccountingCenters(centers = [], classes = [], projects = 
 export function scopeAccountingCenters(rows = [], code = "") {
   return code ? rows.filter((row) => row.costCenter === code) : rows;
 }
+
+export function accountingCenterForProject(rows = [], project = null) {
+  if (!project) return "";
+  const key = centerKey(project.costCenter);
+  return rows.find((row) => row.key === key)?.costCenter ?? "";
+}

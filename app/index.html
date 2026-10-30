@@ -11,7 +11,7 @@
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.16.0" />
+    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.16.1" />
   </head>
   <body>
     <section id="loginView" class="login-shell">
@@ -393,6 +393,10 @@
             <div class="section-heading">
               <div><h3>Costos y gastos por centro de costo</h3><p>Consulta los movimientos de cada centro. El nombre del proyecto aparecerá cuando se cargue su ficha.</p></div>
             </div>
+            <div class="cost-scope-banner" role="status" aria-live="polite">
+              <div><strong id="costScopeBadge" class="cost-scope-badge">Vista general</strong><span id="costScopeDescription">Se muestran todos los centros de costo disponibles.</span></div>
+              <button id="accountingShowAll" type="button" class="btn btn-outline-primary btn-sm" hidden>Ver todos los centros</button>
+            </div>
 
             <section class="accounting-section" aria-labelledby="accountingTitle">
               <div class="section-heading">
@@ -415,7 +419,7 @@
                   <article class="mini-kpi"><span>Costos de producción · clase 7</span><strong id="accountingProductionCosts">$0</strong></article>
                   <article class="mini-kpi"><span>Registros contables de clases 5, 6 y 7</span><strong id="accountingCostLines">0</strong></article>
                 </div>
-                <div class="accounting-overview-heading"><p id="accountingCenterHelp" class="accounting-center-help">Selecciona un centro para ver sus movimientos y sus registros manuales.</p><button id="accountingShowAll" type="button" class="btn btn-outline-secondary btn-sm" hidden>Ver todos los centros</button></div>
+                <p id="accountingCenterHelp" class="accounting-center-help">Selecciona un centro para ver sus movimientos y sus registros manuales.</p>
                 <div class="table-responsive accounting-cost-table"><table class="table align-middle mb-0"><thead><tr><th>Centro de costo</th><th>Proyecto</th><th>Registros 5/6/7</th><th class="text-end">Gastos 5</th><th class="text-end">Costo ventas 6</th><th class="text-end">Costo producción 7</th><th class="text-end">Manual</th><th>Ver</th></tr></thead><tbody id="accountingCostRows"></tbody></table></div>
               </article>
               <article class="panel filter-panel" aria-labelledby="accountingFiltersTitle">
@@ -891,11 +895,11 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="src/assets/js/config.js?v=1.12.0"></script>
-    <script type="module" src="src/assets/js/app.js?v=1.16.0"></script>
-    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.16.0"></script>
-    <script type="module" src="src/assets/js/accounting-ui.js?v=1.16.0"></script>
-    <script type="module" src="src/assets/js/project-import-ui.js?v=1.16.0"></script>
-    <script type="module" src="src/assets/js/assistant-ui.js?v=1.16.0"></script>
+    <script type="module" src="src/assets/js/app.js?v=1.16.1"></script>
+    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.16.1"></script>
+    <script type="module" src="src/assets/js/accounting-ui.js?v=1.16.1"></script>
+    <script type="module" src="src/assets/js/project-import-ui.js?v=1.16.1"></script>
+    <script type="module" src="src/assets/js/assistant-ui.js?v=1.16.1"></script>
   </body>
 </html>
 
