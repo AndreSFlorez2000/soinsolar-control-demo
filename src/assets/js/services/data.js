@@ -9,7 +9,7 @@ import {
   SupportRepository
 } from "../data/repositories.js?v=1.16.0";
 import { requireSupabaseClient } from "./supabase.js?v=1.4.0";
-import { AccountingRepository } from "../data/accounting-repository.js?v=1.14.0";
+import { AccountingRepository } from "../data/accounting-repository.js?v=1.17.0";
 
 export function createDataService(client = requireSupabaseClient()) {
   if (!client?.from || !client?.auth) {

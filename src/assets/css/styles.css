@@ -138,6 +138,19 @@ button, input, select, textarea { font: inherit; }
 .heading-actions, .filter-actions, .dialog-actions { display: flex; align-items: center; gap: 10px; }
 .heading-actions { flex-wrap: wrap; justify-content: flex-end; }
 .cost-import-hint { margin: -6px 0 18px; color: var(--muted); font-size: 12px; }
+.cost-unified-actions { max-width: 710px; }
+.cost-unified-actions .btn { font-size: 11px; }
+.cost-verification { margin: 12px 0 0; padding: 10px 14px; border: 1px solid #c8dfd4; border-radius: 8px; background: #f0faf4; color: #21543b; font-size: 12px; }
+.cost-verification.needs-review { border-color: #f1d19a; background: #fff9ed; color: #754c15; }
+.unified-cost-panel { margin-top: 18px; }
+.unified-cost-panel .table td { vertical-align: top; }
+.unified-cost-panel .table td:nth-child(2) { min-width: 175px; }
+.unified-cost-panel .table td:nth-child(5) { min-width: 180px; }
+.unified-cost-panel .table td:nth-child(6) { min-width: 145px; }
+.cost-review-pill { display: block; width: fit-content; margin-top: 5px; padding: 2px 7px; border-radius: 6px; background: #fff0d3; color: #775014; font-size: 10px; }
+.accounting-original-details { margin-top: 18px; padding: 16px 18px; }
+.accounting-original-details summary { cursor: pointer; color: var(--navy); font-size: 13px; font-weight: 700; }
+.accounting-original-details .data-panel { margin-top: 14px; }
 .cost-scope-banner { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 14px 18px; border: 1px solid #bddceb; border-left: 4px solid var(--blue); border-radius: 10px; background: #f0f8fc; }
 .cost-scope-banner > div { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; min-width: 0; }
 .cost-scope-badge { padding: 5px 9px; border-radius: 7px; color: #175b83; background: #d9eef8; font-size: 12px; white-space: nowrap; }

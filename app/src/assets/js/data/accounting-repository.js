@@ -21,6 +21,26 @@ export class AccountingRepository {
     return data;
   }
 
+  async listCostEntries(importId) {
+    const rows = [];
+    for (let start = 0; ; start += 500) {
+      const { data, error } = await this.client.from("accounting_entries")
+        .select("import_id,row_number,cost_center,movement_date,account_code,account_name,document_number,third_party_name,third_party_id,detail,debit,credit")
+        .eq("import_id", importId).or("account_code.like.5%,account_code.like.6%,account_code.like.7%")
+        .order("row_number").range(start, start + 499);
+      if (error) throw new Error(`No se pudieron consultar los costos del archivo: ${error.message}`);
+      rows.push(...data);
+      if (data.length < 500) return rows;
+    }
+  }
+
+  async getEntry(importId, rowNumber) {
+    const { data, error } = await this.client.from("accounting_entries")
+      .select("*").eq("import_id", importId).eq("row_number", rowNumber).single();
+    if (error) throw new Error(`No se pudo consultar la fila original: ${error.message}`);
+    return data;
+  }
+
   async listParties(importId) {
     const rows = [];
     for (let start = 0; ; start += 500) {

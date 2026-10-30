@@ -1,11 +1,14 @@
 import { AUXILIARY_COLUMNS, auxiliaryCsv, normalizeAuxiliaryRows, parseAuxiliaryCsv } from "./domain/accounting-auxiliary.js?v=1.14.0";
 import { accountingCenterForProject, centerKey, projectAccountingCenters, scopeAccountingCenters } from "./domain/accounting-projects.js?v=1.16.1";
+import { filterUnifiedCosts, unifyCostMovements } from "./domain/unified-costs.js?v=1.17.0";
+import { createXlsx } from "./domain/xlsx-export.js?v=1.5.8";
 
 const $ = (selector) => document.querySelector(selector);
 const cop = (value) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 2 }).format(Number(value ?? 0));
 const number = (value) => new Intl.NumberFormat("es-CO").format(Number(value ?? 0));
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
-let batches = [], centers = [], projectCenters = [], parties = [], visible = [], page = 0, count = 0, loading = false, displayedCenter = "";
+let batches = [], centers = [], projectCenters = [], unified = { rows: [], matchedCount: 0, possibleCount: 0 }, visible = [];
+let page = 0, unifiedPage = 0, count = 0, loading = false, displayedCenter = "";
 
 function message(value = "", error = false) {
   const node = $("#accountingMessage");
@@ -31,44 +34,126 @@ function renderCenters(preferred = $("#accountingCenter").value) {
   select.innerHTML = `<option value="">Todos los centros (${number(projectCenters.length)})</option>`
     + projectCenters.map((row) => `<option value="${escapeHtml(row.costCenter)}">${escapeHtml(row.costCenter || "Sin CC")} · ${escapeHtml(row.project?.projectName || "Ficha pendiente")}</option>`).join("");
   select.value = projectCenters.some((row) => row.costCenter === preferred) ? preferred : "";
-  $("#accountingCenterList").innerHTML = scopeAccountingCenters(projectCenters, select.value).map((row) => `<button type="button" class="accounting-center-chip ${row.costCenter === select.value ? "selected" : ""}" data-center="${escapeHtml(row.costCenter)}"><strong>${escapeHtml(row.costCenter || "Sin CC")}</strong><span>${escapeHtml(row.project?.projectName || "Ficha pendiente")} · ${number(row.sourceRows)} filas</span></button>`).join("");
+  $("#accountingCenterList").innerHTML = scopeAccountingCenters(projectCenters, select.value).map((row) => `<button type="button" class="accounting-center-chip ${row.costCenter === select.value ? "selected" : ""}" data-center="${escapeHtml(row.costCenter)}"><strong>${escapeHtml(row.costCenter || "Sin CC")}</strong><span>${escapeHtml(row.project?.projectName || "Ficha pendiente")} · ${number(row.classifiedLines + row.manualLines)} movimientos</span></button>`).join("");
 }
 
 function renderPartyOptions() {
-  // Las sugerencias globales no deben exponer terceros de otros centros cuando hay un proyecto seleccionado.
-  $("#accountingPartyOptions").innerHTML = $("#accountingCenter").value ? ""
-    : parties.map((party) => `<option value="${escapeHtml(party.third_party_name)}"></option>`).join("");
+  const selected = centerKey($("#accountingCenter").value);
+  const names = new Set(unified.rows.filter((row) => !selected || centerKey(row.costCenter) === selected)
+    .map((row) => row.supplierName).filter(Boolean));
+  $("#accountingPartyOptions").innerHTML = [...names].sort((a, b) => a.localeCompare(b, "es"))
+    .map((name) => `<option value="${escapeHtml(name)}"></option>`).join("");
 }
 
 function renderAccountingCosts() {
   const selectedCode = $("#accountingCenter").value;
   const rows = scopeAccountingCenters(projectCenters, selectedCode);
-  const sum = (key) => rows.reduce((total, row) => total + Number(row[key] ?? 0), 0);
-  $("#accountingRowCount").textContent = number(sum("sourceRows"));
+  const movements = filteredMovements();
+  const totals = new Map();
+  for (const item of movements) {
+    const key = centerKey(item.costCenter);
+    if (!totals.has(key)) totals.set(key, { count: 0, expenses: 0, costs: 0 });
+    const total = totals.get(key);
+    total.count++;
+    total[item.type === "gasto" ? "expenses" : "costs"] += Math.round(item.amount * 100);
+  }
+  const sum = (key) => [...totals.values()].reduce((total, row) => total + row[key], 0);
+  $("#accountingRowCount").textContent = number(movements.length);
   $("#accountingCenterCount").textContent = number(rows.length);
   $("#costScopeBadge").textContent = selectedCode ? rows[0]?.project ? "Proyecto activo" : "Centro contable" : "Vista general";
   $("#costScopeDescription").textContent = selectedCode
     ? `${selectedCode}${rows[0]?.project ? ` · ${rows[0].project.projectName}` : " · Sin ficha de proyecto"}. Se muestran únicamente los movimientos de este centro.`
     : `Se muestran los ${number(projectCenters.length)} centros de costo disponibles (del archivo seleccionado y de las fichas registradas). Elige uno en los filtros para trabajar sobre él.`;
   $("#accountingCenterHelp").textContent = selectedCode
-    ? "Estos totales corresponden solamente al centro seleccionado. Los registros manuales se muestran por separado."
-    : "Estos totales incluyen todos los centros. Selecciona uno para ver sus movimientos y registros adicionales.";
+    ? "Estos totales, la tabla y la lista siguen los filtros del centro seleccionado."
+    : "Estos totales, la tabla y la lista siguen los filtros aplicados. Selecciona un centro para trabajar sobre él.";
   $("#accountingShowAll").hidden = !selectedCode;
-  $("#accountingExpenses").textContent = cop(sum("expenses"));
-  $("#accountingSalesCosts").textContent = cop(sum("salesCosts"));
-  $("#accountingProductionCosts").textContent = cop(sum("productionCosts"));
-  $("#accountingCostLines").textContent = number(sum("classifiedLines"));
+  const expenses = sum("expenses") / 100;
+  const costs = sum("costs") / 100;
+  $("#accountingExpenses").textContent = cop(expenses);
+  $("#accountingSalesCosts").textContent = cop(costs);
+  $("#accountingProductionCosts").textContent = cop(expenses + costs);
+  $("#accountingCostLines").textContent = number(movements.length);
   $("#accountingLinkedCount").textContent = number(rows.filter((row) => row.project).length);
   $("#accountingPendingCount").textContent = number(rows.filter((row) => !row.project && row.sourceRows > 0).length);
-  $("#accountingCostRows").innerHTML = rows.map((row) => `
+  $("#accountingCostRows").innerHTML = rows.map((row) => {
+    const total = totals.get(row.key) ?? { count: 0, expenses: 0, costs: 0 };
+    return `
     <tr class="${row.costCenter === $("#accountingCenter").value ? "accounting-selected-row" : ""}">
       <td><strong>${escapeHtml(row.costCenter || "Sin CC")}</strong>${row.codes.length > 1 ? `<small class="accounting-muted">También: ${escapeHtml(row.codes.filter((code) => code !== row.costCenter).join(", "))}</small>` : ""}</td>
       <td><strong>${escapeHtml(row.project?.projectName || (row.ambiguous ? "Revisar código duplicado" : "Ficha pendiente"))}</strong><small class="accounting-muted">${row.project ? "Proyecto vinculado por CC" : "Se vinculará al cargar su ficha"}</small></td>
-      <td>${number(row.classifiedLines)}</td><td class="text-end">${cop(row.expenses)}</td>
-      <td class="text-end">${cop(row.salesCosts)}</td><td class="text-end">${cop(row.productionCosts)}</td>
-      <td class="text-end">${cop(row.manualCosts + row.manualExpenses)}<small class="accounting-muted">${number(row.manualLines)} registro(s)</small></td>
+      <td>${number(total.count)}</td><td class="text-end">${cop(total.expenses / 100)}</td>
+      <td class="text-end">${cop(total.costs / 100)}</td>
+      <td class="text-end">${cop((total.expenses + total.costs) / 100)}</td>
       <td><button type="button" class="table-action" data-accounting-cost-center="${escapeHtml(row.costCenter)}">Ver movimientos</button>${row.project ? `<a class="table-action accounting-project-link" href="#detail/${encodeURIComponent(row.project.projectId)}">Abrir ficha</a>` : ""}</td>
+    </tr>`;
+  }).join("");
+}
+
+function unifiedFilters() {
+  const chosen = filters(); // También valida el rango de fechas.
+  return { ...chosen, type: $("#accountingType").value,
+    month: $("#accountingMonth").value, category: $("#accountingCategory").value.trim() };
+}
+
+function filteredMovements() {
+  return filterUnifiedCosts(unified.rows, unifiedFilters());
+}
+
+function renderUnifiedMovements() {
+  const rows = filteredMovements();
+  const pages = Math.max(1, Math.ceil(rows.length / 100));
+  unifiedPage = Math.min(unifiedPage, pages - 1);
+  const shown = rows.slice(unifiedPage * 100, (unifiedPage + 1) * 100);
+  $("#unifiedCostCount").textContent = `${number(rows.length)} movimiento(s)`;
+  $("#unifiedCostRows").innerHTML = shown.map((row) => `
+    <tr>
+      <td>${escapeHtml(row.movementDate)}</td>
+      <td><strong>${escapeHtml(row.costCenter || "Sin CC")}</strong><small class="accounting-muted">${escapeHtml(row.projectName || "Ficha pendiente")}</small></td>
+      <td><span class="type-badge ${row.type}">${escapeHtml(row.type)}</span></td>
+      <td>${escapeHtml(row.category || "—")}${row.accountCode ? `<small class="accounting-muted">${escapeHtml(row.accountCode)}</small>` : ""}</td>
+      <td>${escapeHtml(row.description || "—")}${row.verification.includes("revisar") ? `<span class="cost-review-pill">${escapeHtml(row.verification)}</span>` : ""}</td>
+      <td>${escapeHtml(row.supplierName || "—")}<small class="accounting-muted">${escapeHtml(row.documentReference || "Sin documento")}</small></td>
+      <td class="text-end"><strong>${cop(row.amount)}</strong></td>
+      <td>${row.source === "accounting" ? `<button class="table-action" type="button" data-unified-import="${escapeHtml(row.importId)}" data-unified-row="${row.rowNumber}">Ver original</button>` : ""}${row.supportPath ? `<button class="table-action support-action" type="button" data-action="open-support" data-support-path="${escapeHtml(row.supportPath)}">Ver soporte</button>` : ""}</td>
     </tr>`).join("");
+  $("#unifiedCostEmpty").hidden = rows.length > 0;
+  $("#unifiedCostPageStatus").textContent = rows.length
+    ? `Movimientos ${number(unifiedPage * 100 + 1)}–${number(Math.min((unifiedPage + 1) * 100, rows.length))} de ${number(rows.length)}` : "0 movimientos";
+  $("#unifiedCostPrevious").disabled = unifiedPage === 0;
+  $("#unifiedCostNext").disabled = unifiedPage >= pages - 1;
+}
+
+function renderVerification(batch) {
+  const note = $("#costVerification");
+  const status = batch?.status === "complete"
+    ? `Archivo verificado: ${number(batch.expected_rows)} filas; débitos y créditos conciliados. `
+    : batch ? "Archivo incompleto: termina su carga antes de consultar sus costos. "
+      : "Los movimientos registrados se consultan por centro de costo. ";
+  const matches = unified.matchedCount ? `${number(unified.matchedCount)} documento(s) coincidentes se muestran una sola vez. ` : "";
+  const pending = unified.possibleCount
+    ? `${number(unified.possibleCount)} posible(s) coincidencia(s) sin documento idéntico requieren revisión; se conservan visibles para no perder registros.` : "";
+  note.textContent = status + matches + pending;
+  note.classList.toggle("needs-review", Boolean(unified.possibleCount || batch?.status === "importing"));
+}
+
+function exportUnifiedWorkbook() {
+  try {
+    const rows = filteredMovements();
+    if (!rows.length) { message("No hay movimientos para exportar con estos filtros.", true); return; }
+    const workbook = [{
+      name: "Costos y gastos", headers: ["Fecha", "Centro de costo", "Proyecto", "Tipo", "Categoría / cuenta",
+        "Descripción", "Proveedor", "Documento", "Subcuenta", "Valor COP", "Verificación"],
+      types: ["text", "text", "text", "text", "text", "text", "text", "text", "text", "money", "text"],
+      rows: rows.map((row) => [row.movementDate, row.costCenter, row.projectName, row.type, row.category,
+        row.description, row.supplierName, row.documentReference, row.accountCode, row.amount, row.verification]),
+      freezeColumns: 2, columnWidths: [16, 19, 32, 13, 28, 42, 28, 21, 17, 20, 30]
+    }];
+    const url = URL.createObjectURL(createXlsx(workbook));
+    const anchor = document.createElement("a");
+    anchor.href = url; anchor.download = `costos-gastos-${new Date().toISOString().slice(0, 10)}.xlsx`; anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (error) { message(error.message || "No se pudo exportar la consulta.", true); }
 }
 
 function renderRows() {
@@ -82,10 +167,10 @@ function renderRows() {
   $("#accountingEmpty").hidden = count > 0;
   const selected = projectCenters.find((row) => row.costCenter === $("#accountingCenter").value);
   $("#accountingReconciliation").textContent = selected && !selected.sourceRows
-    ? "Este centro ya tiene ficha de proyecto, pero no tiene filas en el archivo seleccionado. Consulta sus registros adicionales más abajo."
+    ? "Este centro ya tiene ficha de proyecto, pero no tiene filas en el archivo seleccionado. Sus otros movimientos se ven en la lista principal."
     : selected && !selected.project
       ? "Los movimientos de este centro están guardados. Su nombre y contrato aparecerán cuando se cargue la ficha del proyecto con el mismo código."
-      : "Los movimientos contables y los registros adicionales se presentan por separado para poder conciliarlos.";
+      : "Estas son las filas originales del auxiliar; la lista principal reúne los costos y gastos del centro.";
   $("#accountingPageStatus").textContent = count ? `Filas ${number(page * 100 + 1)}–${number(Math.min((page + 1) * 100, count))} de ${number(count)} (orden original)` : "0 filas";
   $("#accountingPrevious").disabled = page === 0;
   $("#accountingNext").disabled = (page + 1) * 100 >= count;
@@ -103,14 +188,15 @@ async function loadPage() {
 async function loadBatch() {
   const batch = selectedBatch();
   const gateway = await window.SOINSOLAR_APP_API.gateway();
-  const [centerRows, costRows, partyRows, manualRows] = await Promise.all([
+  const [centerRows, costRows, costEntries, manualRows] = await Promise.all([
     batch ? gateway.listAccountingCenters(batch.id) : [],
     batch ? gateway.listAccountingCostCenters(batch.id) : [],
-    batch ? gateway.listAccountingParties(batch.id) : [],
+    batch?.status === "complete" ? gateway.listAccountingCostEntries(batch.id) : [],
     gateway.listCostsExpenses({})
   ]);
-  centers = centerRows; parties = partyRows;
-  projectCenters = projectAccountingCenters(centers, costRows, window.SOINSOLAR_APP_API.projects(), manualRows);
+  centers = centerRows;
+  unified = unifyCostMovements(costEntries, manualRows, window.SOINSOLAR_APP_API.projects());
+  projectCenters = projectAccountingCenters(centers, costRows, window.SOINSOLAR_APP_API.projects(), unified.unmatchedManual);
   const activeProject = window.SOINSOLAR_APP_API.projects().find((item) => item.projectId === window.SOINSOLAR_APP_API.selectedProjectId());
   const preferredCenter = accountingCenterForProject(projectCenters, activeProject);
   $("#accountingExportButton").disabled = !batch || batch.status !== "complete";
@@ -119,6 +205,9 @@ async function loadBatch() {
   renderPartyOptions();
   displayedCenter = $("#accountingCenter").value;
   renderAccountingCosts();
+  renderVerification(batch);
+  unifiedPage = 0;
+  renderUnifiedMovements();
   page = 0;
   await loadPage();
   if (batch?.status === "importing") message("Esta importación quedó incompleta. Selecciona el mismo archivo para continuar.", true);
@@ -128,8 +217,10 @@ async function refresh(preferredId) {
   const api = window.SOINSOLAR_APP_API;
   if (!api?.profile()?.active) return;
   const gateway = await api.gateway();
+  $(".accounting-section").hidden = gateway.mode !== "supabase";
+  $(".manual-cost-section").hidden = gateway.mode === "supabase";
   $("#accountingImportButton").hidden = gateway.mode !== "supabase" || api.profile().role !== "administrador";
-  if (gateway.mode !== "supabase") { $("#accountingExportButton").disabled = true; message("El auxiliar contable se consulta desde la aplicación conectada."); return; }
+  if (gateway.mode !== "supabase") { $("#accountingExportButton").disabled = true; message(""); return; }
   batches = await gateway.listAccountingImports();
   const selector = $("#accountingBatch");
   const previous = preferredId ?? selector.value;
@@ -210,12 +301,19 @@ async function exportOriginal() {
   } catch (error) { message(error.message || "No se pudo descargar el archivo.", true); }
 }
 
-function openRaw(rowNumber) {
-  const row = visible.find((item) => item.row_number === Number(rowNumber));
+function showOriginalRow(row) {
   if (!row) return;
   $("#accountingDetailTitle").textContent = `Fila ${row.row_number} · ${row.cost_center || "Sin CC"}`;
   $("#accountingDetail").innerHTML = row.raw_cells.map((value, index) => `<div class="accounting-field"><span>${index + 1}. ${escapeHtml(AUXILIARY_COLUMNS[index])}</span><strong>${escapeHtml(value) || "(vacío)"}</strong></div>`).join("");
   $("#accountingDetailDialog").showModal();
+}
+
+function openRaw(rowNumber) {
+  showOriginalRow(visible.find((item) => item.row_number === Number(rowNumber)));
+}
+
+async function openUnifiedOriginal(importId, rowNumber) {
+  showOriginalRow(await (await window.SOINSOLAR_APP_API.gateway()).getAccountingEntry(importId, Number(rowNumber)));
 }
 
 function selectCenter(code, scroll = false) {
@@ -224,6 +322,7 @@ function selectCenter(code, scroll = false) {
   displayedCenter = code;
   renderCenters(); renderPartyOptions();
   renderAccountingCosts();
+  unifiedPage = 0; renderUnifiedMovements();
   const row = projectCenters.find((item) => item.costCenter === code);
   document.dispatchEvent(new CustomEvent("soinsolar:accounting-center-selected", {
     detail: { centerCode: code, projectId: row?.project?.projectId ?? null }
@@ -234,20 +333,29 @@ function selectCenter(code, scroll = false) {
 }
 
 function wire() {
+  window.SOINSOLAR_UNIFIED_COSTS = Object.freeze({ export: exportUnifiedWorkbook });
   document.addEventListener("soinsolar:costs-open", () => refresh().catch((error) => message(error.message, true)));
   $("#accountingImportButton").addEventListener("click", () => $("#accountingFile").click());
   $("#accountingFile").addEventListener("change", importFile);
   $("#accountingExportButton").addEventListener("click", exportOriginal);
   $("#accountingBatch").addEventListener("change", () => loadBatch().catch((error) => message(error.message, true)));
   $("#accountingCenter").addEventListener("change", (event) => selectCenter(event.target.value));
-  $("#accountingFilters").addEventListener("submit", (event) => { event.preventDefault(); page = 0; loadPage().catch((error) => message(error.message, true)); });
+  $("#accountingFilters").addEventListener("submit", (event) => {
+    event.preventDefault(); page = 0; unifiedPage = 0;
+    try { renderAccountingCosts(); renderUnifiedMovements(); loadPage().catch((error) => message(error.message, true)); }
+    catch (error) { message(error.message, true); }
+  });
+  const clearDetailedFilters = () => {
+    for (const id of ["accountingAccount", "accountingParty", "accountingSearch", "accountingCategory",
+      "accountingType", "accountingMonth", "accountingFrom", "accountingTo"]) $("#" + id).value = "";
+  };
   $("#accountingShowAll").addEventListener("click", () => {
-    for (const id of ["accountingAccount", "accountingParty", "accountingSearch", "accountingFrom", "accountingTo"]) $("#" + id).value = "";
+    clearDetailedFilters();
     $("#costFilters").reset();
     selectCenter("");
   });
   $("#accountingClear").addEventListener("click", () => {
-    for (const id of ["accountingAccount", "accountingParty", "accountingSearch", "accountingFrom", "accountingTo"]) $("#" + id).value = "";
+    clearDetailedFilters();
     const projectId = window.SOINSOLAR_APP_API.selectedProjectId();
     const active = window.SOINSOLAR_APP_API.projects().find((row) => row.projectId === projectId);
     const projectCenter = projectCenters.find((row) => active && row.key === centerKey(active.costCenter));
@@ -256,7 +364,7 @@ function wire() {
   $("#accountingCostRows").addEventListener("click", (event) => {
     const button = event.target.closest("[data-accounting-cost-center]");
     if (!button) return;
-    $("#accountingAccount").value = ""; // The CC detail includes all source accounts.
+    clearDetailedFilters();
     selectCenter(button.dataset.accountingCostCenter, true);
   });
   $("#accountingCenterList").addEventListener("click", (event) => {
@@ -270,18 +378,26 @@ function wire() {
     if ($("#accountingCenter").value !== (target?.costCenter ?? "")) $("#accountingParty").value = "";
     $("#accountingCenter").value = target?.costCenter ?? "";
     displayedCenter = $("#accountingCenter").value;
-    renderCenters(); renderPartyOptions(); renderAccountingCosts(); page = 0;
+    renderCenters(); renderPartyOptions(); renderAccountingCosts(); unifiedPage = 0; renderUnifiedMovements(); page = 0;
     loadPage().catch((error) => message(error.message, true));
   });
   document.addEventListener("soinsolar:costs-manual-updated", () => loadBatch().catch((error) => message(error.message, true)));
   $("#accountingRows").addEventListener("click", (event) => { if (event.target.dataset.rawRow) openRaw(event.target.dataset.rawRow); });
+  $("#unifiedCostRows").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-unified-import]");
+    if (button) openUnifiedOriginal(button.dataset.unifiedImport, button.dataset.unifiedRow)
+      .catch((error) => message(error.message, true));
+  });
+  $("#unifiedCostPrevious").addEventListener("click", () => { unifiedPage--; renderUnifiedMovements(); });
+  $("#unifiedCostNext").addEventListener("click", () => { unifiedPage++; renderUnifiedMovements(); });
   $("#accountingPrevious").addEventListener("click", () => { page--; loadPage().catch((error) => message(error.message, true)); });
   $("#accountingNext").addEventListener("click", () => { page++; loadPage().catch((error) => message(error.message, true)); });
   $("#accountingCloseDetail").addEventListener("click", () => $("#accountingDetailDialog").close());
   window.addEventListener("soinsolar:logout", () => {
-    batches = []; centers = []; projectCenters = []; parties = []; visible = []; page = 0; count = 0; displayedCenter = "";
+    batches = []; centers = []; projectCenters = []; unified = { rows: [], matchedCount: 0, possibleCount: 0 };
+    visible = []; page = 0; unifiedPage = 0; count = 0; displayedCenter = "";
     $("#accountingBatch").replaceChildren(); $("#accountingCenter").value = "";
-    $("#accountingCostRows").replaceChildren(); $("#accountingRows").replaceChildren();
+    $("#accountingCostRows").replaceChildren(); $("#accountingRows").replaceChildren(); $("#unifiedCostRows").replaceChildren();
     $("#accountingCenterList").replaceChildren(); message();
   });
 }

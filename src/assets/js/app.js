@@ -9,7 +9,7 @@ import { canEditExecution } from "./domain/execution.js?v=1.9.0";
 import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=1.1.0";
 import { invoicePendingAmount, isSampleProject, payableInvoicesForProject } from "./domain/payment-selection.js?v=1.5.1";
 import { forgetProject, hasProject, recallProject, rememberProject } from "./domain/project-context.js?v=1.8.0";
-import { createApplicationDataGateway } from "./services/application-data.js?v=1.16.0";
+import { createApplicationDataGateway } from "./services/application-data.js?v=1.17.0";
 import { getCurrentSession, isDemoMode, registerAccount, signIn, signOut } from "./services/supabase.js?v=1.13.1";
 
 const loginView = document.querySelector("#loginView");
@@ -1366,7 +1366,10 @@ function downloadCostWorkbook(template = false) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function exportCosts() { downloadCostWorkbook(); }
+function exportCosts() {
+  if (!isDemoMode() && window.SOINSOLAR_UNIFIED_COSTS?.export) return window.SOINSOLAR_UNIFIED_COSTS.export();
+  downloadCostWorkbook();
+}
 function downloadCostTemplate() { downloadCostWorkbook(true); }
 
 function financeFilters() {
@@ -2011,7 +2014,8 @@ document.querySelector("#projectWorkspaceClear").addEventListener("click", async
   const view = routeFromHash().view;
   clearProjectContext();
   document.querySelector("#costFilters").reset();
-  for (const id of ["accountingCenter", "accountingAccount", "accountingParty", "accountingSearch", "accountingFrom", "accountingTo"]) {
+  for (const id of ["accountingCenter", "accountingAccount", "accountingParty", "accountingSearch",
+    "accountingCategory", "accountingType", "accountingMonth", "accountingFrom", "accountingTo"]) {
     document.querySelector(`#${id}`).value = "";
   }
   await showView(view === "detail" ? "projects" : view);
