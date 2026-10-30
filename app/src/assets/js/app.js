@@ -9,7 +9,7 @@ import { canEditExecution } from "./domain/execution.js?v=1.9.0";
 import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=1.1.0";
 import { invoicePendingAmount, isSampleProject, payableInvoicesForProject } from "./domain/payment-selection.js?v=1.5.1";
 import { forgetProject, hasProject, recallProject, rememberProject } from "./domain/project-context.js?v=1.8.0";
-import { createApplicationDataGateway } from "./services/application-data.js?v=1.12.0";
+import { createApplicationDataGateway } from "./services/application-data.js?v=1.14.0";
 import { getCurrentSession, isDemoMode, registerAccount, signIn, signOut } from "./services/supabase.js?v=1.13.1";
 
 const loginView = document.querySelector("#loginView");
@@ -59,6 +59,7 @@ const tableLabels = {
   invoices: "Facturación",
   payments: "Pagos",
   costs_expenses: "Costos y gastos",
+  accounting_imports: "Importaciones contables",
   profiles: "Usuarios"
 };
 const actionLabels = { INSERT: "Creación", UPDATE: "Modificación", DELETE: "Eliminación" };
@@ -398,7 +399,10 @@ async function showView(requestedView) {
   if (view === "projects") await loadProjects();
   if (view === "monthly") await loadMonthlyModule();
   if (view === "finance") await loadFinance();
-  if (view === "costs") await loadCosts();
+  if (view === "costs") {
+    await loadCosts();
+    document.dispatchEvent(new CustomEvent("soinsolar:costs-open"));
+  }
   if (view === "reports") await loadReports();
   if (view === "history") await loadHistory();
   if (view === "admin") await loadProfiles();

@@ -6,6 +6,7 @@ import {
   resolveAssistantQuestion, resolveAssistantQuickQuestion
 } from "./domain/assistant.js?v=1.12.0";
 import { formatCop } from "./domain/financial.js?v=1.1.0";
+import { accountingQuestionFilters, isAccountingQuestion } from "./domain/accounting-assistant.js?v=1.14.0";
 
 const form = document.querySelector("#assistantForm");
 const input = document.querySelector("#assistantQuestion");
@@ -19,6 +20,7 @@ let busy = false;
 let draft = null;
 let lastProjectId = null;
 let useWorkspaceContext = true;
+let accountingCatalog = null;
 
 function updateContext(projects = window.SOINSOLAR_APP_API?.projects() ?? []) {
   const app = window.SOINSOLAR_APP_API;
@@ -621,10 +623,73 @@ function renderQuickAnswer(target, answer) {
     return;
   }
   target.append(node("h4", "", "¿Qué puedo hacer por ti?"));
-  paragraph(target, "Puedo consultar los datos de proyectos, contratos, periodos, seguimiento, facturas, pagos, costos y proveedores. También respondo sobre notas, fechas, potencia, observaciones y estados de validación.");
+  paragraph(target, "Puedo consultar los datos de proyectos, contratos, periodos, seguimiento, facturas, pagos, costos y proveedores. En el auxiliar CSV busco por centro de costo, proveedor, subcuenta, documento y detalle.");
   paragraph(target, "Recuerdo el proyecto entre preguntas, resumo sus cifras y puedo listar centros con cartera, sin avance o por municipio. Los perfiles de otros usuarios están reservados al administrador.");
   paragraph(target, "También puedo mostrar un resumen general y guiarte paso a paso para crear un proyecto, revisar sus datos y guardarlo si tu cuenta tiene permiso.");
   paragraph(target, "Prueba con «¿Qué facturas tiene CC-102?», «¿Qué observaciones hay en septiembre?» o «¿Qué proyectos hay en Neiva?». También puedes escribir «Crear proyecto».", "assistant-caveat");
+}
+
+async function getAccountingCatalog(gateway) {
+  if (accountingCatalog) return accountingCatalog;
+  const batches = (await gateway.listAccountingImports()).filter((item) => item.status === "complete");
+  const [centers, parties] = await Promise.all([
+    Promise.all(batches.map((batch) => gateway.listAccountingCenters(batch.id))).then((groups) => groups.flat()),
+    Promise.all(batches.map((batch) => gateway.listAccountingParties(batch.id))).then((groups) => groups.flat())
+  ]);
+  accountingCatalog = { batches, centers, parties };
+  return accountingCatalog;
+}
+
+async function answerAccounting(question, gateway, target) {
+  const catalog = await getAccountingCatalog(gateway);
+  target.replaceChildren();
+  if (!catalog.batches.length) {
+    paragraph(target, "Todavía no hay auxiliares contables cargados. El administrador puede subir el CSV desde Costos y gastos.");
+    return;
+  }
+  const { filters, context } = accountingQuestionFilters(question, catalog.centers, catalog.parties, catalog.batches);
+  const [summary, pageResults] = await Promise.all([
+    gateway.summarizeAccounting(filters),
+    Promise.all(catalog.batches.map((batch) => gateway.listAccountingEntries(batch.id, filters, 0)))
+  ]);
+  const rows = pageResults.flatMap((page) => page.rows)
+    .sort((a, b) => String(b.movement_date).localeCompare(String(a.movement_date)) || b.row_number - a.row_number)
+    .slice(0, 12);
+  target.append(node("h4", "", "Auxiliar contable · costos, gastos y movimientos"));
+  const applied = [context.requestedCenter && `CC ${filters.costCenter}`, context.party && `Tercero ${context.party}`,
+    context.account && `Cuenta ${context.account}`, context.dateFrom && `Mes ${context.dateFrom.slice(0, 7)}`,
+    context.search && `Texto ${context.search}`].filter(Boolean);
+  paragraph(target, `${Number(summary.row_count).toLocaleString("es-CO")} asientos en ${Number(summary.center_count).toLocaleString("es-CO")} centros de costo${applied.length ? ` · ${applied.join(" · ")}` : ""}.`, "assistant-subtitle");
+  if (!Number(summary.row_count)) {
+    paragraph(target, "No encontré movimientos para esos criterios en los archivos importados. Puedes probar con otro CC, proveedor, cuenta o mes.");
+    return;
+  }
+  const grid = node("div", "assistant-metrics");
+  metric(grid, "Gastos · clase 5 (neto)", formatCop(summary.expenses));
+  metric(grid, "Costos de ventas · clase 6 (neto)", formatCop(summary.sales_costs));
+  metric(grid, "Costos de producción · clase 7 (neto)", formatCop(summary.production_costs));
+  metric(grid, "Asientos de costos y gastos", Number(summary.classified_lines).toLocaleString("es-CO"));
+  metric(grid, "Débitos del auxiliar", formatCop(summary.total_debit));
+  metric(grid, "Créditos del auxiliar", formatCop(summary.total_credit));
+  target.append(grid);
+  paragraph(target, "Cada neto es débito menos crédito. Las clases 5, 6 y 7 se muestran por separado para evitar contar dos veces un mismo costo contable; estos asientos no alteran facturación, recaudo ni avance físico.", "assistant-caveat");
+  if (/\bproveedores\b/i.test(question) && !filters.party) {
+    const suppliers = [...catalog.parties].sort((a, b) => b.row_count - a.row_count).slice(0, 12);
+    const suppliersBlock = section(target, "Terceros con más asientos en el auxiliar");
+    const suppliersList = node("dl", "assistant-details");
+    for (const supplier of suppliers) detail(suppliersList, supplier.third_party_name,
+      `${Number(supplier.row_count).toLocaleString("es-CO")} filas · NIT ${supplier.third_party_id || "sin NIT"}`);
+    suppliersBlock.append(suppliersList);
+  }
+  const block = section(target, `Movimientos encontrados · ${rows.length} de ${Number(summary.row_count).toLocaleString("es-CO")}`);
+  const list = node("dl", "assistant-details");
+  for (const row of rows) detail(list,
+    `${row.movement_date} · CC ${row.cost_center || "sin CC"} · ${row.account_code} · ${row.document_type} ${row.document_number}`,
+    `${row.third_party_name || row.third_party_id || "Sin tercero"} · ${row.detail || row.account_name} · Débito ${formatCop(row.debit)} / crédito ${formatCop(row.credit)}`);
+  block.append(list);
+  const link = node("a", "assistant-choice", "Ver todas las filas y los 58 campos en Costos y gastos");
+  link.href = "#costs";
+  target.append(link);
 }
 
 async function ask(question) {
@@ -659,6 +724,14 @@ async function ask(question) {
       await processDraft(value, projects, profile, gateway, reply, requestGeneration);
       messages.scrollTop = messages.scrollHeight;
       return;
+    }
+    if (isAccountingQuestion(value)) {
+      const accountingGateway = await app.gateway();
+      if (accountingGateway.mode === "supabase") {
+        await answerAccounting(value, accountingGateway, reply);
+        messages.scrollTop = messages.scrollHeight;
+        return;
+      }
     }
     const result = resolveAssistantQuestion(value, projects, {
       projectId: lastProjectId ?? (useWorkspaceContext ? app.selectedProjectId?.() : null), periods: app.periods()
@@ -829,6 +902,7 @@ document.querySelector("#assistantRefresh").addEventListener("click", async () =
   setBusy(true, "Actualizando información…");
   try {
     await window.SOINSOLAR_APP_API.reloadReferenceData();
+    accountingCatalog = null;
     if (requestGeneration !== generation || document.querySelector("#appView").hidden) return;
     const projects = window.SOINSOLAR_APP_API.projects();
     if (lastProjectId && !projects.some((item) => item.projectId === lastProjectId)) lastProjectId = null;
@@ -842,6 +916,7 @@ document.querySelector("#assistantRefresh").addEventListener("click", async () =
 });
 
 window.addEventListener("soinsolar:assistant-open", () => updateContext());
+window.addEventListener("soinsolar:accounting-updated", () => { accountingCatalog = null; });
 window.addEventListener("soinsolar:project-context", (event) => {
   if (!useWorkspaceContext) return;
   lastProjectId = event.detail.projectId;

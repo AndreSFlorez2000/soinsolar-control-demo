@@ -9,6 +9,7 @@ import {
   SupportRepository
 } from "../data/repositories.js?v=1.12.0";
 import { requireSupabaseClient } from "./supabase.js?v=1.4.0";
+import { AccountingRepository } from "../data/accounting-repository.js?v=1.14.0";
 
 export function createDataService(client = requireSupabaseClient()) {
   if (!client?.from || !client?.auth) {
@@ -23,6 +24,7 @@ export function createDataService(client = requireSupabaseClient()) {
     finance: new FinanceRepository(client),
     audit: new AuditRepository(client),
     profiles: new ProfileRepository(client),
-    supports: new SupportRepository(client)
+    supports: new SupportRepository(client),
+    accounting: new AccountingRepository(client)
   });
 }

@@ -1,4 +1,4 @@
-import { createDataService } from "./data.js?v=1.12.0";
+import { createDataService } from "./data.js?v=1.14.0";
 import { getCurrentUser, isDemoMode, requireSupabaseClient } from "./supabase.js?v=1.4.0";
 
 export async function createApplicationDataGateway() {
@@ -45,6 +45,14 @@ export async function createApplicationDataGateway() {
     listPayments: (filters) => data.finance.listPayments(filters),
     createPayment: (input) => data.finance.createPayment(input, userId),
     listCostsExpenses: (filters) => data.finance.listCostsExpenses(filters),
+    listAccountingImports: () => data.accounting.listImports(),
+    listAccountingCenters: (id) => data.accounting.listCenters(id),
+    listAccountingCostCenters: (id) => data.accounting.listCostCenters(id),
+    listAccountingParties: (id) => data.accounting.listParties(id),
+    summarizeAccounting: (filters) => data.accounting.summary(filters),
+    listAccountingEntries: (id, filters, page) => data.accounting.listEntries(id, filters, page),
+    accountingRawPages: (id) => data.accounting.rawPages(id),
+    importAccountingAuxiliary: (input) => data.accounting.importAuxiliary(input),
     createCostExpense: (input) => data.finance.createCostExpense(input, userId),
     createCostsExpenses: (inputs) => data.finance.createCostsExpenses(inputs, userId),
     listAudit: (filters) => data.audit.list(filters),
