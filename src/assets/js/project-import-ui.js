@@ -105,6 +105,8 @@ async function exportProjects() {
 async function importFile(event) {
   const file = event.target.files?.[0];
   if (!file || busy) return;
+  pending = null;
+  $("#projectReviewIssuesButton").hidden = true;
   try {
     const api = window.SOINSOLAR_APP_API;
     if ((await api.gateway()).mode !== "supabase" || !api.profile()?.active || !["administrador", "gerencia"].includes(api.profile()?.role)) {
