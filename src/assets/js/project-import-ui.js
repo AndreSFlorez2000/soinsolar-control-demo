@@ -1,4 +1,4 @@
-import { PROJECT_IMPORT_HEADERS, extractLegacyProjectRows, parseProjectCsv, resolveProjectImportRows } from "./domain/project-import.js?v=1.18.0";
+import { PROJECT_IMPORT_HEADERS, extractLegacyProjectRows, parseProjectCsv, referencedContractValue, resolveProjectImportRows } from "./domain/project-import.js?v=1.18.1";
 import { createXlsx } from "./domain/xlsx-export.js?v=1.17.0";
 
 const $ = (selector) => document.querySelector(selector);
@@ -19,7 +19,7 @@ function template() {
 
 function projectSheet(rows) {
   return { name: "Proyectos", headers: [...PROJECT_IMPORT_HEADERS], rows,
-    types: PROJECT_IMPORT_HEADERS.map((_, index) => index === 6 ? "number" : index === 11 ? "money0" : "text"),
+    types: PROJECT_IMPORT_HEADERS.map((_, index) => index === 6 ? "number" : index === 11 ? "money" : "text"),
     freezeColumns: 2, columnWidths: [20, 34, 22, 28, 16, 26, 16, 18, 18, 20, 44, 22, 28] };
 }
 
@@ -93,7 +93,7 @@ async function exportProjects() {
       return [project.costCenter, project.name, project.municipality, project.serviceType,
         project.status, project.clientName ?? "", project.powerKwp ?? "", project.startDate ?? "",
         project.endDate ?? "", centers.get(project.parentProjectId) ?? "", project.notes ?? "",
-        linked.length ? linked.reduce((sum, contract) => sum + contract.currentValue, 0) : "",
+        linked.length ? linked.reduce((sum, contract) => sum + contract.currentValue, 0) : (referencedContractValue(project.notes) ?? ""),
         linked.length === 1 ? linked[0].contractNumber : linked.length ? "Varios contratos" : ""];
     });
     download(createXlsx([projectSheet(rows)]), `proyectos-soinsolar-${new Date().toISOString().slice(0, 10)}.xlsx`);

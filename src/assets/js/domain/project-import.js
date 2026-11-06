@@ -8,6 +8,16 @@ export const PROJECT_IMPORT_HEADERS = Object.freeze([
   "Centro principal", "Observaciones", "Valor del contrato", "Número de contrato"
 ]);
 
+// Los libros históricos no registran la fecha del contrato. Hasta que se cree
+// un contrato formal, su importe vive como referencia en las observaciones.
+// La exportación lo recupera sin convertirlo en un contrato de la aplicación.
+export function referencedContractValue(notes) {
+  const match = String(notes ?? "").match(/(?:^|·\s*)Valor contractual en (?:Excel|archivo):\s*(\d+(?:\.\d{1,2})?)(?=\s*(?:·|$))/i);
+  if (!match) return null;
+  const value = Number(match[1]);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
 const columns = {
   costCenter: ["centro_de_costo", "centro_de_costos", "cost_center", "cc"],
   name: ["nombre_del_proyecto", "nombre", "proyecto", "name"],
