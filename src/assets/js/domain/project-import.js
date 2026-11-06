@@ -12,10 +12,10 @@ export const PROJECT_IMPORT_HEADERS = Object.freeze([
 // un contrato formal, su importe vive como referencia en las observaciones.
 // La exportación lo recupera sin convertirlo en un contrato de la aplicación.
 export function referencedContractValue(notes) {
-  const match = String(notes ?? "").match(/(?:^|·\s*)Valor contractual en (?:Excel|archivo):\s*(\d+(?:\.\d{1,2})?)(?=\s*(?:·|$))/i);
+  const match = String(notes ?? "").match(/(?:^|·\s*)Valor contractual en (?:Excel|archivo):\s*(\d+(?:\.\d+)?)(?=\s*(?:·|$))/i);
   if (!match) return null;
   const value = Number(match[1]);
-  return Number.isFinite(value) && value > 0 ? value : null;
+  return Number.isFinite(value) && value > 0 ? Math.round(value * 100) / 100 : null;
 }
 
 const columns = {
