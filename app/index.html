@@ -132,7 +132,7 @@
             </div>
 
             <div class="kpi-grid dashboard-primary-grid" aria-label="Indicadores principales">
-              <article class="kpi-card accent-blue"><div class="dashboard-card-heading"><span>Valor contractual vigente</span><button class="dashboard-info-button" type="button" data-dashboard-info="contract" aria-label="Qué es el valor contractual vigente" aria-expanded="false">i</button></div><strong id="contractValue">$0</strong><small id="activeProjectKpi">0 proyectos activos</small></article>
+              <article class="kpi-card accent-blue"><div class="dashboard-card-heading"><span>Valor contractual registrado</span><button class="dashboard-info-button" type="button" data-dashboard-info="contract" aria-label="Qué es el valor contractual registrado" aria-expanded="false">i</button></div><strong id="contractValue">$0</strong><small id="activeProjectKpi">0 proyectos activos</small></article>
               <article class="kpi-card accent-blue"><div class="dashboard-card-heading"><span>Avance de ejecución</span><button class="dashboard-info-button" type="button" data-dashboard-info="execution" aria-label="Qué es el avance de ejecución" aria-expanded="false">i</button></div><strong id="globalExecutionValue">Sin registrar</strong><small>Promedio de proyectos con avance registrado</small></article>
               <article class="kpi-card accent-green"><div class="dashboard-card-heading"><span>Recaudo financiero</span><button class="dashboard-info-button" type="button" data-dashboard-info="collection" aria-label="Qué es el recaudo financiero" aria-expanded="false">i</button></div><strong id="paidValue">$0</strong><small><span id="globalProgressValue">0 %</span> del valor contractual</small></article>
             </div>
@@ -556,12 +556,12 @@
 
           <section id="financeView" class="content-view" hidden>
             <div class="section-heading">
-              <div><h3>Facturación y pagos</h3><p>Las facturas se registran desde «Nueva factura». Para registrar un pago, selecciona primero el centro de costo y luego una factura con saldo.</p></div>
+              <div><h3>Facturación y pagos</h3><p>Esta sección muestra facturas formales y sus pagos. La facturación histórica del Excel aparece en la ficha de cada proyecto y en el total financiero; el libro no aporta fechas de expedición ni datos de pago para convertirla en facturas formales.</p></div>
               <div class="heading-actions"><button id="newPaymentButton" class="btn btn-outline-primary" type="button">Registrar pago</button><button id="newInvoiceButton" class="btn btn-primary" type="button">Nueva factura</button></div>
             </div>
 
             <div class="cost-summary-grid">
-              <article class="mini-kpi"><span>Total facturado</span><strong id="financeInvoicedTotal">$0</strong></article>
+              <article class="mini-kpi"><span>Facturas registradas en el sistema</span><strong id="financeInvoicedTotal">$0</strong></article>
               <article class="mini-kpi"><span>Total pagado</span><strong id="financePaidTotal">$0</strong></article>
               <article class="mini-kpi"><span>Cartera pendiente</span><strong id="financePendingTotal">$0</strong></article>
               <article class="mini-kpi"><span>Facturas con saldo</span><strong id="financePendingInvoices">0</strong></article>

@@ -2,13 +2,13 @@ import { buildMonthlySeries } from "./domain/dashboard.js?v=1.5.9";
 import { topLevelFinancialRows } from "./domain/cost-centers.js?v=1.3.1";
 
 const HELP = Object.freeze({
-  contract: "Suma de los contratos vigentes de los centros principales. Cada contrato se calcula como valor inicial + adiciones − deducciones.",
+  contract: "Suma por centro principal. Usa el contrato formal cuando existe; si aún no se registró, toma el valor contractual de la fila principal del Excel histórico, sujeto a revisión.",
   execution: "Promedio simple de los porcentajes físicos registrados por proyecto. Solo el administrador digita el avance; facturas y pagos no lo modifican.",
   collection: "Suma de pagos no anulados. El porcentaje corresponde a pagos ÷ valor contractual × 100. También cuenta un pago registrado que todavía no esté confirmado por el banco.",
-  invoiced: "Suma de facturas no anuladas. Su porcentaje es facturado ÷ valor contractual × 100; facturar no equivale a recaudar.",
+  invoiced: "Suma del facturado histórico del Excel y las facturas posteriores registradas en el sistema. El Excel no acredita pagos; facturar no equivale a recaudar.",
   costs: "Suma de costos y gastos registrados. Su porcentaje es costos y gastos ÷ valor contractual × 100.",
-  balance: "Parte del contrato aún sin facturar: máximo entre contrato vigente − facturado y cero.",
-  portfolio: "Facturas aún sin pago registrado: máximo entre facturado − pagado y cero.",
+  balance: "Parte del valor contractual aún sin facturar: máximo entre valor contractual − facturado acumulado y cero.",
+  portfolio: "Importe pendiente de las facturas formales registradas en el sistema. El Excel histórico no permite calcular su cartera.",
   equivalent: "Suma, por centro principal con avance registrado, de contrato × porcentaje de ejecución ÷ 100. Es una referencia monetaria de la obra, no una factura ni un pago.",
   profit: "Estimación del contrato menos los costos y gastos registrados. No representa efectivo disponible ni utilidad contable definitiva.",
   count: "Número de proyectos registrados, incluidos los centros dependientes. No equivale al número de contratos principales.",
@@ -16,9 +16,9 @@ const HELP = Object.freeze({
   cashFlowChart: "Compara las facturas y los pagos no anulados de cada mes. Un pago no cambia el avance físico del proyecto.",
   collectionChart: "Suma de pagos no anulados por mes. La altura o posición muestra el valor recaudado en cada periodo.",
   costsChart: "Suma de costos y gastos registrados por periodo mensual.",
-  contractChart: "Distribución del valor contractual vigente entre los centros principales. Cada proyecto se cuenta una sola vez.",
-  portfolioChart: "Cartera por centro principal: máximo entre facturado − pagado y cero.",
-  billedChart: "Facturación por centro principal: suma de las facturas no anuladas.",
+  contractChart: "Distribución del valor contractual registrado o importado entre centros principales. Cada proyecto se cuenta una sola vez.",
+  portfolioChart: "Pendiente de facturas formales por centro principal; no incluye cartera histórica sin dato de pagos.",
+  billedChart: "Facturación por centro principal: histórico del Excel más facturas posteriores registradas.",
   projects: "Tabla con contrato, avance físico registrado, equivalente monetario, facturación y recaudo por proyecto.",
   status: "Cuenta proyectos según su estado registrado: planeado, activo, suspendido, finalizado o cancelado.",
   alerts: "Avisos sobre facturas pendientes de pago, periodos abiertos y seguimientos aún sin validar."

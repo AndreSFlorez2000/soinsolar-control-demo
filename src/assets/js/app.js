@@ -1,5 +1,5 @@
 import { buildMonthlySeries, calculateDashboardIndicators } from "./domain/dashboard.js?v=1.5.9";
-import { createDashboardUI } from "./dashboard-ui.js?v=1.13.0";
+import { createDashboardUI } from "./dashboard-ui.js?v=1.18.3";
 import { calculateProjectIndicators } from "./domain/project-analytics.js?v=1.4.1";
 import { buildManagementReport, buildMonthlyExecutionReport } from "./domain/reports.js?v=1.5.8";
 import { managementSummarySheet, monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.5.9";
@@ -517,7 +517,7 @@ function exportDashboard() {
     ["Indicador", "Valor"],
     ["Proyectos registrados", indicators.projectCount],
     ["Proyectos activos", indicators.activeProjects],
-    ["Valor contractual vigente", indicators.contractValue],
+    ["Valor contractual registrado o importado", indicators.contractValue],
     ["Total facturado", indicators.invoiced],
     ["Total pagado", indicators.paid],
     ["Costos y gastos", indicators.costsExpenses],
