@@ -11,7 +11,7 @@
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.17.0" />
+    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.18.0" />
   </head>
   <body>
     <section id="loginView" class="login-shell">
@@ -345,7 +345,9 @@
                 </div>
                 <input id="projectImportFile" type="file" accept=".csv,.xlsx,.xls" hidden />
                 <button id="projectTemplateButton" class="btn btn-outline-primary" type="button">Descargar formato</button>
+                <button id="projectExportButton" class="btn btn-outline-primary" type="button">Exportar proyectos a Excel</button>
                 <button id="projectImportButton" class="btn btn-outline-primary" type="button" hidden>Importar proyectos</button>
+                <button id="projectReviewIssuesButton" class="btn btn-outline-secondary" type="button" hidden>Descargar centros por revisar</button>
                 <button id="newProjectButton" class="btn btn-primary" type="button">Nuevo proyecto</button>
               </div>
             </div>
@@ -766,8 +768,10 @@
       <div class="history-dialog-content">
         <div class="dialog-heading"><div><p class="eyebrow">Importación de proyectos</p><h3 id="projectImportTitle">Revisar antes de guardar</h3></div><button id="projectImportClose" class="dialog-close" type="button" aria-label="Cerrar">×</button></div>
         <p id="projectImportSummary" class="dialog-note"></p>
-        <p class="dialog-note">Se crean fichas nuevas por centro de costo. Las existentes se identifican y se muestran como omitidas; este cargador no importa contratos, avances ni movimientos. No se descartan columnas con datos desconocidos.</p>
-        <div class="table-responsive project-import-preview"><table class="table align-middle mb-0"><thead><tr><th>Fila</th><th>Centro de costo</th><th>Proyecto</th><th>Municipio</th><th>Servicio</th><th>Estado</th></tr></thead><tbody id="projectImportRows"></tbody></table></div>
+        <p class="dialog-note">Se crean fichas por centro de costo. El valor contractual y el estado de facturación del libro quedan como referencia en observaciones; los contratos necesitan su fecha real de inicio para registrarse. No se importan facturas, pagos ni avances físicos. Los centros repetidos o contradictorios requieren revisión.</p>
+        <div class="table-responsive project-import-preview"><table class="table align-middle mb-0"><thead><tr><th>Hoja y fila</th><th>Centro de costo</th><th>Proyecto</th><th>Municipio</th><th>Servicio</th><th>Valor en Excel</th></tr></thead><tbody id="projectImportRows"></tbody></table></div>
+        <pre id="projectImportIssues" class="project-import-issues" hidden></pre>
+        <button id="projectImportDownloadIssues" class="btn btn-outline-secondary" type="button" hidden>Descargar centros por revisar</button>
         <p id="projectImportPreviewMessage" class="form-message" role="alert"></p>
         <div class="dialog-actions"><button id="projectImportCancel" class="btn btn-outline-secondary" type="button">Cancelar</button><button id="projectImportSave" class="btn btn-primary" type="button">Guardar proyectos</button></div>
       </div>
@@ -916,11 +920,11 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="src/assets/js/config.js?v=1.12.0"></script>
-    <script type="module" src="src/assets/js/app.js?v=1.17.0"></script>
-    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.17.0"></script>
-    <script type="module" src="src/assets/js/accounting-ui.js?v=1.17.0"></script>
-    <script type="module" src="src/assets/js/project-import-ui.js?v=1.17.0"></script>
-    <script type="module" src="src/assets/js/assistant-ui.js?v=1.17.0"></script>
+    <script type="module" src="src/assets/js/app.js?v=1.18.0"></script>
+    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.18.0"></script>
+    <script type="module" src="src/assets/js/accounting-ui.js?v=1.18.0"></script>
+    <script type="module" src="src/assets/js/project-import-ui.js?v=1.18.0"></script>
+    <script type="module" src="src/assets/js/assistant-ui.js?v=1.18.0"></script>
   </body>
 </html>
 
