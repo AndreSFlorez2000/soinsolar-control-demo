@@ -19,6 +19,6 @@ export function formatCop(value) {
   return new Intl.NumberFormat("es-CO", {
     style: "currency",
     currency: "COP",
-    maximumFractionDigits: 0
+    maximumFractionDigits: 2
   }).format(value);
 }

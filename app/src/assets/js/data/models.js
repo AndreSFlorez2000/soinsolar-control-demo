@@ -87,6 +87,14 @@ export function assertMoney(value, field, { allowZero = true } = {}) {
   return Math.round((number + Number.EPSILON) * 100) / 100;
 }
 
+function signedMoney(value, field) {
+  const number = Number(value ?? 0);
+  if (!Number.isFinite(number) || Math.abs(number) > 9999999999999999) {
+    throw new ValidationError(`${field} debe ser un importe válido.`, field);
+  }
+  return Math.round(number * 100) / 100;
+}
+
 export function assertEnum(value, allowed, field) {
   if (!allowed.includes(value)) {
     throw new ValidationError(
@@ -202,7 +210,7 @@ export function normalizeMonthlySummary(record) {
     ? record.executed_cumulative_percentage !== null
     : true;
   const contractValue = assertMoney(record.contract_value ?? 0, "valor contractual");
-  const invoicedValue = assertMoney(record.invoiced_value ?? 0, "valor facturado");
+  const invoicedValue = signedMoney(record.invoiced_value ?? 0, "valor facturado");
   const cumulativeInvoicedValue = assertMoney(
     record.cumulative_invoiced_value ?? invoicedValue,
     "facturación acumulada"
@@ -243,6 +251,12 @@ export function normalizeMonthlySummary(record) {
       record.cumulative_progress_percentage ??
       (contractValue > 0 ? (cumulativeInvoicedValue / contractValue) * 100 : 0)
     ),
+    importedBilledValue: signedMoney(record.imported_billed_value ?? 0, "facturado del Excel"),
+    importedBillingPercentage: record.imported_billing_percentage == null
+      ? null : Number(record.imported_billing_percentage),
+    importedExecutionPercentage: record.imported_execution_percentage == null
+      ? null : Number(record.imported_execution_percentage),
+    importedHistory: Boolean(record.imported_history),
     validationStatus: record.validation_status || null,
     observations: record.observations || null,
     executionIssue: record.execution_issue || null,
@@ -265,6 +279,7 @@ export function normalizePeriod(record) {
     year,
     month,
     status: assertEnum(record.status, PERIOD_STATUSES, "estado del periodo"),
+    importedHistory: Boolean(record.imported_history),
     closedAt: record.closed_at || null,
     closedBy: record.closed_by || null,
     createdAt: record.created_at || null

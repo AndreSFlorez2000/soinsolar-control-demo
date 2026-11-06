@@ -1,15 +1,15 @@
 import { buildMonthlySeries, calculateDashboardIndicators } from "./domain/dashboard.js?v=1.5.9";
-import { createDashboardUI } from "./dashboard-ui.js?v=1.18.5";
+import { createDashboardUI } from "./dashboard-ui.js?v=1.18.6";
 import { calculateProjectIndicators } from "./domain/project-analytics.js?v=1.4.1";
-import { buildManagementReport, buildMonthlyExecutionReport } from "./domain/reports.js?v=1.5.8";
-import { historicalProjectGroups, managementSummarySheet, monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.18.5";
+import { buildManagementReport, buildMonthlyExecutionReport } from "./domain/reports.js?v=1.18.6";
+import { historicalProjectGroups, managementSummarySheet, monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.18.6";
 import { createXlsx } from "./domain/xlsx-export.js?v=1.5.8";
 import { costWorkbookSheets } from "./domain/cost-workbook.js?v=1.5.8";
 import { canEditExecution } from "./domain/execution.js?v=1.9.0";
-import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=1.1.0";
+import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=1.18.6";
 import { invoicePendingAmount, isSampleProject, payableInvoicesForProject } from "./domain/payment-selection.js?v=1.5.1";
 import { forgetProject, hasProject, recallProject, rememberProject } from "./domain/project-context.js?v=1.8.0";
-import { createApplicationDataGateway } from "./services/application-data.js?v=1.18.5";
+import { createApplicationDataGateway } from "./services/application-data.js?v=1.18.6";
 import { getCurrentSession, isDemoMode, registerAccount, signIn, signOut } from "./services/supabase.js?v=1.13.1";
 
 const loginView = document.querySelector("#loginView");
@@ -274,7 +274,7 @@ async function loadReferenceData() {
   document.querySelector("#currentUserName").textContent = name;
   document.querySelector("#currentUserRole").textContent = currentUserProfile.role === "administrador" ? "Administrador" : "Gerencia";
   document.querySelector("#currentUserAvatar").textContent = name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? "").join("");
-  const openPeriod = currentPeriods.find((period) => period.status === "abierto");
+  const openPeriod = currentPeriods.find((period) => period.status === "abierto" && !period.importedHistory);
   document.querySelector("#sidebarPeriodLabel").textContent = openPeriod
     ? `${monthNames[openPeriod.month - 1]} ${openPeriod.year}` : "Sin periodo abierto";
   document.querySelector("#sidebarPeriodStatus").textContent = `${currentPeriods.length} periodo(s) registrado(s)`;
@@ -491,7 +491,7 @@ function renderProjectStatusStats(indicators) {
 }
 
 function renderDashboardAlerts(indicators) {
-  const openPeriod = currentPeriods.find((period) => period.status === "abierto");
+  const openPeriod = currentPeriods.find((period) => period.status === "abierto" && !period.importedHistory);
   const pendingValidation = currentMonthly.filter((row) => row.validationStatus && row.validationStatus !== "validado").length;
   const alerts = [];
 
@@ -1000,8 +1000,9 @@ function periodLabel(period) {
 }
 
 function populatePeriodOptions() {
-  const openOptions = currentPeriods.map((period) => `<option value="${period.id}" ${period.status === "cerrado" ? "disabled" : ""}>${escapeHtml(periodLabel(period))}</option>`).join("");
-  const allOptions = currentPeriods.map((period) => `<option value="${period.id}">${escapeHtml(periodLabel(period))}</option>`).join("");
+  const openOptions = currentPeriods.filter((period) => !period.importedHistory)
+    .map((period) => `<option value="${period.id}" ${period.status === "cerrado" ? "disabled" : ""}>${escapeHtml(periodLabel(period))}</option>`).join("");
+  const allOptions = currentPeriods.map((period) => `<option value="${period.id}">${escapeHtml(periodLabel(period))}${period.importedHistory ? " · Excel histórico" : ""}</option>`).join("");
   ["costFilterPeriod", "monthlyFilterPeriod", "financeFilterPeriod"].forEach((id) => {
     const select = document.querySelector(`#${id}`);
     setSelectOptions(select, '<option value="">Todos</option>', allOptions, select.value);
@@ -1011,7 +1012,8 @@ function populatePeriodOptions() {
   setSelectOptions(document.querySelector("#invoicePeriod"), '<option value="">Selecciona un periodo abierto</option>', openOptions);
   setSelectOptions(document.querySelector("#paymentPeriod"), '<option value="">Selecciona un periodo abierto</option>', openOptions);
 
-  const activePeriod = currentPeriods.find((period) => period.status === "abierto") ?? currentPeriods[0];
+  const activePeriod = currentPeriods.find((period) => period.status === "abierto" && !period.importedHistory)
+    ?? currentPeriods.find((period) => !period.importedHistory);
   if (activePeriod) {
     document.querySelector(".period-card strong").textContent = periodLabel(activePeriod).replace(" · Cerrado", "");
     document.querySelector(".period-card span").innerHTML = activePeriod.status === "abierto"
@@ -1031,12 +1033,12 @@ function monthlyFilters() {
 function renderPeriods() {
   const mayEdit = canEditExecution(currentUserProfile);
   document.querySelector("#periodCount").textContent = currentPeriods.length;
-  document.querySelector("#openPeriodCount").textContent = currentPeriods.filter((period) => period.status === "abierto").length;
+  document.querySelector("#openPeriodCount").textContent = currentPeriods.filter((period) => period.status === "abierto" && !period.importedHistory).length;
   document.querySelector("#periodRows").innerHTML = currentPeriods.map((period) => {
-    const action = !mayEdit ? "Solo administrador" : period.status === "abierto"
+    const action = period.importedHistory ? "Origen Excel; consulta" : !mayEdit ? "Solo administrador" : period.status === "abierto"
       ? `<button class="table-action" data-action="close-period" data-period-id="${period.id}">Cerrar periodo</button>`
       : `<button class="table-action" data-action="reopen-period" data-period-id="${period.id}">Reabrir para corregir</button>`;
-    return `<tr><td><strong>${escapeHtml(periodLabel(period).replace(" · Cerrado", ""))}</strong></td><td><span class="period-badge ${period.status}">${capitalize(period.status)}</span></td><td>${period.closedAt ? escapeHtml(formatDateTime(period.closedAt)) : "—"}</td><td>${action}</td></tr>`;
+    return `<tr><td><strong>${escapeHtml(periodLabel(period).replace(" · Cerrado", ""))}</strong></td><td><span class="period-badge ${period.importedHistory ? "cerrado" : period.status}">${period.importedHistory ? "Excel histórico" : capitalize(period.status)}</span></td><td>${period.importedHistory ? "—" : period.closedAt ? escapeHtml(formatDateTime(period.closedAt)) : "—"}</td><td>${action}</td></tr>`;
   }).join("");
 }
 
@@ -1044,7 +1046,11 @@ function renderMonthly() {
   const reportRows = new Map(buildMonthlyExecutionReport(currentProjects, currentMonthly, allMonthlyRows)
     .map((row) => [`${row.projectId}:${row.year}:${row.month}`, row]));
   const grouped = new Map();
+  const search = document.querySelector("#monthlyHistoricalSearch").value.trim().normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es");
   for (const tracking of currentMonthly) {
+    if (search && !`${tracking.costCenter} ${tracking.projectName}`.normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es").includes(search)) continue;
     if (!grouped.has(tracking.projectId)) grouped.set(tracking.projectId, []);
     grouped.get(tracking.projectId).push(tracking);
   }
@@ -1053,35 +1059,42 @@ function renderMonthly() {
     return String(left.costCenter).localeCompare(String(right.costCenter), "es", { numeric: true })
       || left.projectName.localeCompare(right.projectName, "es");
   });
+  const historicalById = new Map(historicalProjectDetails.map((item) => [item.id, item]));
   document.querySelector("#monthlyRows").innerHTML = orderedProjects.map((projectId) => {
     const months = grouped.get(projectId).sort((a, b) => a.year - b.year || a.month - b.month);
     const project = currentProjects.find((item) => item.projectId === projectId);
     const latest = months.at(-1);
     const contract = project?.contractValue ?? latest.contractValue;
     const summary = reportRows.get(`${latest.projectId}:${latest.year}:${latest.month}`);
-    const header = `<tr class="monthly-project-heading"><th colspan="14" scope="rowgroup"><div class="monthly-project-summary">
+    const source = historicalById.get(projectId);
+    const sourceNotes = source && months.some((item) => item.importedHistory)
+      ? `${source.importedFinancialReview ? `<p>Pendiente de revisar: ${escapeHtml(source.importedFinancialReview)}</p>` : ""}${importedFollowupHtml({ ...source, importedExecutionSnapshotPercentage: null })}` : "";
+    const header = `<tr class="monthly-project-heading"><th colspan="15" scope="rowgroup"><div class="monthly-project-summary">
       <div><strong>${escapeHtml(latest.costCenter)} · ${escapeHtml(latest.projectName)}</strong><small>Centro de costo / proyecto</small></div>
       <div><span>Valor de contrato</span><strong>${formatCop(contract)}</strong></div>
       <div><span>Ejecutado al último mes mostrado (referencia)</span><strong>${summary?.executionRecorded ? formatCop(summary.cumulativeEquivalent) : "—"}</strong></div>
       <div><span>Recaudado al último mes mostrado</span><strong>${formatCop(summary?.cumulativePaid ?? 0)}</strong></div>
-    </div></th></tr>`;
+    </div>${sourceNotes}</th></tr>`;
     return header + months.map((tracking) => {
     const payment = reportRows.get(`${tracking.projectId}:${tracking.year}:${tracking.month}`);
-    const locked = tracking.periodStatus === "cerrado";
+    const locked = tracking.importedHistory || tracking.periodStatus === "cerrado";
     const canValidate = !locked && tracking.trackingId && tracking.validationStatus !== "validado";
     const mayEdit = canEditExecution(currentUserProfile);
     const actions = tracking.trackingId
       ? `${mayEdit && !locked ? `<button class="table-action" data-action="edit-monthly" data-tracking-id="${tracking.trackingId}">Sumar avance</button>` : ""}${canValidate ? `<button class="table-action success" data-action="validate-monthly" data-tracking-id="${tracking.trackingId}">Validar</button>` : ""}`
       : mayEdit && !locked ? `<button class="table-action" data-action="new-monthly-preset" data-project-id="${tracking.projectId}" data-period-id="${tracking.periodId}">Registrar avance</button>` : "";
-    const periodAction = locked && mayEdit
+    const periodAction = locked && !tracking.importedHistory && mayEdit
       ? `<button class="table-action" data-action="reopen-period" data-period-id="${tracking.periodId}">Reabrir para corregir</button>` : "";
     const openAction = `<button class="table-action" type="button" data-action="open-project" data-project-id="${escapeHtml(tracking.projectId)}">Abrir ficha</button>`;
     return `<tr>
-      <td><strong>${escapeHtml(`${monthNames[tracking.month - 1]} ${tracking.year}`)}</strong><br><small>${capitalize(tracking.periodStatus)}</small></td>
+      <td><strong>${escapeHtml(`${monthNames[tracking.month - 1]} ${tracking.year}`)}</strong><br><small>${tracking.importedHistory ? "Excel histórico" : capitalize(tracking.periodStatus)}</small></td>
       <td>${tracking.monthlyProgressPercentage == null ? "—" : formatPercent(tracking.monthlyProgressPercentage)}</td>
-      <td>${tracking.cumulativeProgressPercentage == null ? "—" : formatPercent(tracking.cumulativeProgressPercentage)}</td>
+      <td>${tracking.cumulativeProgressPercentage == null
+        ? tracking.importedExecutionPercentage == null ? "—" : `${formatPercent(tracking.importedExecutionPercentage)}<br><small>Referencia Excel</small>`
+        : formatPercent(tracking.cumulativeProgressPercentage)}</td>
       <td>${payment?.executionRecorded ? formatCop(payment.cumulativeEquivalent) : "—"}</td>
       <td>${formatCop(tracking.invoicedValue)}</td>
+      <td>${tracking.importedBillingPercentage == null ? "—" : formatPercent(tracking.importedBillingPercentage)}</td>
       <td>${formatCop(payment?.cumulativeInvoiced ?? tracking.cumulativeInvoicedValue)}</td>
       <td>${formatPercent(payment?.cumulativeBilling ?? tracking.cumulativeBillingPercentage)}</td>
       <td>${formatCop(tracking.paidValue)}</td>
@@ -1089,12 +1102,12 @@ function renderMonthly() {
       <td>${contract > 0 ? formatPercent((payment?.cumulativePaid ?? 0) / contract * 100) : "—"}</td>
       <td>${formatCop(tracking.costsExpensesValue)}</td>
       <td>${tracking.executionIssue ? escapeHtml(tracking.executionIssue) : "—"}</td>
-      <td><span class="validation-badge ${escapeHtml(tracking.validationStatus || "borrador")}">${escapeHtml(tracking.validationStatus || "sin registro")}</span></td>
+      <td><span class="validation-badge ${tracking.importedHistory ? "borrador" : escapeHtml(tracking.validationStatus || "borrador")}">${tracking.importedHistory ? "Dato del Excel" : escapeHtml(tracking.validationStatus || "sin registro")}</span></td>
       <td><span class="table-actions">${openAction}${actions || periodAction}</span></td>
     </tr>`;
     }).join("");
   }).join("");
-  document.querySelector("#monthlyEmpty").hidden = currentMonthly.length > 0;
+  document.querySelector("#monthlyEmpty").hidden = orderedProjects.length > 0;
 }
 
 function importedFollowupHtml(project) {
@@ -1102,27 +1115,10 @@ function importedFollowupHtml(project) {
   const references = project.importedInvoiceReferences ?? [];
   const alternates = project.importedAlternateSnapshots ?? [];
   const snapshot = project.importedExecutionSnapshotPercentage;
-  return `${snapshot == null ? "" : `<p><strong>Avance de ejecución general informado en Excel:</strong> ${formatPercent(snapshot)}${project.importedExecutionMonthLabel ? ` · mes «${escapeHtml(project.importedExecutionMonthLabel)}» (sin año acreditado)` : ""}. Referencia sin validación mensual.</p>`}
+  return `${snapshot == null ? "" : `<p><strong>Avance de ejecución general informado en Excel:</strong> ${formatPercent(snapshot)}${project.importedExecutionMonthLabel ? ` · mes «${escapeHtml(project.importedExecutionMonthLabel)}» (año inferido del encabezado del Excel cuando es único)` : ""}. Referencia sin validación mensual.</p>`}
     ${notes.length ? `<h5>Notas de seguimiento del Excel</h5><ul>${notes.map((item) => `<li>${escapeHtml(item.text)} <small>(${escapeHtml(item.sheet)}, fila ${escapeHtml(item.row)})</small></li>`).join("")}</ul>` : ""}
     ${references.length ? `<p><strong>Referencias de factura en Excel:</strong> ${references.map((item) => escapeHtml(item.reference)).join("; ")}. No acreditan pagos.</p>` : ""}
     ${alternates.length ? `<details><summary>Otra hoja con cifras distintas (${alternates.length}); pendiente de conciliar</summary>${alternates.map((item) => `<p>${escapeHtml(item.sheet)}, fila ${escapeHtml(item.row)}: contrato ${item.contractValue == null ? "sin valor" : formatCop(item.contractValue)}; facturado ${formatCop(item.billedTotal ?? 0)}. No sumado a la fila principal.</p>${Object.keys(item.monthlyBilled ?? {}).length ? `<ul>${Object.entries(item.monthlyBilled).sort(([left], [right]) => left.localeCompare(right)).map(([month, billed]) => `<li>${escapeHtml(month)}: ${formatCop(billed)}${item.monthlyPercentages?.[month] == null ? "" : ` (${formatPercent(item.monthlyPercentages[month])} en esa hoja)`}</li>`).join("")}</ul>` : ""}`).join("")}</details>` : ""}`;
-}
-
-function renderHistoricalMonthly(projects, filters) {
-  const search = document.querySelector("#monthlyHistoricalSearch").value.trim().normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es");
-  const groups = historicalProjectGroups(projects, filters.projectId).filter(({ project }) =>
-    !search || `${project.costCenter} ${project.name}`.normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es").includes(search));
-  const tbody = document.querySelector("#monthlyHistoricalRows");
-  tbody.innerHTML = groups.map(({ project, months }) => {
-    const summary = `<tr class="monthly-project-heading"><th colspan="5" scope="rowgroup"><div class="monthly-project-summary"><div><strong>${escapeHtml(project.costCenter)} · ${escapeHtml(project.name)}</strong><small>${escapeHtml(project.importedFinancialSource || "Excel histórico")}</small></div><div><span>Contrato principal</span><strong>${project.importedContractValue == null ? "—" : formatCop(project.importedContractValue)}</strong></div><div><span>Facturado al corte</span><strong>${project.importedBilledTotal == null ? "—" : formatCop(project.importedBilledTotal)}</strong></div><div><span>Avance general en Excel</span><strong>${project.importedExecutionSnapshotPercentage == null ? "—" : formatPercent(project.importedExecutionSnapshotPercentage)}</strong></div></div>${project.importedExecutionMonthLabel ? `<small>Mes de ejecución informado: ${escapeHtml(project.importedExecutionMonthLabel)} (sin año acreditado).</small>` : ""}${project.importedFinancialReview ? `<p>Pendiente de revisar: ${escapeHtml(project.importedFinancialReview)}</p>` : ""}${importedFollowupHtml({ ...project, importedExecutionSnapshotPercentage: null })}</th></tr>`;
-    const detail = months.length ? months.map(({ month, billed, sourcePercent, calculatedPercent, cumulative }) => `<tr><td>${escapeHtml(month)}</td><td>${formatCop(billed)}</td><td>${sourcePercent == null ? "—" : formatPercent(sourcePercent)}</td><td>${calculatedPercent == null ? "—" : formatPercent(calculatedPercent)}</td><td>${formatCop(cumulative)}</td></tr>`).join("")
-      : `<tr><td colspan="5">Sin facturación mensual en el Excel.</td></tr>`;
-    return summary + detail;
-  }).join("");
-  document.querySelector("#monthlyHistoricalCount").textContent = `${groups.length} proyecto(s) · ${groups.reduce((sum, group) => sum + group.months.length, 0)} mes(es) con dato del Excel`;
-  document.querySelector("#monthlyHistoricalEmpty").hidden = !!groups.length;
 }
 
 async function loadMonthlyModule(filters) {
@@ -1137,11 +1133,10 @@ async function loadMonthlyModule(filters) {
     ], "monthlyFilters");
     const data = await ensureGateway();
     const filtered = Object.values(appliedFilters).some(Boolean);
-    const [allRows, shownRows, historicalDetails] = await Promise.all([
-      data.listMonthlyTracking({}),
-      filtered ? data.listMonthlyTracking(appliedFilters) : data.listMonthlyTracking({}),
-      data.listProjectDetails()
+    const [allRows, historicalDetails] = await Promise.all([
+      data.listMonthlyTracking({}), data.listProjectDetails()
     ]);
+    const shownRows = filtered ? await data.listMonthlyTracking(appliedFilters) : allRows;
     allMonthlyRows = allRows;
     currentMonthly = shownRows;
     historicalProjectDetails = historicalDetails;
@@ -1149,8 +1144,7 @@ async function loadMonthlyModule(filters) {
     document.querySelector("#monthlyPendingCount").textContent = allRows.filter((row) => row.trackingId && row.validationStatus !== "validado").length;
     renderPeriods();
     renderMonthly();
-    renderHistoricalMonthly(historicalProjectDetails, appliedFilters);
-    setMessage(message, shownRows.length || historicalDetails.length ? "Consulta actualizada. El histórico del Excel se filtra por proyecto; los filtros de periodo y validación corresponden a los registros mensuales del sistema." : "");
+    setMessage(message, shownRows.length ? "Consulta actualizada. Los meses importados del Excel aparecen en la tabla con su origen y porcentaje." : "");
   } catch (error) {
     setMessage(message, error.message || "No fue posible consultar el seguimiento mensual.", true);
   }
@@ -1223,7 +1217,7 @@ function openNewMonthly(projectId = "", periodId = "") {
   document.querySelector("#monthlyDialogTitle").textContent = "Sumar avance de ejecución";
   populateProjectOptions();
   populatePeriodOptions();
-  const activePeriod = currentPeriods.find((period) => period.status === "abierto");
+  const activePeriod = currentPeriods.find((period) => period.status === "abierto" && !period.importedHistory);
   if (activePeriod) document.querySelector("#monthlyPeriod").value = activePeriod.id;
   document.querySelector("#monthlyProject").value = projectId || selectedProjectId || document.querySelector("#monthlyFilterProject").value;
   if (periodId) document.querySelector("#monthlyPeriod").value = periodId;
@@ -1358,7 +1352,7 @@ function openNewCost() {
   populateProjectOptions();
   populatePeriodOptions();
   document.querySelector("#costProject").value = selectedProjectId || document.querySelector("#costFilterProject").value;
-  const activePeriod = currentPeriods.find((period) => period.status === "abierto");
+  const activePeriod = currentPeriods.find((period) => period.status === "abierto" && !period.importedHistory);
   if (activePeriod) {
     document.querySelector("#costPeriod").value = activePeriod.id;
     const current = new Date().toISOString().slice(0, 10);
@@ -2104,8 +2098,7 @@ document.querySelector("#projectFilters").addEventListener("submit", (event) => 
 document.querySelector("#clearProjectFilters").addEventListener("click", () => { document.querySelector("#projectFilters").reset(); loadProjects(); });
 document.querySelector("#monthlyFilters").addEventListener("submit", (event) => { event.preventDefault(); loadMonthlyModule(); });
 document.querySelector("#clearMonthlyFilters").addEventListener("click", () => { document.querySelector("#monthlyFilters").reset(); document.querySelector("#monthlyHistoricalSearch").value = ""; loadMonthlyModule({}); });
-document.querySelector("#monthlyHistoricalSearch").addEventListener("input", () => renderHistoricalMonthly(historicalProjectDetails, monthlyFilters()));
-document.querySelector("#monthlyFilterProject").addEventListener("change", () => renderHistoricalMonthly(historicalProjectDetails, monthlyFilters()));
+document.querySelector("#monthlyHistoricalSearch").addEventListener("input", renderMonthly);
 document.querySelector("#financeFilters").addEventListener("submit", (event) => { event.preventDefault(); loadFinance(); });
 document.querySelector("#clearFinanceFilters").addEventListener("click", () => { document.querySelector("#financeFilters").reset(); loadFinance({}); });
 document.addEventListener("soinsolar:accounting-center-selected", (event) => {

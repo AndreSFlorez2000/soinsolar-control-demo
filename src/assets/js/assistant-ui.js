@@ -5,7 +5,7 @@ import {
   parseProjectDraftField, prepareProjectDraft, PROJECT_DRAFT_FIELDS,
   resolveAssistantQuestion, resolveAssistantQuickQuestion
 } from "./domain/assistant.js?v=1.12.0";
-import { formatCop } from "./domain/financial.js?v=1.1.0";
+import { formatCop } from "./domain/financial.js?v=1.18.6";
 import { accountingQuestionFilters, isAccountingQuestion } from "./domain/accounting-assistant.js?v=1.14.0";
 
 const form = document.querySelector("#assistantForm");

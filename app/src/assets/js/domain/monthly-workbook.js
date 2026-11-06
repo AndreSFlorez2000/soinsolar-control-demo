@@ -68,7 +68,7 @@ export function historicalWorkbookSheet(projects = [], projectId = "") {
     title: "Seguimiento mensual y notas del libro histórico",
     notes: [
       "El porcentaje facturado del Excel corresponde a la columna % junto a FACTURADO. El porcentaje calculado divide el importe mensual entre el valor contractual principal.",
-      "El avance de ejecución general es una referencia de la fila del Excel, sin fecha anual verificable cuando solo se informa el nombre del mes. No es ejecución mensual validada.",
+      "El avance general del Excel se ubica en el mes MES y el año único de los encabezados del libro. No es ejecución mensual validada.",
       "Las cifras de otra hoja se muestran para conciliación y no se suman a la fila principal. El archivo no acredita pagos."
     ],
     headers: ["Centro de costo", "Proyecto", "Hoja / fuente", "Mes facturado", "Contrato principal (COP)",
@@ -155,7 +155,7 @@ export function monthlyWorkbookSheets(rows = []) {
         "Lee F → G → H: avance anterior 15 %; avance actual 50 %; diferencia de octubre = 35 p.p. (puntos porcentuales). H se recalcula en Excel como (G − F) × 100.",
         "El valor equivalente del mes = contrato × H ÷ 100. Es una referencia física: no es una factura, un pago ni un costo.",
         "Facturado y pagado del mes son movimientos del periodo. Los acumulados suman los periodos anteriores, incluso de otros años. Cartera = facturado acumulado − pagado acumulado.",
-        "Sin registro físico: 0 p.p. consignados no equivale a una verificación de obra sin avance. Una celda vacía en las matrices indica que el periodo no está exportado."
+        "Sin registro físico: 0 p.p. consignados no equivale a una verificación de obra sin avance. Los meses del Excel muestran su facturación y avance general en columnas propias; ese avance aún no está validado."
       ],
       headers: [
         "Centro de costo", "Proyecto", "Periodo", "Comparado con", "Contrato (COP)",
@@ -166,9 +166,10 @@ export function monthlyWorkbookSheets(rows = []) {
         "Pagado del mes (COP)", "Pagado acumulado (COP)",
         "Costos del mes (COP)", "Costos acumulados (COP)",
         "Cartera por cobrar (COP)", "Saldo por facturar (COP)",
-        "Estado del avance", "Novedad que afecta la ejecución", "Observaciones", "Validación"
+        "Estado del avance", "Novedad que afecta la ejecución", "Observaciones", "Validación",
+        "Avance general Excel (%)", "Facturación Excel mes (%)", "Origen"
       ],
-      types: ["text", "text", "text", "text", "money0", "percent", "percent", "points", "money0", "money0", "money0", "money0", "percent", "percent", "money0", "money0", "money0", "money0", "money0", "money0", "text", "text", "text", "text"],
+      types: ["text", "text", "text", "text", "money0", "percent", "percent", "points", "money0", "money0", "money0", "money0", "percent", "percent", "money0", "money0", "money0", "money0", "money0", "money0", "text", "text", "text", "text", "percent", "percent", "text"],
       rows: rows.map((row) => [
         row.costCenter, row.projectName, `${row.year}-${String(row.month).padStart(2, "0")}`,
         row.previousExecutionPeriod
@@ -178,8 +179,12 @@ export function monthlyWorkbookSheets(rows = []) {
         row.monthlyInvoiced, row.cumulativeInvoiced, row.monthlyBilling / 100, row.cumulativeBilling / 100,
         row.monthlyPaid, row.cumulativePaid, row.monthlyCosts, row.cumulativeCosts,
         row.receivable, row.contractBalance,
-        row.executionRecorded ? "Avance registrado" : "Sin seguimiento físico",
-        row.executionIssue, row.observations, row.validationStatus
+        row.executionRecorded ? "Avance registrado" : row.importedExecutionPercentage == null
+          ? "Sin seguimiento físico" : "Referencia Excel sin validar",
+        row.executionIssue, row.observations, row.validationStatus,
+        row.importedExecutionPercentage == null ? null : row.importedExecutionPercentage / 100,
+        row.importedBillingPercentage == null ? null : row.importedBillingPercentage / 100,
+        row.importedHistory ? "Excel histórico" : "Sistema"
       ]),
       formulas: {
         7: (r) => `ROUND((G${r}-F${r})*100,2)`,
@@ -196,12 +201,12 @@ export function monthlyWorkbookSheets(rows = []) {
         { from: 0, to: 3, style: 1 }, { from: 4, to: 9, style: 10 },
         { from: 10, to: 13, style: 11 }, { from: 14, to: 15, style: 12 },
         { from: 16, to: 17, style: 13 }, { from: 18, to: 19, style: 14 },
-        { from: 20, to: 23, style: 15 }
+        { from: 20, to: 23, style: 15 }, { from: 24, to: 26, style: 15 }
       ],
       wrapColumns: [21, 22],
       tabColor: "0C5361",
       printPagesWide: 3,
-      columnWidths: [20, 40, 14, 22, 20, 21, 21, 27, 30, 34, 25, 28, 26, 30, 25, 28, 23, 27, 26, 27, 25, 48, 48, 21]
+      columnWidths: [20, 40, 14, 22, 20, 21, 21, 27, 30, 34, 25, 28, 26, 30, 25, 28, 23, 27, 26, 27, 25, 48, 48, 21, 26, 26, 21]
     };
   const paymentMatrix = {
       name: "Pagos mes a mes",

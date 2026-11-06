@@ -11,7 +11,7 @@
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.18.5" />
+    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.18.6" />
   </head>
   <body>
     <section id="loginView" class="login-shell">
@@ -310,7 +310,7 @@
 
           <section id="monthlyView" class="content-view" hidden>
             <div class="section-heading">
-              <div><h3>Seguimiento mensual</h3><p>Consulta primero los meses del Excel histórico, con sus importes, porcentajes y notas. Los registros nuevos y sus periodos aparecen después.</p></div>
+              <div><h3>Seguimiento mensual</h3><p>Los meses y avances del Excel histórico aparecen en esta misma tabla, identificados como datos importados. Los nuevos seguimientos continúan separados por periodo.</p></div>
               <div class="heading-actions"><button id="exportMonthlyButton" class="btn btn-outline-primary">Exportar Excel detallado</button><button id="newPeriodButton" class="btn btn-outline-primary">Nuevo periodo</button><button id="newMonthlyButton" class="btn btn-primary">Registrar seguimiento</button></div>
             </div>
 
@@ -322,8 +322,9 @@
             </div>
 
             <article class="panel filter-panel monthly-filter-panel" aria-labelledby="monthlyFiltersTitle">
-              <div class="filter-panel-heading"><div><h4 id="monthlyFiltersTitle">Filtros de seguimiento</h4><p>El proyecto filtra el Excel y el sistema. Periodo y validación solo filtran los registros del sistema.</p></div><span class="filter-panel-tip">Opcional</span></div>
+              <div class="filter-panel-heading"><div><h4 id="monthlyFiltersTitle">Filtros de seguimiento</h4><p>Busca un centro o proyecto, o selecciona un periodo. Los avances del Excel se distinguen de los validados en el sistema.</p></div><span class="filter-panel-tip">Opcional</span></div>
               <form id="monthlyFilters" class="filter-grid" autocomplete="off">
+                <label>Buscar centro o proyecto<input id="monthlyHistoricalSearch" class="form-control" type="search" placeholder="Ej.: 220 o DISLICORES" autocomplete="off" /></label>
                 <label>Proyecto<select id="monthlyFilterProject" class="form-select"><option value="">Todos</option></select></label>
                 <label>Periodo<select id="monthlyFilterPeriod" class="form-select"><option value="">Todos</option></select></label>
                 <label>Validación<select id="monthlyFilterStatus" class="form-select"><option value="">Todos</option><option value="borrador">Borrador</option><option value="pendiente">Pendiente</option><option value="validado">Validado</option><option value="rechazado">Rechazado</option></select></label>
@@ -333,20 +334,14 @@
             <div id="monthlyActiveFilters" class="active-filter-list" aria-live="polite" hidden></div>
 
             <div id="monthlyModuleMessage" class="module-message module-message-block" role="status" aria-live="polite"></div>
-            <article class="panel data-panel" id="monthlyHistoricalPanel">
-              <div class="panel-heading"><div><h4>Mes a mes del Excel histórico</h4><small>Importes y porcentajes de facturación de la columna «FACTURADO»; avance general y notas de seguimiento del libro.</small></div><label class="historical-search-control">Buscar centro o proyecto<input id="monthlyHistoricalSearch" class="form-control" type="search" placeholder="Ej.: 220 o DISLICORES" autocomplete="off" /></label></div>
-              <p id="monthlyHistoricalCount" class="historical-count"></p>
-              <div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Mes del Excel</th><th>Facturado</th><th>% facturado en Excel</th><th>% según importe / contrato</th><th>Facturado acumulado</th></tr></thead><tbody id="monthlyHistoricalRows"></tbody></table></div>
-              <div id="monthlyHistoricalEmpty" class="inline-empty" hidden>El centro o proyecto buscado no tiene datos históricos del Excel.</div>
+            <article class="panel data-panel">
+              <div class="panel-heading"><div><h4>Mes a mes de proyectos</h4><small>La columna «% Excel mes» es facturación; el avance general del Excel aparece en el mes indicado por la hoja, sin tratarlo como validación.</small></div></div>
+              <div class="table-responsive"><table class="table monthly-table align-middle mb-0"><thead><tr><th>Periodo</th><th>Ejecución mes</th><th>Ejecución acumulada</th><th>Equivalente ejecutado</th><th>Facturado mes</th><th>% Excel mes</th><th>Facturado acumulado</th><th>Facturación %</th><th>Recaudado mes</th><th>Recaudado acumulado</th><th>Recaudo Financiero</th><th>Costos y gastos</th><th>Novedad de ejecución</th><th>Validación</th><th>Acciones</th></tr></thead><tbody id="monthlyRows"></tbody></table></div>
+              <div id="monthlyEmpty" class="inline-empty" hidden>No se encontraron registros mensuales.</div>
             </article>
             <article class="panel data-panel period-panel">
-              <div class="panel-heading"><div><h4>Periodos del sistema</h4><small>El administrador puede reabrir un mes anterior para corregirlo sin cerrar el mes actual. Los cambios quedan en el historial; cierra el mes al terminar.</small></div><span id="periodModuleMessage" class="module-message" role="status" aria-live="polite"></span></div>
+              <div class="panel-heading"><div><h4>Periodos del sistema</h4><small>Los periodos del Excel se identifican como históricos. El administrador puede cerrar o reabrir los periodos operativos.</small></div><span id="periodModuleMessage" class="module-message" role="status" aria-live="polite"></span></div>
               <div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Periodo</th><th>Estado</th><th>Fecha de cierre</th><th>Acción</th></tr></thead><tbody id="periodRows"></tbody></table></div>
-            </article>
-            <article class="panel data-panel">
-              <div class="panel-heading"><div><h4>Seguimiento registrado en el sistema</h4><small>Periodos creados y validados dentro de SOINSOLAR.</small></div></div>
-              <div class="table-responsive"><table class="table monthly-table align-middle mb-0"><thead><tr><th>Periodo</th><th>Ejecución mes</th><th>Ejecución acumulada</th><th>Equivalente ejecutado</th><th>Facturado mes</th><th>Facturado acumulado</th><th>Facturación %</th><th>Recaudado mes</th><th>Recaudado acumulado</th><th>Recaudo Financiero</th><th>Costos y gastos</th><th>Novedad de ejecución</th><th>Validación</th><th>Acciones</th></tr></thead><tbody id="monthlyRows"></tbody></table></div>
-              <div id="monthlyEmpty" class="inline-empty" hidden>No se encontraron registros mensuales.</div>
             </article>
           </section>
 
@@ -939,11 +934,11 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="src/assets/js/config.js?v=1.12.0"></script>
-    <script type="module" src="src/assets/js/app.js?v=1.18.5"></script>
-    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.18.5"></script>
-    <script type="module" src="src/assets/js/accounting-ui.js?v=1.18.5"></script>
-    <script type="module" src="src/assets/js/project-import-ui.js?v=1.18.5"></script>
-    <script type="module" src="src/assets/js/assistant-ui.js?v=1.18.5"></script>
+    <script type="module" src="src/assets/js/app.js?v=1.18.6"></script>
+    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.18.6"></script>
+    <script type="module" src="src/assets/js/accounting-ui.js?v=1.18.6"></script>
+    <script type="module" src="src/assets/js/project-import-ui.js?v=1.18.6"></script>
+    <script type="module" src="src/assets/js/assistant-ui.js?v=1.18.6"></script>
   </body>
 </html>
 

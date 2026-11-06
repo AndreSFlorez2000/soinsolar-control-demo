@@ -5,6 +5,11 @@ function amount(value) {
   return Number.isFinite(number) && number > 0 ? number : 0;
 }
 
+function signedAmount(value) {
+  const number = Number(value ?? 0);
+  return Number.isFinite(number) ? number : 0;
+}
+
 function percentage(numerator, denominator) {
   return denominator > 0 ? (numerator / denominator) * 100 : 0;
 }
@@ -91,7 +96,7 @@ export function buildMonthlyExecutionReport(projects = [], monthlyRows = [], all
     if (!included.has(row.projectId)) continue;
     const previous = runningByProject.get(row.projectId) ?? { invoiced: 0, paid: 0, costs: 0, lastExecution: null };
     const running = {
-      invoiced: previous.invoiced + amount(row.invoicedValue),
+      invoiced: previous.invoiced + signedAmount(row.invoicedValue),
       paid: previous.paid + amount(row.paidValue),
       costs: previous.costs + amount(row.costsExpensesValue),
       lastExecution: row.executedCumulativePercentage === null || row.executedCumulativePercentage === undefined
@@ -113,7 +118,7 @@ export function buildMonthlyExecutionReport(projects = [], monthlyRows = [], all
       const cumulativeProgress = Number(row.executedCumulativePercentage ?? row.previousExecutedCumulativePercentage ?? 0);
       const previousProgress = Number(row.previousExecutedCumulativePercentage ?? cumulativeProgress - monthlyProgress);
       const running = cumulativeByPeriod.get(`${row.projectId}:${row.year}:${row.month}`);
-      const cumulativeInvoiced = running?.invoiced ?? amount(row.cumulativeInvoicedValue ?? row.invoicedValue);
+      const cumulativeInvoiced = running?.invoiced ?? signedAmount(row.cumulativeInvoicedValue ?? row.invoicedValue);
       const cumulativePaid = running?.paid ?? amount(row.paidValue);
       return Object.freeze({
         projectId: row.projectId,
@@ -127,7 +132,7 @@ export function buildMonthlyExecutionReport(projects = [], monthlyRows = [], all
         cumulativeProgress,
         monthlyEquivalent: Math.round(contractValue * monthlyProgress) / 100,
         cumulativeEquivalent: Math.round(contractValue * cumulativeProgress) / 100,
-        monthlyInvoiced: amount(row.invoicedValue),
+        monthlyInvoiced: signedAmount(row.invoicedValue),
         cumulativeInvoiced,
         monthlyBilling: Number(row.monthlyBillingPercentage ?? 0),
         cumulativeBilling: contractValue > 0 ? Math.round(cumulativeInvoiced / contractValue * 10000) / 100 : 0,
@@ -141,6 +146,9 @@ export function buildMonthlyExecutionReport(projects = [], monthlyRows = [], all
         executionRecorded: row.executedCumulativePercentage !== null && row.executedCumulativePercentage !== undefined,
         executionIssue: row.executionIssue || "",
         observations: row.observations || "",
+        importedBillingPercentage: row.importedBillingPercentage ?? null,
+        importedExecutionPercentage: row.importedExecutionPercentage ?? null,
+        importedHistory: Boolean(row.importedHistory),
         validationStatus: row.validationStatus || "sin registro"
       });
     });
