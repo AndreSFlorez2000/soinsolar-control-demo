@@ -132,7 +132,14 @@ export function normalizeProject(record) {
     parentCostCenter: record.parent_cost_center || null,
     startDate: record.start_date || null,
     endDate: record.end_date || null,
-    notes: record.notes || null
+    notes: record.notes || null,
+    importedContractValue: record.imported_contract_value == null ? null : Number(record.imported_contract_value),
+    importedBilledTotal: record.imported_billed_total == null ? null : Number(record.imported_billed_total),
+    importedMonthlyBilled: record.imported_monthly_billed || {},
+    importedContractComponents: record.imported_contract_components || [],
+    importedAsOf: record.imported_as_of || null,
+    importedFinancialSource: record.imported_financial_source || null,
+    importedFinancialReview: record.imported_financial_review || null
   });
 }
 
@@ -327,7 +334,7 @@ export function projectInputToRecord(input, userId) {
     );
   }
 
-  return {
+  const record = {
     cost_center: assertText(input.costCenter, "centro de costo", {
       min: 2,
       max: 50
@@ -353,6 +360,21 @@ export function projectInputToRecord(input, userId) {
     notes: input.notes?.trim() || null,
     updated_by: userId ? assertUuid(userId, "usuario") : null
   };
+  if (Object.hasOwn(input, "importedContractValue")) {
+    const amount = input.importedContractValue;
+    record.imported_contract_value = amount == null ? null : assertMoney(amount, "valor contractual importado", { allowZero: false });
+    const billed = Number(input.importedBilledTotal ?? 0);
+    if (!Number.isFinite(billed) || Math.abs(billed) > 9999999999999999) {
+      throw new ValidationError("El facturado importado es inválido.", "importedBilledTotal");
+    }
+    record.imported_billed_total = Math.round(billed * 100) / 100;
+    record.imported_monthly_billed = input.importedMonthlyBilled || {};
+    record.imported_contract_components = input.importedContractComponents || [];
+    record.imported_as_of = input.importedAsOf ? assertDate(input.importedAsOf, "corte de facturación") : null;
+    record.imported_financial_source = input.importedFinancialSource || null;
+    record.imported_financial_review = input.importedFinancialReview || null;
+  }
+  return record;
 }
 
 function assertPower(value) {

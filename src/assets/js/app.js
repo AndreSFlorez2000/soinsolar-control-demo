@@ -9,7 +9,7 @@ import { canEditExecution } from "./domain/execution.js?v=1.9.0";
 import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=1.1.0";
 import { invoicePendingAmount, isSampleProject, payableInvoicesForProject } from "./domain/payment-selection.js?v=1.5.1";
 import { forgetProject, hasProject, recallProject, rememberProject } from "./domain/project-context.js?v=1.8.0";
-import { createApplicationDataGateway } from "./services/application-data.js?v=1.18.0";
+import { createApplicationDataGateway } from "./services/application-data.js?v=1.18.3";
 import { getCurrentSession, isDemoMode, registerAccount, signIn, signOut } from "./services/supabase.js?v=1.13.1";
 
 const loginView = document.querySelector("#loginView");
@@ -663,7 +663,7 @@ async function loadProjects(filters) {
     const rows = await (await ensureGateway()).listProjects(appliedFilters);
     document.querySelector("#projectResultCount").textContent = rows.length;
     document.querySelector("#projectsManagementRows").innerHTML = rows.map((project) => `
-      <tr><td><strong>${escapeHtml(project.costCenter)}</strong></td><td><span class="project-name-cell"><strong>${escapeHtml(project.projectName)}</strong><small>${escapeHtml(project.contractNumber || "Sin contrato registrado")}</small></span></td><td>${escapeHtml(project.municipality)}</td><td>${escapeHtml(project.serviceType)}</td><td><span class="status-badge ${escapeHtml(project.status)}">${escapeHtml(capitalize(project.status))}</span></td><td>${formatExecutionPercent(project.executedProgressPercentage)}</td><td>${formatPercent(project.financialProgressPercentage)}</td><td><span class="table-actions"><button class="table-action" type="button" data-action="open-project" data-project-id="${project.projectId}">Abrir</button><button class="table-action" type="button" data-action="edit-project" data-project-id="${project.projectId}">Editar</button><button class="table-action danger" type="button" data-action="delete-project" data-project-id="${project.projectId}">Eliminar</button></span></td></tr>`).join("");
+      <tr><td><strong>${escapeHtml(project.costCenter)}</strong></td><td><span class="project-name-cell"><strong>${escapeHtml(project.projectName)}</strong><small>${escapeHtml(project.contractNumber || (project.contractValue > 0 ? "Valor según Excel; contrato por registrar" : "Sin contrato registrado"))}</small></span></td><td>${escapeHtml(project.municipality)}</td><td>${escapeHtml(project.serviceType)}</td><td><span class="status-badge ${escapeHtml(project.status)}">${escapeHtml(capitalize(project.status))}</span></td><td>${formatExecutionPercent(project.executedProgressPercentage)}</td><td>${formatPercent(project.financialProgressPercentage)}</td><td><span class="table-actions"><button class="table-action" type="button" data-action="open-project" data-project-id="${project.projectId}">Abrir</button><button class="table-action" type="button" data-action="edit-project" data-project-id="${project.projectId}">Editar</button><button class="table-action danger" type="button" data-action="delete-project" data-project-id="${project.projectId}">Eliminar</button></span></td></tr>`).join("");
     document.querySelector("#projectsEmpty").hidden = rows.length > 0;
     setMessage(message, rows.length ? "Consulta actualizada." : "");
   } catch (error) {
@@ -874,6 +874,8 @@ async function openProjectDetail(projectId) {
   document.querySelector("#detailServiceType").textContent = project.serviceType;
   document.querySelector("#detailMunicipality").textContent = project.municipality;
   document.querySelector("#detailContractValue").textContent = formatCop(project.contractValue);
+  document.querySelector("#detailContractLabel").textContent = projectRecord.importedContractValue != null && !project.contractId
+    ? "Valor contractual según Excel" : "Valor contractual vigente";
   document.querySelector("#detailProjectProgress").textContent = formatExecutionPercent(project.executedProgressPercentage);
   document.querySelector("#detailFinancialProgress").textContent = formatPercent(project.financialProgressPercentage);
   document.querySelector("#detailPaymentPending").textContent = formatCop(project.paymentPending);
@@ -885,11 +887,30 @@ async function openProjectDetail(projectId) {
   document.querySelector("#detailProgressBar").style.width = `${Math.min(100, Math.max(0, project.financialProgressPercentage))}%`;
 
   document.querySelector("#detailClient").textContent = projectRecord.clientName || "Sin registrar";
-  document.querySelector("#detailContractNumber").textContent = project.contractNumber || "Sin registrar";
+  document.querySelector("#detailContractNumber").textContent = project.contractNumber ||
+    (projectRecord.importedContractValue != null ? "Sin contrato formal; valor del Excel" : "Sin registrar");
   document.querySelector("#detailPower").textContent = projectRecord.powerKwp === null ? "Sin registrar" : `${projectRecord.powerKwp.toLocaleString("es-CO")} kWp`;
   document.querySelector("#detailStartDate").textContent = formatDate(projectRecord.startDate);
   document.querySelector("#detailEndDate").textContent = formatDate(projectRecord.endDate);
   document.querySelector("#detailNotes").textContent = projectRecord.notes || "Sin observaciones";
+  const historical = document.querySelector("#detailImportedFinance");
+  historical.hidden = projectRecord.importedContractValue == null && projectRecord.importedBilledTotal == null;
+  if (!historical.hidden) {
+    document.querySelector("#detailImportedSource").textContent =
+      `${projectRecord.importedFinancialSource || "Archivo de proyectos"}${projectRecord.importedAsOf ? ` · corte ${formatDate(projectRecord.importedAsOf)}` : ""}`;
+    document.querySelector("#detailImportedContract").textContent = projectRecord.importedContractValue == null
+      ? "Sin valor" : formatCop(projectRecord.importedContractValue);
+    document.querySelector("#detailImportedBilled").textContent = formatCop(projectRecord.importedBilledTotal || 0);
+    const review = document.querySelector("#detailImportedReview");
+    review.hidden = !projectRecord.importedFinancialReview;
+    review.textContent = projectRecord.importedFinancialReview || "";
+    const months = Object.entries(projectRecord.importedMonthlyBilled || {})
+      .filter(([month, value]) => /^20\d{2}-(0[1-9]|1[0-2])$/.test(month) && Number.isFinite(Number(value)))
+      .sort(([a], [b]) => a.localeCompare(b));
+    document.querySelector("#detailImportedMonths").innerHTML = months.length
+      ? `<h5>Facturado por mes</h5><div class="table-responsive"><table class="table align-middle"><thead><tr><th>Mes</th><th>Valor</th></tr></thead><tbody>${months.map(([month, amount]) => `<tr><td>${month}</td><td>${formatCop(Number(amount))}</td></tr>`).join("")}</tbody></table></div>`
+      : "Sin desglose mensual en el archivo.";
+  }
 
   renderProjectAnalytics(project);
   await showView("detail");

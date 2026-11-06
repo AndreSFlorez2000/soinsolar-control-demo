@@ -1,4 +1,4 @@
-import { PROJECT_IMPORT_HEADERS, extractLegacyProjectRows, parseProjectCsv, referencedContractValue, resolveProjectImportRows } from "./domain/project-import.js?v=1.18.2";
+import { PROJECT_IMPORT_HEADERS, extractLegacyProjectRows, parseProjectCsv, referencedContractValue, resolveProjectImportRows } from "./domain/project-import.js?v=1.18.3";
 import { createXlsx } from "./domain/xlsx-export.js?v=1.17.0";
 
 const $ = (selector) => document.querySelector(selector);
@@ -17,10 +17,11 @@ function template() {
   download(blob, "formato-proyectos-soinsolar.xlsx");
 }
 
-function projectSheet(rows) {
-  return { name: "Proyectos", headers: [...PROJECT_IMPORT_HEADERS], rows,
-    types: PROJECT_IMPORT_HEADERS.map((_, index) => index === 6 ? "number" : index === 11 ? "money" : "text"),
-    freezeColumns: 2, columnWidths: [20, 34, 22, 28, 16, 26, 16, 18, 18, 20, 44, 22, 28] };
+function projectSheet(rows, months = []) {
+  const headers = [...PROJECT_IMPORT_HEADERS, ...months.map((month) => `Facturado ${month}`)];
+  return { name: "Proyectos", headers, rows,
+    types: headers.map((_, index) => index === 6 ? "number" : [11, 13].includes(index) || index >= PROJECT_IMPORT_HEADERS.length ? "money" : "text"),
+    freezeColumns: 2, columnWidths: [20, 34, 22, 28, 16, 26, 16, 18, 18, 20, 44, 22, 28, 22, 18, ...months.map(() => 22)] };
 }
 
 function download(blob, fileName) {
@@ -48,11 +49,12 @@ async function readRows(file) {
 function showPreview(result, fileName, legacy, issues) {
   pending = { rows: result.sourceRows, valid: result.valid, skipped: result.skipped, fileName, legacy, issues };
   const contracts = result.valid.filter((row) => row.contractValue != null).length;
-  $("#projectImportSummary").textContent = `${fileName}: ${result.valid.length} proyecto(s) nuevo(s); ${contracts} valor(es) del Excel quedan como referencia en observaciones; ${result.skipped.length} existente(s) sin cambios; ${issues.length} caso(s) para revisar. ${result.valid.length > 12 ? "Vista previa de los primeros 12; se guardarán todos los válidos." : ""}`;
+  const billed = result.valid.filter((row) => row.importedBilledTotal !== 0).length;
+  $("#projectImportSummary").textContent = `${fileName}: ${result.valid.length} proyecto(s) nuevo(s); ${contracts} valor(es) contractuales y ${billed} registro(s) con facturación en campos financieros; ${result.skipped.length} existente(s) sin cambios; ${issues.length} caso(s) para revisar. ${result.valid.length > 12 ? "Vista previa de los primeros 12; se guardarán todos los válidos." : ""}`;
   $("#projectImportRows").innerHTML = result.valid.slice(0, 12).map((row) => `<tr>
     <td>${escapeHtml(row.sourceSheet || "Proyectos")} · ${row.rowNumber}</td><td><strong>${escapeHtml(row.costCenter)}</strong></td>
     <td>${escapeHtml(row.name)}</td><td>${escapeHtml(row.municipality)}</td>
-    <td>${escapeHtml(row.serviceType)}</td><td>${row.contractValue == null ? "Sin valor" : escapeHtml(new Intl.NumberFormat("es-CO").format(row.contractValue))}</td>
+    <td>${escapeHtml(row.serviceType)}</td><td>${row.contractValue == null ? "Sin valor" : escapeHtml(new Intl.NumberFormat("es-CO").format(row.contractValue))}</td><td>${escapeHtml(new Intl.NumberFormat("es-CO").format(row.importedBilledTotal))}</td>
   </tr>`).join("");
   $("#projectImportIssues").hidden = !issues.length;
   $("#projectImportIssues").textContent = issues.slice(0, 5).map((issue) =>
@@ -83,20 +85,39 @@ async function exportProjects() {
   try {
     const api = window.SOINSOLAR_APP_API;
     const gateway = await api.gateway();
-    const [projects, contracts] = await Promise.all([gateway.listProjectDetails(), gateway.listContracts()]);
-    const byProject = new Map();
+    const [projects, summaries, contracts, invoices] = await Promise.all([
+      gateway.listProjectDetails(), gateway.listProjects(), gateway.listContracts(), gateway.listInvoices()
+    ]);
+    const byProject = new Map(), invoiceByProject = new Map();
+    const summaryByProject = new Map(summaries.map((summary) => [summary.projectId, summary]));
     const centers = new Map(projects.map((project) => [project.id, project.costCenter]));
     for (const contract of contracts) byProject.set(contract.projectId,
       [...(byProject.get(contract.projectId) ?? []), contract]);
+    for (const invoice of invoices) if (invoice.status !== "anulada") invoiceByProject.set(invoice.projectId,
+      [...(invoiceByProject.get(invoice.projectId) ?? []), invoice]);
+    const monthlyByProject = new Map(projects.map((project) => {
+      const months = { ...project.importedMonthlyBilled };
+      for (const invoice of invoiceByProject.get(project.id) ?? []) {
+        if (project.importedAsOf && invoice.issueDate <= project.importedAsOf) continue;
+        const month = invoice.issueDate.slice(0, 7);
+        months[month] = Math.round(((Number(months[month]) || 0) + invoice.amount) * 100) / 100;
+      }
+      return [project.id, months];
+    }));
+    const months = [...new Set([...monthlyByProject.values()].flatMap((monthly) => Object.keys(monthly)))].sort();
     const rows = projects.map((project) => {
       const linked = byProject.get(project.id) ?? [];
+      const summary = summaryByProject.get(project.id);
+      const monthly = monthlyByProject.get(project.id);
       return [project.costCenter, project.name, project.municipality, project.serviceType,
         project.status, project.clientName ?? "", project.powerKwp ?? "", project.startDate ?? "",
         project.endDate ?? "", centers.get(project.parentProjectId) ?? "", project.notes ?? "",
-        linked.length ? linked.reduce((sum, contract) => sum + contract.currentValue, 0) : (referencedContractValue(project.notes) ?? ""),
-        linked.length === 1 ? linked[0].contractNumber : linked.length ? "Varios contratos" : ""];
+        summary?.contractValue || project.importedContractValue || referencedContractValue(project.notes) || "",
+        linked.length === 1 ? linked[0].contractNumber : linked.length ? "Varios contratos" : "",
+        summary?.totalInvoiced ?? project.importedBilledTotal ?? 0, project.importedAsOf ?? "",
+        ...months.map((month) => monthly[month] ?? "")];
     });
-    download(createXlsx([projectSheet(rows)]), `proyectos-soinsolar-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    download(createXlsx([projectSheet(rows, months)]), `proyectos-soinsolar-${new Date().toISOString().slice(0, 10)}.xlsx`);
     message(`${rows.length} proyecto(s) exportados a Excel.`);
   } catch (error) { message(error.message || "No se pudo exportar la lista.", true); }
   finally { button.disabled = false; }
