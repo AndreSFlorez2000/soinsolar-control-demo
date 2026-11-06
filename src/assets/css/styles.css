@@ -370,6 +370,9 @@ button, input, select, textarea { font: inherit; }
 .execution-track { width: 95px; height: 9px; overflow: hidden; border-radius: 999px; background: #e7edf2; }
 .execution-track span { display: block; height: 100%; border-radius: inherit; background: var(--green); }
 .monthly-table { min-width: 1450px; }
+.historical-search-control { display: grid; gap: 5px; min-width: 220px; font-size: 11px; color: var(--muted); }
+.historical-search-control .form-control { font-size: 12px; }
+.historical-count { margin: 0 0 10px; color: var(--muted); font-size: 12px; }
 .monthly-project-heading th { padding: 15px 12px !important; background: #eaf3fa; border-top: 14px solid #fff; border-bottom: 1px solid #d5e5f0 !important; text-transform: none; letter-spacing: normal; }
 .monthly-project-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 30px; }
 .monthly-project-summary > div { display: grid; gap: 4px; }

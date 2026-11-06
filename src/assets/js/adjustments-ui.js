@@ -1,7 +1,7 @@
 import { planExecutionChange } from "./domain/execution.js?v=1.9.0";
 import { parseCostCsv, resolveCostImportRows } from "./domain/cost-import.js?v=1.5.8";
 import { buildMonthlyExecutionReport } from "./domain/reports.js?v=1.5.8";
-import { historicalWorkbookSheet, monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.18.4";
+import { historicalWorkbookSheet, monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.18.5";
 import { createXlsx } from "./domain/xlsx-export.js?v=1.5.8";
 
 function api() {
@@ -55,7 +55,11 @@ async function exportMonthly() {
     const rows = buildMonthlyExecutionReport(api().projects(), visible, api().monthly());
     const projects = await (await api().gateway()).listProjectDetails();
     const projectId = document.querySelector("#monthlyFilterProject")?.value ?? "";
-    const historical = historicalWorkbookSheet(projects, projectId);
+    const search = document.querySelector("#monthlyHistoricalSearch")?.value.trim().normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es") ?? "";
+    const matching = search ? projects.filter((project) => `${project.costCenter} ${project.name}`
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es").includes(search)) : projects;
+    const historical = historicalWorkbookSheet(matching, projectId);
     if (!rows.length && !historical.rows.length) {
       window.alert("No hay seguimiento mensual para exportar.");
       return;

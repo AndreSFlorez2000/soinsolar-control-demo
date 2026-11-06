@@ -1,15 +1,15 @@
 import { buildMonthlySeries, calculateDashboardIndicators } from "./domain/dashboard.js?v=1.5.9";
-import { createDashboardUI } from "./dashboard-ui.js?v=1.18.4";
+import { createDashboardUI } from "./dashboard-ui.js?v=1.18.5";
 import { calculateProjectIndicators } from "./domain/project-analytics.js?v=1.4.1";
 import { buildManagementReport, buildMonthlyExecutionReport } from "./domain/reports.js?v=1.5.8";
-import { historicalProjectGroups, managementSummarySheet, monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.18.4";
+import { historicalProjectGroups, managementSummarySheet, monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.18.5";
 import { createXlsx } from "./domain/xlsx-export.js?v=1.5.8";
 import { costWorkbookSheets } from "./domain/cost-workbook.js?v=1.5.8";
 import { canEditExecution } from "./domain/execution.js?v=1.9.0";
 import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=1.1.0";
 import { invoicePendingAmount, isSampleProject, payableInvoicesForProject } from "./domain/payment-selection.js?v=1.5.1";
 import { forgetProject, hasProject, recallProject, rememberProject } from "./domain/project-context.js?v=1.8.0";
-import { createApplicationDataGateway } from "./services/application-data.js?v=1.18.4";
+import { createApplicationDataGateway } from "./services/application-data.js?v=1.18.5";
 import { getCurrentSession, isDemoMode, registerAccount, signIn, signOut } from "./services/supabase.js?v=1.13.1";
 
 const loginView = document.querySelector("#loginView");
@@ -1109,7 +1109,11 @@ function importedFollowupHtml(project) {
 }
 
 function renderHistoricalMonthly(projects, filters) {
-  const groups = historicalProjectGroups(projects, filters.projectId);
+  const search = document.querySelector("#monthlyHistoricalSearch").value.trim().normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es");
+  const groups = historicalProjectGroups(projects, filters.projectId).filter(({ project }) =>
+    !search || `${project.costCenter} ${project.name}`.normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es").includes(search));
   const tbody = document.querySelector("#monthlyHistoricalRows");
   tbody.innerHTML = groups.map(({ project, months }) => {
     const summary = `<tr class="monthly-project-heading"><th colspan="5" scope="rowgroup"><div class="monthly-project-summary"><div><strong>${escapeHtml(project.costCenter)} · ${escapeHtml(project.name)}</strong><small>${escapeHtml(project.importedFinancialSource || "Excel histórico")}</small></div><div><span>Contrato principal</span><strong>${project.importedContractValue == null ? "—" : formatCop(project.importedContractValue)}</strong></div><div><span>Facturado al corte</span><strong>${project.importedBilledTotal == null ? "—" : formatCop(project.importedBilledTotal)}</strong></div><div><span>Avance general en Excel</span><strong>${project.importedExecutionSnapshotPercentage == null ? "—" : formatPercent(project.importedExecutionSnapshotPercentage)}</strong></div></div>${project.importedExecutionMonthLabel ? `<small>Mes de ejecución informado: ${escapeHtml(project.importedExecutionMonthLabel)} (sin año acreditado).</small>` : ""}${project.importedFinancialReview ? `<p>Pendiente de revisar: ${escapeHtml(project.importedFinancialReview)}</p>` : ""}${importedFollowupHtml({ ...project, importedExecutionSnapshotPercentage: null })}</th></tr>`;
@@ -1117,7 +1121,7 @@ function renderHistoricalMonthly(projects, filters) {
       : `<tr><td colspan="5">Sin facturación mensual en el Excel.</td></tr>`;
     return summary + detail;
   }).join("");
-  document.querySelector("#monthlyHistoricalCount").textContent = `${groups.length} proyecto(s) · ${groups.reduce((sum, group) => sum + group.months.length, 0)} mes(es) con dato`;
+  document.querySelector("#monthlyHistoricalCount").textContent = `${groups.length} proyecto(s) · ${groups.reduce((sum, group) => sum + group.months.length, 0)} mes(es) con dato del Excel`;
   document.querySelector("#monthlyHistoricalEmpty").hidden = !!groups.length;
 }
 
@@ -2099,7 +2103,9 @@ document.querySelector("#reloadProfilesButton").addEventListener("click", loadPr
 document.querySelector("#projectFilters").addEventListener("submit", (event) => { event.preventDefault(); loadProjects(); });
 document.querySelector("#clearProjectFilters").addEventListener("click", () => { document.querySelector("#projectFilters").reset(); loadProjects(); });
 document.querySelector("#monthlyFilters").addEventListener("submit", (event) => { event.preventDefault(); loadMonthlyModule(); });
-document.querySelector("#clearMonthlyFilters").addEventListener("click", () => { document.querySelector("#monthlyFilters").reset(); loadMonthlyModule({}); });
+document.querySelector("#clearMonthlyFilters").addEventListener("click", () => { document.querySelector("#monthlyFilters").reset(); document.querySelector("#monthlyHistoricalSearch").value = ""; loadMonthlyModule({}); });
+document.querySelector("#monthlyHistoricalSearch").addEventListener("input", () => renderHistoricalMonthly(historicalProjectDetails, monthlyFilters()));
+document.querySelector("#monthlyFilterProject").addEventListener("change", () => renderHistoricalMonthly(historicalProjectDetails, monthlyFilters()));
 document.querySelector("#financeFilters").addEventListener("submit", (event) => { event.preventDefault(); loadFinance(); });
 document.querySelector("#clearFinanceFilters").addEventListener("click", () => { document.querySelector("#financeFilters").reset(); loadFinance({}); });
 document.addEventListener("soinsolar:accounting-center-selected", (event) => {
