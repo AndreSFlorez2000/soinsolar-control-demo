@@ -1,4 +1,4 @@
-import { PROJECT_IMPORT_HEADERS, extractLegacyProjectRows, parseProjectCsv, referencedContractValue, resolveProjectImportRows } from "./domain/project-import.js?v=1.18.1";
+import { PROJECT_IMPORT_HEADERS, extractLegacyProjectRows, parseProjectCsv, referencedContractValue, resolveProjectImportRows } from "./domain/project-import.js?v=1.18.2";
 import { createXlsx } from "./domain/xlsx-export.js?v=1.17.0";
 
 const $ = (selector) => document.querySelector(selector);
