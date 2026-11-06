@@ -198,7 +198,6 @@ function legacyRows(sheet) {
     }
     const extras = [
       `Origen: ${sheet.name}, fila ${start + 1}`,
-      Number(row[contractColumn]) > 0 && `Valor contractual en Excel: ${row[contractColumn]}`,
       description && `Descripción: ${description}`,
       serviceCode && `T.S.: ${serviceCode}`,
       row[descriptionColumn + 2] && `Tipo en Excel: ${row[descriptionColumn + 2]}`,
@@ -315,10 +314,9 @@ export function resolveProjectImportRows(rows, existingProjects = [], newId = ()
       const importedAsOf = dateValue(row.__importedAsOf__ ?? field(values, columns.billedAsOf))
         ?? (Object.keys(billed.monthly).length ? lastDayOfMonth(Object.keys(billed.monthly).sort().at(-1)) : null);
       const importedNumber = String(field(values, columns.contractNumber)).trim();
-      const sourceNotes = String(field(values, columns.notes)).trim();
+      const sourceNotes = String(field(values, columns.notes)).trim()
+        .replace(/\s*·?\s*Valor contractual en (?:Excel|archivo):\s*\d+(?:\.\d+)?/gi, "").trim();
       const notes = [sourceNotes,
-        importedValue != null && !/Valor contractual en (Excel|archivo):/i.test(sourceNotes)
-          ? `Valor contractual en archivo: ${importedValue}` : "",
         importedNumber && !/Contrato en archivo:/i.test(sourceNotes)
           ? `Contrato en archivo: ${importedNumber}` : ""
       ].filter(Boolean).join(" · ");
