@@ -149,7 +149,8 @@ export function extractLegacyProjectRows(sheets) {
       grouped.set(cc, [...(grouped.get(cc) ?? []), row]);
     }
     for (const [cc, matches] of grouped) {
-      if (matches.length > 1) ambiguous.set(cc, `${sheet.name}: filas ${matches.map((row) => row.__rowNum__ + 1).join(", ")}`);
+      if (matches.length > 1) ambiguous.set(cc, `${sheet.name}: ${matches.map((row) =>
+        `fila ${row.__rowNum__ + 1}, ${row["Nombre del proyecto"].replace(/\s+/g, " ").slice(0, 65)}`).join("; ")}`);
     }
   }
   const seen = new Set(), rows = [], issues = [];
