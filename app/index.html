@@ -11,7 +11,7 @@
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.18.6" />
+    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.18.7" />
   </head>
   <body>
     <section id="loginView" class="login-shell">
@@ -202,7 +202,7 @@
               </div>
               <div class="project-kpis">
                 <div><span id="detailContractLabel">Valor contractual vigente</span><strong id="detailContractValue">$0</strong></div>
-                <div><span>Avance de ejecución</span><strong id="detailProjectProgress">0 %</strong></div>
+                <div><span>Avance de ejecución</span><strong id="detailProjectProgress">0 %</strong><small id="detailProjectProgressSource"></small></div>
                 <div><span>Facturación del contrato</span><strong id="detailFinancialProgress" class="positive">0 %</strong></div>
                 <div><span>Pago pendiente</span><strong id="detailPaymentPending">$0</strong></div>
               </div>
@@ -558,14 +558,14 @@
 
           <section id="financeView" class="content-view" hidden>
             <div class="section-heading">
-              <div><h3>Facturación y pagos</h3><p>Esta sección muestra facturas formales y sus pagos. La facturación histórica del Excel aparece en la ficha de cada proyecto y en el total financiero; el libro no aporta fechas de expedición ni datos de pago para convertirla en facturas formales.</p></div>
+              <div><h3>Facturación y pagos</h3><p>La tabla incluye lo facturado por mes en el Excel y las facturas formales del sistema. Los importes históricos no aportan fecha de emisión ni constancia de pago.</p></div>
               <div class="heading-actions"><button id="newPaymentButton" class="btn btn-outline-primary" type="button">Registrar pago</button><button id="newInvoiceButton" class="btn btn-primary" type="button">Nueva factura</button></div>
             </div>
 
             <div class="cost-summary-grid">
-              <article class="mini-kpi"><span>Facturas registradas en el sistema</span><strong id="financeInvoicedTotal">$0</strong></article>
-              <article class="mini-kpi"><span>Total pagado</span><strong id="financePaidTotal">$0</strong></article>
-              <article class="mini-kpi"><span>Cartera pendiente</span><strong id="financePendingTotal">$0</strong></article>
+              <article class="mini-kpi"><span>Facturado (Excel + sistema)</span><strong id="financeInvoicedTotal">$0</strong></article>
+              <article class="mini-kpi"><span>Pagos registrados en sistema</span><strong id="financePaidTotal">$0</strong></article>
+              <article class="mini-kpi"><span>Saldo de facturas formales</span><strong id="financePendingTotal">$0</strong></article>
               <article class="mini-kpi"><span>Facturas con saldo</span><strong id="financePendingInvoices">0</strong></article>
             </div>
 
@@ -583,9 +583,9 @@
             <div id="financeModuleMessage" class="module-message module-message-block" role="status" aria-live="polite"></div>
 
             <article class="panel data-panel finance-data-panel">
-              <div class="panel-heading"><div><h4>Facturas</h4><small>El saldo se calcula descontando los pagos activos de cada factura.</small></div></div>
+              <div class="panel-heading"><div><h4>Facturado por mes y facturas</h4><small>El saldo y la opción de pago solo aplican a facturas formales. El filtro de fechas incluye meses históricos que se cruzan con el rango.</small></div></div>
               <div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Factura</th><th>Fecha</th><th>Proyecto</th><th>Periodo</th><th>Estado</th><th>Valor</th><th>Saldo</th><th>Acción</th></tr></thead><tbody id="invoiceRows"></tbody></table></div>
-              <div id="invoiceEmpty" class="inline-empty" hidden>No se encontraron facturas.</div>
+              <div id="invoiceEmpty" class="inline-empty" hidden>No se encontró facturación para los filtros seleccionados.</div>
             </article>
 
             <article class="panel data-panel finance-data-panel">
@@ -626,7 +626,7 @@
             <article class="panel report-formulas">
               <h4>Lectura del reporte</h4>
               <div class="formula-grid">
-                <span>Avance de ejecución = porcentaje registrado manualmente por el administrador</span>
+                <span>Avance de ejecución = registro del administrador; si falta, corte del Excel señalado como histórico</span>
                 <span>Facturación % = facturación acumulada ÷ contrato vigente × 100</span>
                 <span>Recaudo Financiero = pagos acumulados ÷ contrato vigente × 100</span>
                 <span>Rentabilidad estimada = contrato vigente − costos y gastos</span>
@@ -934,11 +934,11 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="src/assets/js/config.js?v=1.12.0"></script>
-    <script type="module" src="src/assets/js/app.js?v=1.18.6"></script>
-    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.18.6"></script>
-    <script type="module" src="src/assets/js/accounting-ui.js?v=1.18.6"></script>
-    <script type="module" src="src/assets/js/project-import-ui.js?v=1.18.6"></script>
-    <script type="module" src="src/assets/js/assistant-ui.js?v=1.18.6"></script>
+    <script type="module" src="src/assets/js/app.js?v=1.18.7"></script>
+    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.18.7"></script>
+    <script type="module" src="src/assets/js/accounting-ui.js?v=1.18.7"></script>
+    <script type="module" src="src/assets/js/project-import-ui.js?v=1.18.7"></script>
+    <script type="module" src="src/assets/js/assistant-ui.js?v=1.18.7"></script>
   </body>
 </html>
 

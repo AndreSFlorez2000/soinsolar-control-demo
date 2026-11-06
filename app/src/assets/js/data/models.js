@@ -197,6 +197,7 @@ export function normalizeProjectSummary(record) {
     ),
     executedProgressPercentage: record.executed_progress_percentage === null || record.executed_progress_percentage === undefined
       ? null : Number(record.executed_progress_percentage),
+    executionProgressSource: record.execution_progress_source || null,
     profitability: Number(record.profitability ?? (contractValue - totalCostsExpenses)),
     profitabilityPercentage: Number(
       record.profitability_percentage ??

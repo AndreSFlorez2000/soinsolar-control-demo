@@ -367,6 +367,8 @@ button, input, select, textarea { font: inherit; }
 .execution-panel .panel-heading small { display: block; margin-top: 5px; color: var(--muted); font-size: 11px; }
 .execution-progress-cell { display: flex; align-items: center; gap: 10px; min-width: 155px; }
 .execution-progress-cell strong { flex: 0 0 78px; font-size: 11px; }
+.execution-progress-cell > span { display: grid; gap: 2px; }
+.execution-progress-cell small, .project-kpis small { color: var(--muted); font-size: 10px; }
 .execution-track { width: 95px; height: 9px; overflow: hidden; border-radius: 999px; background: #e7edf2; }
 .execution-track span { display: block; height: 100%; border-radius: inherit; background: var(--green); }
 .monthly-table { min-width: 1450px; }
@@ -448,6 +450,7 @@ button, input, select, textarea { font: inherit; }
 .finance-status.emitida, .finance-status.confirmado { color: var(--green); background: #e5f5eb; }
 .finance-status.registrada, .finance-status.registrado { color: var(--blue); background: #e7f0f8; }
 .finance-status.anulada, .finance-status.anulado { color: var(--red); background: #fae8e8; }
+.finance-status.historico { color: var(--blue); background: #e7f0f8; }
 .reference-cell .sample-invoice-badge { width: fit-content; padding: 3px 7px; border-radius: 6px; color: #805413; background: #fff1d4; font-weight: 700; }
 .report-kpi-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
 .report-kpi-grid .mini-kpi strong { font-size: clamp(15px, 1.15vw, 19px); }
