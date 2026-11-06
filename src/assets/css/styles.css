@@ -329,6 +329,7 @@ button, input, select, textarea { font: inherit; }
 .project-import-dialog { width: min(900px, calc(100% - 24px)); }
 .project-import-preview { max-height: 330px; overflow: auto; margin: 16px 0; }
 .project-import-preview .table { min-width: 690px; }
+.project-import-issues { white-space: pre-wrap; max-height: 170px; overflow: auto; padding: 12px; border-radius: 8px; background: #fff4e8; color: #683b16; font: inherit; font-size: .86rem; }
 .global-search { position: relative; width: min(360px, 100%); }
 .global-search label { display: block; margin-bottom: 5px; color: var(--navy); font-size: 11px; font-weight: 700; }
 .global-search-control { position: relative; }
