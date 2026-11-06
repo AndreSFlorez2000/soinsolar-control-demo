@@ -212,6 +212,15 @@ export function resolveProjectImportRows(rows, existingProjects = [], newId = ()
       return;
     }
     try {
+      const importedValue = contractValue(field(values, columns.contractValue));
+      const importedNumber = String(field(values, columns.contractNumber)).trim();
+      const sourceNotes = String(field(values, columns.notes)).trim();
+      const notes = [sourceNotes,
+        importedValue != null && !/Valor contractual en (Excel|archivo):/i.test(sourceNotes)
+          ? `Valor contractual en archivo: ${importedValue}` : "",
+        importedNumber && !/Contrato en archivo:/i.test(sourceNotes)
+          ? `Contrato en archivo: ${importedNumber}` : ""
+      ].filter(Boolean).join(" · ");
       const input = {
         id: newId(), costCenter,
         name: String(field(values, columns.name)).trim(),
@@ -222,10 +231,10 @@ export function resolveProjectImportRows(rows, existingProjects = [], newId = ()
         powerKwp: powerValue(field(values, columns.powerKwp)),
         startDate: dateValue(field(values, columns.startDate)),
         endDate: dateValue(field(values, columns.endDate)),
-        notes: String(field(values, columns.notes)).trim(),
+        notes,
         parentCenter: String(field(values, columns.parentCenter)).trim(),
-        contractValue: contractValue(field(values, columns.contractValue)),
-        contractNumber: String(field(values, columns.contractNumber)).trim(),
+        contractValue: importedValue,
+        contractNumber: importedNumber,
         sourceSheet: row.__sourceSheet__ ?? ""
       };
       if (input.clientName.length > 180 || input.notes.length > 500 || input.contractNumber.length > 80) throw new Error("cliente, contrato u observaciones demasiado largos");
