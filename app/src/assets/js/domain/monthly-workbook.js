@@ -3,6 +3,84 @@ const monthNames = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
 ];
 
+export function historicalProjectGroups(projects = [], projectId = "") {
+  return projects.filter((project) => (!projectId || (project.id ?? project.projectId) === projectId)
+    && (project.importedContractValue != null || project.importedBilledTotal != null
+      || Object.keys(project.importedMonthlyBilled ?? {}).length
+      || project.importedFollowupNotes?.length || project.importedInvoiceReferences?.length))
+    .sort((left, right) => String(left.costCenter).localeCompare(String(right.costCenter), "es", { numeric: true }))
+    .map((project) => {
+      let cumulative = 0;
+      const monthKeys = new Set([...Object.keys(project.importedMonthlyBilled ?? {}),
+        ...Object.keys(project.importedMonthlyBilledPercentages ?? {})]);
+      const months = [...monthKeys].filter((month) => /^20\d{2}-(0[1-9]|1[0-2])$/.test(month))
+        .sort((left, right) => left.localeCompare(right))
+        .map((month) => {
+          const billed = Number(project.importedMonthlyBilled?.[month] ?? 0);
+          cumulative = Math.round((cumulative + billed) * 100) / 100;
+          const sourcePercent = project.importedMonthlyBilledPercentages?.[month];
+          return { month, billed, cumulative,
+            sourcePercent: sourcePercent == null ? null : Number(sourcePercent),
+            calculatedPercent: Number(project.importedContractValue) > 0
+              ? billed / Number(project.importedContractValue) * 100 : null };
+        });
+      return { project, months };
+    });
+}
+
+export function historicalWorkbookSheet(projects = [], projectId = "") {
+  const groups = historicalProjectGroups(projects, projectId);
+  const rows = [];
+  for (const { project, months } of groups) {
+    const notes = (project.importedFollowupNotes ?? []).map((item) =>
+      `${item.sheet || "Excel"} fila ${item.row || "?"}: ${item.text}`).join("\n");
+    const references = (project.importedInvoiceReferences ?? []).map((item) => item.reference).join("; ");
+    const entries = months.length ? months : [{ month: "", billed: null, cumulative: null, sourcePercent: null, calculatedPercent: null }];
+    for (const [index, item] of entries.entries()) {
+      rows.push([project.costCenter, project.name, project.importedFinancialSource || "Excel histórico",
+        item.month, project.importedContractValue ?? null, item.billed,
+        item.sourcePercent == null ? null : item.sourcePercent / 100,
+        item.calculatedPercent == null ? null : item.calculatedPercent / 100,
+        item.cumulative, project.importedBilledTotal ?? null,
+        index === 0 && project.importedExecutionSnapshotPercentage != null
+          ? Number(project.importedExecutionSnapshotPercentage) / 100 : null,
+        index === 0 ? project.importedExecutionMonthLabel || "" : "",
+        index === 0 ? references : "", index === 0 ? notes : "",
+        index === 0 ? project.importedFinancialReview || "" : "", "Fila principal"]);
+    }
+    for (const alternate of project.importedAlternateSnapshots ?? []) {
+      const altMonths = [...new Set([...Object.keys(alternate.monthlyBilled ?? {}),
+        ...Object.keys(alternate.monthlyPercentages ?? {})])].sort();
+      for (const month of altMonths.length ? altMonths : [""]) {
+        const billed = alternate.monthlyBilled?.[month];
+        const percentage = alternate.monthlyPercentages?.[month];
+        rows.push([project.costCenter, project.name, `${alternate.sheet || "Otra hoja"}, fila ${alternate.row || "?"}`,
+          month, alternate.contractValue ?? null, billed == null ? null : Number(billed),
+          percentage == null ? null : Number(percentage) / 100,
+          Number(alternate.contractValue) > 0 && billed != null ? Number(billed) / Number(alternate.contractValue) : null,
+          null, alternate.billedTotal ?? null, null, "", "", "",
+          "Cifras distintas: conciliar antes de incorporar", "Otra hoja; no sumada"]);
+      }
+    }
+  }
+  return {
+    name: "Histórico del Excel",
+    title: "Seguimiento mensual y notas del libro histórico",
+    notes: [
+      "El porcentaje facturado del Excel corresponde a la columna % junto a FACTURADO. El porcentaje calculado divide el importe mensual entre el valor contractual principal.",
+      "El avance de ejecución general es una referencia de la fila del Excel, sin fecha anual verificable cuando solo se informa el nombre del mes. No es ejecución mensual validada.",
+      "Las cifras de otra hoja se muestran para conciliación y no se suman a la fila principal. El archivo no acredita pagos."
+    ],
+    headers: ["Centro de costo", "Proyecto", "Hoja / fuente", "Mes facturado", "Contrato principal (COP)",
+      "Facturado mes (COP)", "% facturado Excel", "% importe / contrato", "Facturado acumulado (COP)",
+      "Facturado al corte (COP)", "Avance ejecución general Excel", "Mes de ejecución (sin año)",
+      "Referencias de factura", "Notas de seguimiento", "Pendiente de revisión", "Procedencia"],
+    types: ["text", "text", "text", "text", "money", "money", "percent", "percent", "money", "money", "percent", "text", "text", "text", "text", "text"],
+    rows, freezeColumns: 2, wrapColumns: [12, 13, 14], tabColor: "8053A0",
+    columnWidths: [18, 36, 32, 17, 23, 23, 20, 22, 27, 26, 27, 23, 32, 55, 55, 24]
+  };
+}
+
 export function managementSummarySheet(reportRows = []) {
   return {
     name: "Resumen",

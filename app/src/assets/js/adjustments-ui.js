@@ -1,7 +1,7 @@
 import { planExecutionChange } from "./domain/execution.js?v=1.9.0";
 import { parseCostCsv, resolveCostImportRows } from "./domain/cost-import.js?v=1.5.8";
 import { buildMonthlyExecutionReport } from "./domain/reports.js?v=1.5.8";
-import { monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.5.8";
+import { historicalWorkbookSheet, monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.18.4";
 import { createXlsx } from "./domain/xlsx-export.js?v=1.5.8";
 
 function api() {
@@ -47,22 +47,29 @@ function updateExecutionPreview() {
   }
 }
 
-function exportMonthly() {
-  const visible = api().visibleMonthly();
-  const rows = buildMonthlyExecutionReport(api().projects(), visible, api().monthly());
-
-  if (!rows.length) {
-    window.alert("No hay periodos mensuales para exportar.");
-    return;
-  }
-
-  const blob = createXlsx(monthlyWorkbookSheets(rows));
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = "seguimiento-mensual-" + new Date().toISOString().slice(0, 10) + ".xlsx";
-  anchor.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+async function exportMonthly() {
+  const button = document.querySelector("#exportMonthlyButton");
+  button.disabled = true;
+  try {
+    const visible = api().visibleMonthly();
+    const rows = buildMonthlyExecutionReport(api().projects(), visible, api().monthly());
+    const projects = await (await api().gateway()).listProjectDetails();
+    const projectId = document.querySelector("#monthlyFilterProject")?.value ?? "";
+    const historical = historicalWorkbookSheet(projects, projectId);
+    if (!rows.length && !historical.rows.length) {
+      window.alert("No hay seguimiento mensual para exportar.");
+      return;
+    }
+    const blob = createXlsx([...monthlyWorkbookSheets(rows), historical]);
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "seguimiento-mensual-" + new Date().toISOString().slice(0, 10) + ".xlsx";
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (error) {
+    window.alert(error.message || "No se pudo exportar el seguimiento mensual.");
+  } finally { button.disabled = false; }
 }
 
 async function readImportRows(file) {

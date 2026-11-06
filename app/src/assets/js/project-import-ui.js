@@ -1,4 +1,4 @@
-import { PROJECT_IMPORT_HEADERS, extractLegacyProjectRows, parseProjectCsv, referencedContractValue, resolveProjectImportRows } from "./domain/project-import.js?v=1.18.3";
+import { PROJECT_IMPORT_HEADERS, extractLegacyProjectRows, parseProjectCsv, referencedContractValue, resolveProjectImportRows } from "./domain/project-import.js?v=1.18.4";
 import { createXlsx } from "./domain/xlsx-export.js?v=1.17.0";
 
 const $ = (selector) => document.querySelector(selector);
@@ -18,10 +18,11 @@ function template() {
 }
 
 function projectSheet(rows, months = []) {
-  const headers = [...PROJECT_IMPORT_HEADERS, ...months.map((month) => `Facturado ${month}`)];
+  const headers = [...PROJECT_IMPORT_HEADERS, ...months.flatMap((month) => [`Facturado ${month}`, `Porcentaje facturado ${month}`])];
   return { name: "Proyectos", headers, rows,
-    types: headers.map((_, index) => index === 6 ? "number" : [11, 13].includes(index) || index >= PROJECT_IMPORT_HEADERS.length ? "money" : "text"),
-    freezeColumns: 2, columnWidths: [20, 34, 22, 28, 16, 26, 16, 18, 18, 20, 44, 22, 28, 22, 18, ...months.map(() => 22)] };
+    types: headers.map((_, index) => index === 6 || index === 15 || (index >= PROJECT_IMPORT_HEADERS.length && (index - PROJECT_IMPORT_HEADERS.length) % 2 === 1)
+      ? "number" : [11, 13].includes(index) || index >= PROJECT_IMPORT_HEADERS.length ? "money" : "text"),
+    freezeColumns: 2, columnWidths: [20, 34, 22, 28, 16, 26, 16, 18, 18, 20, 44, 22, 28, 22, 18, 25, 24, 56, 36, ...months.flatMap(() => [22, 26])] };
 }
 
 function download(blob, fileName) {
@@ -104,7 +105,8 @@ async function exportProjects() {
       }
       return [project.id, months];
     }));
-    const months = [...new Set([...monthlyByProject.values()].flatMap((monthly) => Object.keys(monthly)))].sort();
+    const months = [...new Set([...monthlyByProject.values()].flatMap((monthly) => Object.keys(monthly))
+      .concat(projects.flatMap((project) => Object.keys(project.importedMonthlyBilledPercentages ?? {}))))].sort();
     const rows = projects.map((project) => {
       const linked = byProject.get(project.id) ?? [];
       const summary = summaryByProject.get(project.id);
@@ -115,7 +117,10 @@ async function exportProjects() {
         summary?.contractValue || project.importedContractValue || referencedContractValue(project.notes) || "",
         linked.length === 1 ? linked[0].contractNumber : linked.length ? "Varios contratos" : "",
         summary?.totalInvoiced ?? project.importedBilledTotal ?? 0, project.importedAsOf ?? "",
-        ...months.map((month) => monthly[month] ?? "")];
+        project.importedExecutionSnapshotPercentage ?? "", project.importedExecutionMonthLabel ?? "",
+        (project.importedFollowupNotes ?? []).map((item) => item.text).join("\n"),
+        (project.importedInvoiceReferences ?? []).map((item) => item.reference).join("\n"),
+        ...months.flatMap((month) => [monthly[month] ?? "", project.importedMonthlyBilledPercentages?.[month] ?? ""])];
     });
     download(createXlsx([projectSheet(rows, months)]), `proyectos-soinsolar-${new Date().toISOString().slice(0, 10)}.xlsx`);
     message(`${rows.length} proyecto(s) exportados a Excel.`);

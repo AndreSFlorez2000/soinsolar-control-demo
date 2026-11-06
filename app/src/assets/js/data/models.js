@@ -136,7 +136,14 @@ export function normalizeProject(record) {
     importedContractValue: record.imported_contract_value == null ? null : Number(record.imported_contract_value),
     importedBilledTotal: record.imported_billed_total == null ? null : Number(record.imported_billed_total),
     importedMonthlyBilled: record.imported_monthly_billed || {},
+    importedMonthlyBilledPercentages: record.imported_monthly_billed_percentages || {},
     importedContractComponents: record.imported_contract_components || [],
+    importedExecutionSnapshotPercentage: record.imported_execution_snapshot_percentage == null
+      ? null : Number(record.imported_execution_snapshot_percentage),
+    importedExecutionMonthLabel: record.imported_execution_month_label || null,
+    importedFollowupNotes: record.imported_followup_notes || [],
+    importedInvoiceReferences: record.imported_invoice_references || [],
+    importedAlternateSnapshots: record.imported_alternate_snapshots || [],
     importedAsOf: record.imported_as_of || null,
     importedFinancialSource: record.imported_financial_source || null,
     importedFinancialReview: record.imported_financial_review || null
@@ -369,7 +376,14 @@ export function projectInputToRecord(input, userId) {
     }
     record.imported_billed_total = Math.round(billed * 100) / 100;
     record.imported_monthly_billed = input.importedMonthlyBilled || {};
+    record.imported_monthly_billed_percentages = input.importedMonthlyBilledPercentages || {};
     record.imported_contract_components = input.importedContractComponents || [];
+    record.imported_execution_snapshot_percentage = input.importedExecutionSnapshotPercentage == null
+      ? null : assertPercentage(input.importedExecutionSnapshotPercentage, "avance de ejecución histórico");
+    record.imported_execution_month_label = input.importedExecutionMonthLabel || null;
+    record.imported_followup_notes = input.importedFollowupNotes || [];
+    record.imported_invoice_references = input.importedInvoiceReferences || [];
+    record.imported_alternate_snapshots = input.importedAlternateSnapshots || [];
     record.imported_as_of = input.importedAsOf ? assertDate(input.importedAsOf, "corte de facturación") : null;
     record.imported_financial_source = input.importedFinancialSource || null;
     record.imported_financial_review = input.importedFinancialReview || null;

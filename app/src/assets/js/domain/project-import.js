@@ -1,4 +1,4 @@
-import { projectInputToRecord } from "../data/models.js?v=1.18.3";
+import { projectInputToRecord } from "../data/models.js?v=1.18.4";
 import { parseCostCsv } from "./cost-import.js?v=1.16.0";
 import { centerKey } from "./accounting-projects.js?v=1.16.0";
 
@@ -6,7 +6,8 @@ export const PROJECT_IMPORT_HEADERS = Object.freeze([
   "Centro de costo", "Nombre del proyecto", "Municipio", "Tipo de servicio",
   "Estado", "Cliente", "Potencia kWp", "Fecha de inicio", "Fecha de finalización",
   "Centro principal", "Observaciones", "Valor del contrato", "Número de contrato",
-  "Facturado acumulado", "Corte de facturación"
+  "Facturado acumulado", "Corte de facturación", "Avance ejecución Excel (%)",
+  "Mes informado de ejecución", "Notas de seguimiento Excel", "Referencias factura Excel"
 ]);
 
 // Compatibilidad con las exportaciones anteriores, que dejaban el valor en notas.
@@ -31,7 +32,11 @@ const columns = {
   contractValue: ["valor_del_contrato", "valor_contrato", "contract_value"],
   contractNumber: ["numero_de_contrato", "numero_contrato", "contract_number"],
   billedTotal: ["facturado_acumulado", "total_facturado", "billed_total"],
-  billedAsOf: ["corte_de_facturacion", "fecha_de_corte", "imported_as_of"]
+  billedAsOf: ["corte_de_facturacion", "fecha_de_corte", "imported_as_of"],
+  executionSnapshot: ["avance_ejecucion_excel", "avance_ejecucion_excel_", "avance_de_ejecucion_excel"],
+  executionMonth: ["mes_informado_de_ejecucion"],
+  followupNotes: ["notas_de_seguimiento_excel"],
+  invoiceReferences: ["referencias_factura_excel"]
 };
 
 const headerKey = (value) => String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
@@ -138,6 +143,20 @@ function readMonthlyBilling(row, values) {
   return { monthly, total: Object.keys(monthly).length ? total : billedAmount(stated) };
 }
 
+function readMonthlyPercentages(row, values) {
+  const source = row.__monthlyPercentages__ ?? Object.fromEntries(Object.entries(values)
+    .filter(([key, value]) => /^porcentaje_facturado_20\d{2}_(0[1-9]|1[0-2])$/.test(key) && value !== "" && value != null)
+    .map(([key, value]) => [key.slice(21, 25) + "-" + key.slice(26), value]));
+  const percentages = {};
+  for (const [month, value] of Object.entries(source)) {
+    if (!/^20\d{2}-(0[1-9]|1[0-2])$/.test(month)) throw new Error("mes del porcentaje facturado inválido");
+    const number = Number(String(value).replace(",", "."));
+    if (!Number.isFinite(number) || Math.abs(number) > 10000) throw new Error("porcentaje facturado inválido");
+    percentages[month] = Math.round(number * 100) / 100;
+  }
+  return percentages;
+}
+
 function legacyRows(sheet) {
   const header = sheet.rows.findIndex((row) =>
     String(row[0] ?? "").trim().toUpperCase() === "C COSTO" &&
@@ -150,10 +169,12 @@ function legacyRows(sheet) {
     String(value ?? "").trim().toUpperCase().startsWith("PROYECTO Y OBSERVACIONES"));
   const orderColumn = sheet.rows[header].findIndex((value) => /^O\.?C\.?$/i.test(String(value ?? "").trim()));
   const invoiceColumn = sheet.rows[header].findIndex((value) => /^N[ªº°]?\s*FAC$/i.test(String(value ?? "").trim()));
+  const executionColumn = sheet.rows[header].findIndex((value) => /^%\s*AVANCE$/i.test(String(value ?? "").trim()));
+  const executionMonthColumn = sheet.rows[header].findIndex((value) => /^MES$/i.test(String(value ?? "").trim()));
   const monthlyColumns = sheet.rows[header].flatMap((value, index) => {
     const month = monthFromHeader(value);
     return month && String(sheet.rows[header + 1]?.[index] ?? "").trim().toUpperCase() === "FACTURADO"
-      ? [{ index, month }] : [];
+      ? [{ index, month, percentIndex: String(sheet.rows[header + 1]?.[index + 1] ?? "").trim() === "%" ? index + 1 : -1 }] : [];
   });
   const asOf = monthlyColumns.length ? lastDayOfMonth(monthlyColumns.map(({ month }) => month).sort().at(-1)) : null;
   const boundaries = sheet.rows.flatMap((row, index) => index > header && projectCenter(row[0]) ? [index] : []);
@@ -166,27 +187,42 @@ function legacyRows(sheet) {
     if (!name) continue; // Las filas de centros vacíos terminan el bloque anterior.
     const description = String(row[descriptionColumn] ?? "").trim();
     const serviceCode = String(row[descriptionColumn + 1] ?? "").trim();
-    const monthly = {}, contractComponents = [], review = [];
+    const monthly = {}, monthlyPercentages = {}, contractComponents = [], review = [];
+    const followupNotes = [], invoiceReferences = [];
     const seenInvoices = new Set();
     let unlabeled = false, duplicate = false;
     for (let index = start; index < end; index++) {
       const detail = sheet.rows[index];
       const invoice = String(detail[invoiceColumn] ?? "").trim().toUpperCase();
+      if (index > start && String(detail[descriptionColumn] ?? "").trim()) {
+        followupNotes.push({ sheet: sheet.name, row: index + 1, text: String(detail[descriptionColumn]).trim() });
+      }
+      if (invoice) invoiceReferences.push({ sheet: sheet.name, row: index + 1, reference: String(detail[invoiceColumn]).trim() });
       const extraValue = Number(detail[contractColumn]);
       if (Number.isFinite(extraValue) && extraValue > 0) {
         contractComponents.push({ row: index + 1, amount: Math.round(extraValue * 100) / 100 });
       }
       const amountCells = monthlyColumns.filter(({ index: col }) =>
         typeof detail[col] === "number" && Number.isFinite(detail[col]) && detail[col] !== 0);
+      if (index === start) for (const { index: col, month, percentIndex } of monthlyColumns) {
+        const percent = percentIndex >= 0 ? detail[percentIndex] : null;
+        if (!amountCells.some((item) => item.index === col) && typeof percent === "number" && Number.isFinite(percent)) {
+          monthlyPercentages[month] = Math.round(percent * 10000) / 100;
+        }
+      }
       // Los totales al pie de la hoja no son una continuación del último proyecto.
       if (!invoice && !detail[descriptionColumn] && extraValue > 0 && amountCells.length > 3) continue;
-      for (const { index: col, month } of amountCells) {
+      for (const { index: col, month, percentIndex } of amountCells) {
         const value = billedAmount(detail[col]);
         const key = invoice ? `${month}|${invoice}|${value}` : "";
         if (key && seenInvoices.has(key)) { duplicate = true; continue; }
         if (key) seenInvoices.add(key);
         if (!invoice) unlabeled = true;
         monthly[month] = Math.round(((monthly[month] ?? 0) + value) * 100) / 100;
+        const percentage = percentIndex >= 0 ? detail[percentIndex] : null;
+        if (typeof percentage === "number" && Number.isFinite(percentage)) {
+          monthlyPercentages[month] = Math.round(((monthlyPercentages[month] ?? 0) + percentage * 100) * 100) / 100;
+        }
       }
     }
     if (contractComponents.length > 1) review.push("Varios valores contractuales en el centro; revisar ajustes o adiciones.");
@@ -217,7 +253,15 @@ function legacyRows(sheet) {
       __rowNum__: start,
       __sourceSheet__: sheet.name,
       __monthlyBilled__: monthly,
+      __monthlyPercentages__: monthlyPercentages,
       __contractComponents__: contractComponents,
+      __executionSnapshotPercentage__: executionColumn >= 0 && typeof row[executionColumn] === "number"
+        && row[executionColumn] >= 0 && row[executionColumn] <= 1
+          ? Math.round(row[executionColumn] * 10000) / 100 : null,
+      __executionMonthLabel__: executionMonthColumn >= 0 ? String(row[executionMonthColumn] ?? "").trim() : "",
+      __followupNotes__: followupNotes,
+      __invoiceReferences__: invoiceReferences,
+      __alternateSnapshots__: [],
       __importedAsOf__: asOf,
       __financialReview__: review.join(" ")
     });
@@ -259,6 +303,43 @@ export function extractLegacyProjectRows(sheets) {
         reason: `Centro repetido para varios proyectos (${ambiguous.get(cc)}). Corrige el centro de costo en el Excel.` });
     } else rows.push(row);
   }
+  const alternate = all.find(({ sheet }) => sheet.name.toUpperCase() === "AVANCE DE PROYECTOS AGOSTO")?.rows ?? [];
+  for (const row of rows) {
+    if (row.__sourceSheet__ === primary.name && primary.name.toUpperCase() === "PROYECTOS FV") {
+      const matches = alternate.filter((other) => other["Centro de costo"] === row["Centro de costo"]
+        && headerKey(other["Nombre del proyecto"]) === headerKey(row["Nombre del proyecto"]));
+      if (matches.length === 1) {
+        const other = matches[0];
+        const notes = new Set(row.__followupNotes__.map(({ text }) => headerKey(text)));
+        for (const item of other.__followupNotes__) if (!notes.has(headerKey(item.text))) {
+          row.__followupNotes__.push(item);
+          notes.add(headerKey(item.text));
+        }
+        const references = new Set(row.__invoiceReferences__.map(({ reference }) => headerKey(reference)));
+        for (const item of other.__invoiceReferences__) if (!references.has(headerKey(item.reference))) {
+          row.__invoiceReferences__.push(item);
+          references.add(headerKey(item.reference));
+        }
+        const contract = contractValue(other["Valor del contrato"]);
+        const originalContract = contractValue(row["Valor del contrato"]);
+        const differs = contract !== originalContract ||
+          Math.abs(other["Facturado acumulado"] - row["Facturado acumulado"]) > 0.01 ||
+          JSON.stringify(other.__monthlyBilled__) !== JSON.stringify(row.__monthlyBilled__);
+        if (differs) {
+          row.__alternateSnapshots__.push({ sheet: other.__sourceSheet__, row: other.__rowNum__ + 1,
+            contractValue: contract, billedTotal: other["Facturado acumulado"],
+            monthlyBilled: other.__monthlyBilled__, monthlyPercentages: other.__monthlyPercentages__ });
+          row.__financialReview__ += " Otra hoja del libro contiene cifras distintas para este centro; conciliar ambas versiones.";
+        }
+      }
+    }
+    const value = contractValue(row["Valor del contrato"]);
+    const mismatches = Object.entries(row.__monthlyBilled__).filter(([month, amount]) =>
+      value && Object.hasOwn(row.__monthlyPercentages__, month)
+      && Math.abs(row.__monthlyPercentages__[month] - amount / value * 100) > 0.05).map(([month]) => month);
+    if (mismatches.length) row.__financialReview__ += ` El porcentaje facturado del Excel difiere del importe/contrato en ${mismatches.join(", ")}.`;
+    row.__financialReview__ = row.__financialReview__.trim();
+  }
   if (!rows.length) throw new Error("La plantilla no contiene proyectos identificables por centro de costo.");
   return { rows, issues, sourceSheets: ordered.map(({ name }) => name) };
 }
@@ -276,6 +357,7 @@ export function resolveProjectImportRows(rows, existingProjects = [], newId = ()
   const supported = new Set(Object.values(columns).flat());
   const unexpected = Object.keys(rows[0]).filter((header) => !header.startsWith("__") && !supported.has(headerKey(header))
     && !/^facturado_20\d{2}_(0[1-9]|1[0-2])$/.test(headerKey(header))
+    && !/^porcentaje_facturado_20\d{2}_(0[1-9]|1[0-2])$/.test(headerKey(header))
     && rows.some((row) => row[header] !== undefined && row[header] !== null && String(row[header]).trim()));
   if (unexpected.length) throw new Error(`El archivo contiene columnas con datos que este cargador no guardaría: ${unexpected.slice(0, 5).join(", ")}. Revisa el formato antes de importar.`);
   for (const key of ["costCenter", "name", "municipality", "serviceType"]) {
@@ -311,11 +393,20 @@ export function resolveProjectImportRows(rows, existingProjects = [], newId = ()
     try {
       const importedValue = contractValue(field(values, columns.contractValue));
       const billed = readMonthlyBilling(row, values);
+      const billedPercentages = readMonthlyPercentages(row, values);
       const importedAsOf = dateValue(row.__importedAsOf__ ?? field(values, columns.billedAsOf))
         ?? (Object.keys(billed.monthly).length ? lastDayOfMonth(Object.keys(billed.monthly).sort().at(-1)) : null);
       const importedNumber = String(field(values, columns.contractNumber)).trim();
       const sourceNotes = String(field(values, columns.notes)).trim()
         .replace(/\s*·?\s*Valor contractual en (?:Excel|archivo):\s*\d+(?:\.\d+)?/gi, "").trim();
+      const executionValue = row.__executionSnapshotPercentage__ ?? field(values, columns.executionSnapshot);
+      const executionSnapshot = executionValue === "" || executionValue == null ? null
+        : Number(String(executionValue).replace(",", "."));
+      const followup = row.__followupNotes__ ?? String(field(values, columns.followupNotes)).split("\n")
+        .map((text) => text.trim()).filter(Boolean).map((text) => ({ sheet: "Archivo de proyectos", row: rowNumber, text }));
+      const references = row.__invoiceReferences__ ?? String(field(values, columns.invoiceReferences)).split("\n")
+        .map((reference) => reference.trim()).filter(Boolean)
+        .map((reference) => ({ sheet: "Archivo de proyectos", row: rowNumber, reference }));
       const notes = [sourceNotes,
         importedNumber && !/Contrato en archivo:/i.test(sourceNotes)
           ? `Contrato en archivo: ${importedNumber}` : ""
@@ -338,7 +429,13 @@ export function resolveProjectImportRows(rows, existingProjects = [], newId = ()
         importedContractValue: importedValue,
         importedBilledTotal: billed.total,
         importedMonthlyBilled: billed.monthly,
+        importedMonthlyBilledPercentages: billedPercentages,
         importedContractComponents: row.__contractComponents__ ?? [],
+        importedExecutionSnapshotPercentage: executionSnapshot,
+        importedExecutionMonthLabel: row.__executionMonthLabel__ ?? String(field(values, columns.executionMonth)).trim(),
+        importedFollowupNotes: followup,
+        importedInvoiceReferences: references,
+        importedAlternateSnapshots: row.__alternateSnapshots__ ?? [],
         importedAsOf,
         importedFinancialSource: row.__sourceSheet__
           ? `${row.__sourceSheet__}, fila ${rowNumber}` : "Archivo de proyectos",
