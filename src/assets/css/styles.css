@@ -393,6 +393,8 @@ button, input, select, textarea { font: inherit; }
 .monthly-value strong { color: var(--navy); font-size: 13px; }
 .monthly-muted { color: #8496a6; font-weight: 500; }
 .monthly-no-activity td { background: #fafcfe; color: var(--muted); font-size: 12px; padding: 13px 18px !important; }
+.monthly-undated-row td { background: #fff9eb; color: #74501e; font-size: 12px; border-top: 1px solid #f1e2be; }
+.monthly-undated-row strong { color: #664311; }
 .monthly-source-details { margin-top: 12px; border-top: 1px solid #d5e5f0; padding-top: 10px; color: var(--text); font-size: 12px; font-weight: 400; line-height: 1.55; }
 .monthly-source-details > summary, .monthly-month-details > summary { width: fit-content; color: #245f8b; cursor: pointer; font-weight: 700; }
 .monthly-source-details > summary:hover, .monthly-month-details > summary:hover { color: var(--navy); }

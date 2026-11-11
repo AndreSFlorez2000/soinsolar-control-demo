@@ -36,7 +36,10 @@ export function buildManagementReport(projects = []) {
       paid,
       costsExpenses,
       contractualBalance: Math.max(contractValue - invoiced, 0),
-      paymentPending: Math.max(invoiced - paid, 0),
+      // El histórico facturado no acredita recaudo. La vista de base calcula
+      // cartera solo sobre facturas formales; no inventar deuda del Excel.
+      paymentPending: project.paymentPending == null
+        ? Math.max(invoiced - paid, 0) : amount(project.paymentPending),
       financialProgress: percentage(invoiced, contractValue),
       executionProgress,
       profitability,

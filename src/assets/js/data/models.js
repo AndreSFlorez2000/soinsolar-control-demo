@@ -1,3 +1,5 @@
+import { extractPaymentEvidence } from "../domain/excel-payment-evidence.js?v=1.18.13";
+
 export class ValidationError extends Error {
   constructor(message, field) {
     super(message);
@@ -153,6 +155,7 @@ export function normalizeProject(record) {
       ? null : Number(record.imported_execution_snapshot_percentage),
     importedExecutionMonthLabel: record.imported_execution_month_label || null,
     importedFollowupNotes: record.imported_followup_notes || [],
+    importedPaymentEvidence: record.imported_payment_evidence || [],
     importedInvoiceReferences: record.imported_invoice_references || [],
     importedAlternateSnapshots: record.imported_alternate_snapshots || [],
     importedAsOf: record.imported_as_of || null,
@@ -406,6 +409,7 @@ export function projectInputToRecord(input, userId) {
       ? null : assertPercentage(input.importedExecutionSnapshotPercentage, "avance de ejecución histórico");
     record.imported_execution_month_label = input.importedExecutionMonthLabel || null;
     record.imported_followup_notes = input.importedFollowupNotes || [];
+    record.imported_payment_evidence = extractPaymentEvidence(record.imported_followup_notes);
     record.imported_invoice_references = input.importedInvoiceReferences || [];
     record.imported_alternate_snapshots = input.importedAlternateSnapshots || [];
     record.imported_as_of = input.importedAsOf ? assertDate(input.importedAsOf, "corte de facturación") : null;

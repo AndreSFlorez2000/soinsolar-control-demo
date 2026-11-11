@@ -98,7 +98,7 @@ export function managementSummarySheet(reportRows = []) {
       "Avance físico acumulado: obra ejecutada. Facturación: facturado ÷ contrato. Recaudo Financiero: pagado ÷ contrato. Consulta las hojas mensuales para comparar cada periodo.",
       "Importes en pesos colombianos (COP). Las celdas vacías de avance físico indican que aún no se registró seguimiento."
     ],
-    headers: ["Centro de costo", "Centro principal", "Proyecto", "Municipio", "Estado", "Contrato vigente", "Avance físico acumulado", "Facturado", "Facturación %", "Pagado", "Costos y gastos", "Rentabilidad", "Saldo contractual", "Cartera"],
+    headers: ["Centro de costo", "Centro principal", "Proyecto", "Municipio", "Estado", "Contrato vigente", "Avance físico acumulado", "Facturado", "Facturación %", "Recaudo registrado", "Costos y gastos", "Rentabilidad", "Saldo por facturar", "Cartera formal"],
     types: ["text", "text", "text", "text", "text", "money", "percent", "money", "percent", "money", "money", "money", "money", "money"],
     freezeColumns: 3,
     highlightColumns: [6, 8, 9, 13],
@@ -163,7 +163,7 @@ export function monthlyWorkbookSheets(rows = []) {
       notes: [
         "Lee F → G → H: avance anterior 15 %; avance actual 50 %; diferencia de octubre = 35 p.p. (puntos porcentuales). H se recalcula en Excel como (G − F) × 100.",
         "El valor equivalente del mes = contrato × H ÷ 100. Es una referencia física: no es una factura, un pago ni un costo.",
-        "Facturado y pagado del mes son movimientos del periodo. Los acumulados suman los periodos anteriores, incluso de otros años. Cartera = facturado acumulado − pagado acumulado.",
+        "Facturado y recaudo registrado son movimientos distintos. Los acumulados suman los periodos anteriores. El Excel histórico no confirma importes ni fechas de recaudo.",
         "Sin registro físico: 0 p.p. consignados no equivale a una verificación de obra sin avance. Los meses del Excel muestran su facturación y avance general en columnas propias; ese avance aún no está validado."
       ],
       headers: [
@@ -174,7 +174,7 @@ export function monthlyWorkbookSheets(rows = []) {
         "Facturación del mes (%)", "Facturación acumulada (%)",
         "Pagado del mes (COP)", "Pagado acumulado (COP)",
         "Costos del mes (COP)", "Costos acumulados (COP)",
-        "Cartera por cobrar (COP)", "Saldo por facturar (COP)",
+        "Diferencia facturado − recaudo registrado, sin conciliar (COP)", "Saldo por facturar (COP)",
         "Estado del avance", "Novedad que afecta la ejecución", "Observaciones", "Validación",
         "Avance general Excel (%)", "Facturación Excel mes (%)", "Origen"
       ],

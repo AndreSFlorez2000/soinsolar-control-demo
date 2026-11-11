@@ -1,18 +1,19 @@
 import { buildMonthlySeries, calculateDashboardIndicators } from "./domain/dashboard.js?v=1.5.9";
-import { createDashboardUI } from "./dashboard-ui.js?v=1.18.12";
+import { createDashboardUI } from "./dashboard-ui.js?v=1.18.13";
 import { calculateProjectIndicators } from "./domain/project-analytics.js?v=1.4.1";
-import { buildManagementReport, buildMonthlyExecutionReport } from "./domain/reports.js?v=1.18.12";
-import { historicalProjectGroups, managementSummarySheet, monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.18.12";
-import { hasMonthlyActivity, monthlyDisplayCounts, monthlyDisplayRows } from "./domain/monthly-display.js?v=1.18.12";
+import { buildManagementReport, buildMonthlyExecutionReport } from "./domain/reports.js?v=1.18.13";
+import { historicalProjectGroups, historicalWorkbookSheet, managementSummarySheet, monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.18.13";
+import { hasMonthlyActivity, monthlyDisplayCounts, monthlyDisplayRows } from "./domain/monthly-display.js?v=1.18.13";
+import { contractPosition, paymentEvidenceHeadline } from "./domain/excel-payment-evidence.js?v=1.18.13";
 import { createXlsx } from "./domain/xlsx-export.js?v=1.5.8";
 import { costWorkbookSheets } from "./domain/cost-workbook.js?v=1.5.8";
 import { canEditExecution } from "./domain/execution.js?v=1.9.0";
-import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=1.18.12";
-import { importedBillingRows, recognizedInvoices } from "./domain/finance-history.js?v=1.18.12";
+import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=1.18.13";
+import { importedBillingRows, recognizedInvoices } from "./domain/finance-history.js?v=1.18.13";
 import { invoicePendingAmount, isSampleProject, payableInvoicesForProject } from "./domain/payment-selection.js?v=1.5.1";
 import { forgetProject, hasProject, recallProject, rememberProject } from "./domain/project-context.js?v=1.8.0";
-import { displayProjectCenter } from "./domain/project-center.js?v=1.18.12";
-import { createApplicationDataGateway } from "./services/application-data.js?v=1.18.12";
+import { displayProjectCenter } from "./domain/project-center.js?v=1.18.13";
+import { createApplicationDataGateway } from "./services/application-data.js?v=1.18.13";
 import { getCurrentSession, isDemoMode, registerAccount, signIn, signOut } from "./services/supabase.js?v=1.13.1";
 
 const loginView = document.querySelector("#loginView");
@@ -199,6 +200,15 @@ function formatExecutionPercent(value) {
   return value === null ? "Sin registrar" : formatPercent(value);
 }
 
+function contractPositionDisplay(project, source) {
+  const known = Boolean(project?.contractId || source?.importedContractValue != null || Number(project?.contractValue) > 0);
+  const position = contractPosition(project?.contractValue, project?.totalInvoiced, known);
+  if (position.kind === "unknown") return { label: "Saldo por facturar", value: "Sin valor contractual" };
+  if (position.kind === "excess") return { label: "Exceso facturado", value: formatCop(position.amount) };
+  if (position.kind === "settled") return { label: "Saldo por facturar", value: formatCop(0) };
+  return { label: "Saldo por facturar", value: formatCop(position.amount) };
+}
+
 function formatDate(value) {
   if (!value) return "Sin fecha";
   return new Intl.DateTimeFormat("es-CO", { year: "numeric", month: "short", day: "2-digit", timeZone: "UTC" })
@@ -270,10 +280,11 @@ async function loadReferenceData() {
     error.code = "APP_ACCESS_PENDING";
     throw error;
   }
-  [currentProjects, currentPeriods, allMonthlyRows] = await Promise.all([
+  [currentProjects, currentPeriods, allMonthlyRows, historicalProjectDetails] = await Promise.all([
     data.listProjects(),
     data.listPeriods(),
-    data.listMonthlyTracking({})
+    data.listMonthlyTracking({}),
+    data.listProjectDetails()
   ]);
   currentMonthly = allMonthlyRows;
   const name = currentUserProfile.fullName || "Usuario autorizado";
@@ -449,6 +460,7 @@ async function refreshApplication() {
 
 function renderDashboard() {
   const indicators = calculateDashboardIndicators(currentProjects);
+  const sourceById = new Map(historicalProjectDetails.map((item) => [item.id, item]));
 
   document.querySelector("#contractValue").textContent = formatCop(indicators.contractValue);
   document.querySelector("#invoicedValue").textContent = formatCop(indicators.invoiced);
@@ -456,7 +468,7 @@ function renderDashboard() {
   document.querySelector("#costValue").textContent = formatCop(indicators.costsExpenses);
   document.querySelector("#activeProjectKpi").textContent = `${indicators.activeProjects} proyecto(s) activo(s)`;
   document.querySelector("#invoicedRatioText").textContent = `${formatPercent(indicators.financialProgress)} del valor contractual`;
-  document.querySelector("#receivableValue").textContent = `${formatCop(indicators.paymentPending)} por cobrar`;
+  document.querySelector("#receivableValue").textContent = "Solo facturas del sistema; histórico Excel por conciliar";
   document.querySelector("#costRatio").textContent = `${formatPercent(indicators.costRatio)} del contrato`;
   document.querySelector("#contractualBalanceValue").textContent = formatCop(indicators.contractualBalance);
   document.querySelector("#paymentPendingValue").textContent = formatCop(indicators.paymentPending);
@@ -472,15 +484,22 @@ function renderDashboard() {
   document.querySelector("#dashboardProjectsEmpty").hidden = currentProjects.length > 0;
   document.querySelector("#projectRows").innerHTML = [...currentProjects]
     .sort((left, right) => String(left.costCenter).localeCompare(String(right.costCenter), "es", { numeric: true }))
-    .map((project) => `
+    .map((project) => {
+      const source = sourceById.get(project.projectId);
+      const receiptNote = source?.importedPaymentEvidence?.length
+        ? paymentEvidenceHeadline(source.importedPaymentEvidence) : "";
+      const noReceiptAmount = source?.importedBilledTotal > 0 && project.totalPaid === 0;
+      const contractKnown = Boolean(project.contractId || source?.importedContractValue != null || project.contractValue > 0);
+      return `
       <tr>
         <td><span class="project-name-cell"><strong>${escapeHtml(project.projectName)}</strong><small>${escapeHtml(displayProjectCenter(project.costCenter))}</small></span></td>
         <td><div class="execution-progress-cell"><div class="execution-track"><span style="width:${Math.min(100, Math.max(0, Number(project.executedProgressPercentage) || 0))}%"></span></div><span><strong>${formatExecutionPercent(project.executedProgressPercentage)}</strong>${project.executionProgressSource === "excel" ? '<small>Excel histórico</small>' : ""}</span></div></td>
-        <td>${project.executedProgressPercentage === null ? "—" : formatCop(Math.round(project.contractValue * project.executedProgressPercentage) / 100)}</td>
-        <td>${formatCop(project.contractValue)}</td><td>${formatCop(project.totalInvoiced)}</td><td>${formatCop(project.totalPaid)}</td>
-        <td>${project.contractValue > 0 ? formatPercent(project.totalPaid / project.contractValue * 100) : "—"}</td>
+        <td>${!contractKnown ? "Sin valor contractual" : project.executedProgressPercentage === null ? "—" : formatCop(Math.round(project.contractValue * project.executedProgressPercentage) / 100)}</td>
+        <td>${contractKnown ? formatCop(project.contractValue) : "Sin valor contractual"}</td><td>${formatCop(project.totalInvoiced)}</td><td>${noReceiptAmount ? "Sin importe registrado" : formatCop(project.totalPaid)}${receiptNote ? `<br><small>${escapeHtml(receiptNote)}</small>` : ""}</td>
+        <td>${noReceiptAmount ? "Sin dato" : project.contractValue > 0 ? formatPercent(project.totalPaid / project.contractValue * 100) : "—"}</td>
         <td><button class="open-project" type="button" data-action="open-project" data-project-id="${project.projectId}">Abrir</button></td>
-      </tr>`).join("");
+      </tr>`;
+    }).join("");
   dashboardUI.setOwner(currentUserProfile?.id);
   dashboardUI.render({ projects: currentProjects, monthly: allMonthlyRows });
 }
@@ -505,7 +524,7 @@ function renderDashboardAlerts(indicators) {
   const alerts = [];
 
   if (indicators.paymentPending > 0) {
-    alerts.push(["red", "Pagos pendientes", `${formatCop(indicators.paymentPending)} facturados sin pago registrado`]);
+    alerts.push(["red", "Facturas del sistema por cobrar", `${formatCop(indicators.paymentPending)} en facturas registradas sin pago`]);
   }
   if (openPeriod) {
     alerts.push(["gold", `${periodLabel(openPeriod)} está abierto`, "Los movimientos del periodo todavía pueden actualizarse"]);
@@ -531,8 +550,8 @@ function exportDashboard() {
     ["Total facturado", indicators.invoiced],
     ["Total pagado", indicators.paid],
     ["Costos y gastos", indicators.costsExpenses],
-    ["Saldo contractual", indicators.contractualBalance],
-    ["Pago pendiente", indicators.paymentPending],
+    ["Saldo por facturar", indicators.contractualBalance],
+    ["Cartera de facturas del sistema", indicators.paymentPending],
     ["Promedio de avance de proyectos (%)", indicators.executionProgress ?? ""],
     ["Valor equivalente ejecutado (referencia)", indicators.executedEquivalent],
     ["Facturación del contrato (%)", indicators.financialProgress],
@@ -848,9 +867,11 @@ function renderProjectChart() {
   });
 }
 
-function renderProjectAnalytics(project) {
+function renderProjectAnalytics(project, projectRecord) {
   const indicators = calculateProjectIndicators(project, selectedProjectMonthly);
-  document.querySelector("#projectPaymentCompliance").textContent = formatPercent(indicators.paymentCompliance);
+  document.querySelector("#projectPaymentCompliance").textContent =
+    projectRecord.importedBilledTotal > 0 && project.totalPaid === 0
+      ? "Sin recaudo cuantificado" : formatPercent(indicators.paymentCompliance);
   document.querySelector("#projectCostExecution").textContent = formatPercent(indicators.costExecution);
   document.querySelector("#projectActiveMonths").textContent = indicators.activeMonths;
   document.querySelector("#projectPendingValidations").textContent = indicators.pendingValidations;
@@ -883,18 +904,25 @@ async function openProjectDetail(projectId) {
   status.className = `status-badge ${project.status}`;
   document.querySelector("#detailServiceType").textContent = project.serviceType;
   document.querySelector("#detailMunicipality").textContent = project.municipality;
-  document.querySelector("#detailContractValue").textContent = formatCop(project.contractValue);
+  const contractPositionText = contractPositionDisplay(project, projectRecord);
+  document.querySelector("#detailContractValue").textContent = contractPositionText.value === "Sin valor contractual"
+    ? projectRecord.importedFinancialSource ? "Sin valor en el Excel" : "Sin contrato registrado"
+    : formatCop(project.contractValue);
   document.querySelector("#detailContractLabel").textContent = projectRecord.importedContractValue != null && !project.contractId
     ? "Valor contractual según Excel" : "Valor contractual vigente";
   document.querySelector("#detailProjectProgress").textContent = formatExecutionPercent(project.executedProgressPercentage);
   document.querySelector("#detailProjectProgressSource").textContent = project.executionProgressSource === "excel"
     ? "Corte del Excel · sin validación mensual" : "";
   document.querySelector("#detailFinancialProgress").textContent = formatPercent(project.financialProgressPercentage);
-  document.querySelector("#detailPaymentPending").textContent = formatCop(project.paymentPending);
+  document.querySelector("#detailPaymentPending").textContent =
+    projectRecord.importedBilledTotal > 0 && project.paymentPending === 0
+      ? "Histórico por conciliar" : formatCop(project.paymentPending);
   document.querySelector("#detailInvoiced").textContent = formatCop(project.totalInvoiced);
-  document.querySelector("#detailPaid").textContent = formatCop(project.totalPaid);
+  document.querySelector("#detailPaid").textContent = projectRecord.importedBilledTotal != null && project.totalPaid === 0
+    ? "Sin importe registrado" : formatCop(project.totalPaid);
   document.querySelector("#detailCosts").textContent = formatCop(project.totalCostsExpenses);
-  document.querySelector("#detailContractBalance").textContent = formatCop(project.contractualBalance);
+  document.querySelector("#detailContractBalanceLabel").textContent = contractPositionText.label;
+  document.querySelector("#detailContractBalance").textContent = contractPositionText.value;
   document.querySelector("#detailProgressLabel").textContent = formatPercent(project.financialProgressPercentage);
   document.querySelector("#detailProgressBar").style.width = `${Math.min(100, Math.max(0, project.financialProgressPercentage))}%`;
 
@@ -913,6 +941,10 @@ async function openProjectDetail(projectId) {
     document.querySelector("#detailImportedContract").textContent = projectRecord.importedContractValue == null
       ? "Sin valor" : formatCop(projectRecord.importedContractValue);
     document.querySelector("#detailImportedBilled").textContent = formatCop(projectRecord.importedBilledTotal || 0);
+    document.querySelector("#detailImportedPaid").textContent =
+      project.totalPaid > 0 ? formatCop(project.totalPaid) : "Sin importe registrado";
+    document.querySelector("#detailImportedPaymentStatus").textContent =
+      paymentEvidenceHeadline(projectRecord.importedPaymentEvidence);
     document.querySelector("#detailImportedUndatedWrap").hidden = !projectRecord.importedUndatedBilled;
     document.querySelector("#detailImportedUndated").textContent = formatCop(projectRecord.importedUndatedBilled);
     document.querySelector("#detailImportedPendingWrap").hidden = projectRecord.importedPendingToInvoice == null;
@@ -928,7 +960,7 @@ async function openProjectDetail(projectId) {
     document.querySelector("#detailImportedFollowup").innerHTML = importedFollowupHtml(projectRecord);
   }
 
-  renderProjectAnalytics(project);
+  renderProjectAnalytics(project, projectRecord);
   await showView("detail");
 }
 
@@ -1102,19 +1134,33 @@ function renderMonthly() {
     const sourceNotes = source && (sourceContent.trim() || source.importedFinancialReview)
       ? `<details class="monthly-source-details"><summary>Notas, facturas y valores del Excel</summary>${source.importedFinancialReview ? `<p><strong>Por conciliar:</strong> ${escapeHtml(source.importedFinancialReview)}</p>` : ""}${sourceContent}</details>` : "";
     const executed = project?.executedProgressPercentage ?? source?.importedExecutionSnapshotPercentage;
+    const balance = contractPositionDisplay(project, source);
+    const paymentEvidence = source?.importedPaymentEvidence ?? [];
+    const paymentNote = paymentEvidence.length
+      ? paymentEvidenceHeadline(paymentEvidence)
+      : source?.importedBilledTotal > 0 ? "Excel sin recaudo cuantificado" : "";
     const executionLabel = project?.executionProgressSource === "sistema"
       ? "Avance registrado" : "Avance general Excel (AK)";
     const activityCount = months.filter(hasMonthlyActivity).length;
     const header = `<tr class="monthly-project-heading"><th colspan="8" scope="rowgroup">
       <div class="monthly-project-summary">
         <div class="monthly-project-title"><strong>${escapeHtml(displayProjectCenter(latest.costCenter))} · ${escapeHtml(latest.projectName)}</strong><small>${activityCount} mes(es) con datos · ${months.length} periodo(s) disponibles</small></div>
-        <div><span>Contrato</span><strong>${monthlyMoney(contract)}</strong></div>
+        <div><span>Contrato</span><strong>${balance.value === "Sin valor contractual" ? "Sin valor en Excel" : monthlyMoney(contract)}</strong></div>
+        <div><span>${escapeHtml(balance.label)}</span><strong>${balance.value}</strong></div>
         <div><span>Facturado total</span><strong>${monthlyMoney(project?.totalInvoiced ?? 0)}</strong></div>
         <div><span>${executionLabel}</span><strong>${executed == null ? "—" : formatPercent(executed)}</strong></div>
-        <div><span>Recaudado total</span><strong>${monthlyMoney(project?.totalPaid ?? 0)}</strong></div>
+        <div><span>Recaudo registrado</span><strong>${source?.importedBilledTotal > 0 && !project?.totalPaid ? "Sin importe registrado" : monthlyMoney(project?.totalPaid ?? 0)}</strong>${paymentNote ? `<small>${escapeHtml(paymentNote)}</small>` : ""}</div>
         <button class="table-action" type="button" data-action="open-project" data-project-id="${escapeHtml(projectId)}">Ver ficha</button>
       </div>${sourceNotes}</th></tr>`;
-    if (!visibleMonths.length) return header + `<tr class="monthly-no-activity"><td colspan="8">Sin movimientos en los periodos consultados. Puedes mostrar los meses vacíos o registrar un seguimiento.</td></tr>`;
+    const undatedBilled = !selectedPeriod && Number(source?.importedUndatedBilled) > 0
+      ? `<tr class="monthly-undated-row">
+        <td><strong>Sin mes · Excel AI</strong><small>Fecha por conciliar</small></td>
+        <td>—</td><td class="monthly-value"><strong>${formatCop(source.importedUndatedBilled)}</strong><small>Facturado sin mes asignado</small></td>
+        <td>Incluido en el total del proyecto</td><td>—</td><td>—</td>
+        <td>Dato del Excel · fecha de factura por conciliar</td>
+        <td><button class="table-action" type="button" data-action="open-project" data-project-id="${escapeHtml(projectId)}">Abrir ficha</button></td>
+      </tr>` : "";
+    if (!visibleMonths.length) return header + (undatedBilled || `<tr class="monthly-no-activity"><td colspan="8">Sin movimientos en los periodos consultados. Puedes mostrar los meses vacíos o registrar un seguimiento.</td></tr>`);
     return header + visibleMonths.map((tracking) => {
       const payment = reportRows.get(`${tracking.projectId}:${tracking.year}:${tracking.month}`);
       const cumulativeBilled = payment?.cumulativeInvoiced ?? tracking.cumulativeInvoicedValue;
@@ -1160,23 +1206,24 @@ function renderMonthly() {
         <td class="monthly-value">${advance}</td>
         <td class="monthly-value"><strong>${monthlyMoney(tracking.invoicedValue)}</strong>${billedExcel}</td>
         <td class="monthly-value"><strong>${monthlyMoney(cumulativeBilled)}</strong><small>${monthlyPercent(payment?.cumulativeBilling ?? tracking.cumulativeBillingPercentage)} facturado</small></td>
-        <td class="monthly-value"><strong>${monthlyMoney(tracking.paidValue)}</strong><small>Acum. ${monthlyMoney(cumulativePaid)}</small></td>
+        <td class="monthly-value"><strong>${monthlyMoney(tracking.paidValue)}</strong><small>${cumulativePaid ? `Acum. ${formatCop(cumulativePaid)}` : Number(tracking.invoicedValue) ? "Sin recaudo registrado" : "—"}</small></td>
         <td class="monthly-value">${monthlyMoney(tracking.costsExpensesValue)}</td>
         <td class="monthly-state"><span class="validation-badge ${tracking.importedHistory ? "borrador" : escapeHtml(tracking.validationStatus || "borrador")}">${escapeHtml(status)}</span>${tracking.executionIssue ? `<small class="monthly-issue">${escapeHtml(tracking.executionIssue)}</small>` : ""}${details}</td>
         <td><span class="table-actions">${openAction}${actions || periodAction}</span></td>
       </tr>`;
-    }).join("");
+    }).join("") + undatedBilled;
   }).join("");
   document.querySelector("#monthlyEmpty").hidden = orderedProjects.length > 0;
 }
 
 function importedFollowupHtml(project) {
   const notes = project.importedFollowupNotes ?? [];
+  const paymentEvidence = project.importedPaymentEvidence ?? [];
   const references = project.importedInvoiceReferences ?? [];
   const alternates = project.importedAlternateSnapshots ?? [];
   const components = project.importedContractComponents ?? [];
   const snapshot = project.importedExecutionSnapshotPercentage;
-  return `${project.importedUndatedBilled > 0 ? `<p><strong>Facturado sin mes identificado en la fórmula AI:</strong> ${formatCop(project.importedUndatedBilled)}. Incluido en el total sin asignarlo a un mes.</p>` : ""}${snapshot == null ? "" : `<p><strong>Avance de ejecución general (columna AK del Excel):</strong> ${formatPercent(snapshot)}${project.importedExecutionMonthLabel ? ` · mes indicado «${escapeHtml(project.importedExecutionMonthLabel)}»` : ""}. Es una referencia general; si el libro mezcla años, no se asigna a un año sin evidencia. No equivale a un avance mensual validado.</p>`}
+  return `${paymentEvidence.length ? `<h5>Pago informado en el Excel · sin importe ni fecha confirmados</h5><p><strong>${escapeHtml(paymentEvidenceHeadline(paymentEvidence))}</strong>. Estas notas no se suman al recaudo registrado.</p><ul>${paymentEvidence.map((item) => `<li>${escapeHtml(item.text)} <small>(${escapeHtml(item.sheet)}, fila ${escapeHtml(item.row)})</small></li>`).join("")}</ul>` : ""}${project.importedUndatedBilled > 0 ? `<p><strong>Facturado sin mes identificado en la fórmula AI:</strong> ${formatCop(project.importedUndatedBilled)}. Incluido en el total sin asignarlo a un mes.</p>` : ""}${snapshot == null ? "" : `<p><strong>Avance de ejecución general (columna AK del Excel):</strong> ${formatPercent(snapshot)}${project.importedExecutionMonthLabel ? ` · mes indicado «${escapeHtml(project.importedExecutionMonthLabel)}»` : ""}. Es una referencia general; si el libro mezcla años, no se asigna a un año sin evidencia. No equivale a un avance mensual validado.</p>`}
     ${components.length > 1 ? `<details><summary>Valores contractuales por fila (${components.length})</summary><ul>${components.map((item) => `<li>Fila ${escapeHtml(item.row)}: ${formatCop(item.amount)}</li>`).join("")}</ul><p>Suma de líneas J: ${formatCop(components.reduce((sum, item) => sum + Number(item.amount || 0), 0))}. Algunas líneas son adiciones o contratos separados; consulta la fórmula AI y la revisión antes de usarlas como valor contractual único.</p></details>` : ""}
     ${notes.length ? `<h5>Notas de seguimiento del Excel</h5><ul>${notes.map((item) => `<li>${escapeHtml(item.text)} <small>(${escapeHtml(item.sheet)}, fila ${escapeHtml(item.row)})</small></li>`).join("")}</ul>` : ""}
     ${references.length ? `<p><strong>Referencias de factura en Excel:</strong> ${references.map((item) => escapeHtml(item.reference)).join("; ")}. No acreditan pagos.</p>` : ""}
@@ -1195,13 +1242,10 @@ async function loadMonthlyModule(filters) {
     ], "monthlyFilters");
     const data = await ensureGateway();
     const filtered = Object.values(appliedFilters).some(Boolean);
-    const [allRows, historicalDetails] = await Promise.all([
-      data.listMonthlyTracking({}), data.listProjectDetails()
-    ]);
+    const allRows = await data.listMonthlyTracking({});
     const shownRows = filtered ? await data.listMonthlyTracking(appliedFilters) : allRows;
     allMonthlyRows = allRows;
     currentMonthly = shownRows;
-    historicalProjectDetails = historicalDetails;
     document.querySelector("#monthlyCount").textContent = monthlyDisplayCounts(allRows).activity;
     document.querySelector("#monthlyPendingCount").textContent = allRows.filter((row) => row.trackingId && row.validationStatus !== "validado").length;
     renderPeriods();
@@ -1747,6 +1791,7 @@ async function loadReports() {
 
 function renderReports() {
   const totals = currentReport.totals;
+  const sourceById = new Map(historicalProjectDetails.map((item) => [item.id, item]));
   document.querySelector("#reportContractValue").textContent = formatCop(totals.contractValue);
   document.querySelector("#reportInvoiced").textContent = formatCop(totals.invoiced);
   document.querySelector("#reportPaid").textContent = formatCop(totals.paid);
@@ -1756,15 +1801,24 @@ function renderReports() {
   document.querySelector("#reportProfitability").textContent = formatCop(totals.profitability);
   document.querySelector("#reportExecution").textContent = formatExecutionPercent(totals.executionProgress);
   document.querySelector("#reportResultCount").textContent = `${totals.projectCount} proyecto(s) · promedio avance de ejecución ${formatExecutionPercent(totals.executionProgress)} · facturación ${formatPercent(totals.financialProgress)}`;
-  document.querySelector("#reportRows").innerHTML = currentReport.rows.map((row) => `<tr>
+  document.querySelector("#reportRows").innerHTML = currentReport.rows.map((row) => {
+    const source = sourceById.get(row.projectId);
+    const contract = currentProjects.find((item) => item.projectId === row.projectId);
+    const balance = contractPositionDisplay(contract, source);
+    const known = balance.value !== "Sin valor contractual";
+    const receiptNote = source?.importedPaymentEvidence?.length
+      ? paymentEvidenceHeadline(source.importedPaymentEvidence) : source?.importedBilledTotal > 0
+        ? "Excel sin recaudo cuantificado" : "";
+    return `<tr>
     <td>${escapeHtml(displayProjectCenter(row.costCenter))}</td><td>${escapeHtml(row.parentCostCenter || "—")}</td><td><strong>${escapeHtml(row.projectName)}</strong><br><small>${escapeHtml(row.municipality)}</small></td>
-    <td>${formatCop(row.contractValue)}</td><td>${formatExecutionPercent(row.executionProgress)}</td><td>${formatCop(row.invoiced)}</td><td>${formatCop(row.paid)}</td>
-    <td>${formatCop(row.costsExpenses)}</td><td>${formatCop(row.profitability)}</td><td>${formatCop(row.contractualBalance)}</td><td>${formatCop(row.paymentPending)}</td>
+    <td>${known ? formatCop(row.contractValue) : "Sin valor contractual"}</td><td>${formatExecutionPercent(row.executionProgress)}</td><td>${formatCop(row.invoiced)}</td><td>${source && !row.paid ? "Sin importe registrado" : formatCop(row.paid)}${receiptNote ? `<br><small>${escapeHtml(receiptNote)}</small>` : ""}</td>
+    <td>${formatCop(row.costsExpenses)}</td><td>${formatCop(row.profitability)}</td><td>${balance.label === "Exceso facturado" ? `Exceso ${balance.value}` : balance.value}</td><td>${monthlyMoney(row.paymentPending)}</td>
     <td><strong>${formatPercent(row.financialProgress)}</strong></td>
     <td>${canEditExecution(currentUserProfile)
       ? `<button class="table-action" type="button" data-action="edit-report-progress" data-project-id="${escapeHtml(row.projectId)}" aria-label="Corregir avance general de ${escapeHtml(row.projectName)}">Corregir avance general</button>`
       : "Solo administrador"}</td>
-  </tr>`).join("");
+  </tr>`;
+  }).join("");
   document.querySelector("#reportEmpty").hidden = currentReport.rows.length > 0;
   document.querySelector("#reportMonthlyRows").innerHTML = currentReportMonthly.map((row) => `<tr>
     <td><strong>${escapeHtml(row.projectName)}</strong><br><small>${escapeHtml(displayProjectCenter(row.costCenter))}</small></td>
@@ -1867,7 +1921,9 @@ async function saveReportProgress(event) {
 
 function exportManagementReport() {
   try {
-    const blob = createXlsx([managementSummarySheet(currentReport.rows), ...monthlyWorkbookSheets(currentReportMonthly)]);
+    const selectedIds = new Set(currentReport.rows.map((row) => row.projectId));
+    const blob = createXlsx([managementSummarySheet(currentReport.rows), ...monthlyWorkbookSheets(currentReportMonthly),
+      historicalWorkbookSheet(historicalProjectDetails.filter((item) => selectedIds.has(item.id)))]);
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
