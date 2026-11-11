@@ -1,4 +1,4 @@
-import { projectInputToRecord } from "../data/models.js?v=1.18.10";
+import { projectInputToRecord } from "../data/models.js?v=1.18.11";
 import { parseCostCsv } from "./cost-import.js?v=1.16.0";
 import { centerKey } from "./accounting-projects.js?v=1.16.0";
 
@@ -103,6 +103,21 @@ const projectCenter = (value) => {
   return /^\d+\.0+$/.test(text) ? text.slice(0, text.indexOf(".")) : "";
 };
 
+export function provisionalExcelCenter(sourceCenter, sheet, rowNumber) {
+  const tag = /^PROYECTOS FV$/i.test(sheet) ? "FV"
+    : /^AVANCE DE PROYECTOS/i.test(sheet) ? "AGO"
+      : /^VISITAS Y OTROS$/i.test(sheet) ? "VIS" : "AUX";
+  return `${sourceCenter}-EXCEL-${tag}${rowNumber}`;
+}
+
+function provisionalize(row, reason) {
+  const original = row.__sourceCostCenter__ ?? row["Centro de costo"];
+  row.__sourceCostCenter__ = original;
+  row["Centro de costo"] = provisionalExcelCenter(original, row.__sourceSheet__, row.__rowNum__ + 1);
+  row.__financialReview__ = `Centro A ${original}: ${reason} Código provisional ${row["Centro de costo"]}; conciliar el centro antes de registrar movimientos nuevos. ${row.__financialReview__ ?? ""}`.trim();
+  return row;
+}
+
 const monthFromHeader = (value) => {
   if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString().slice(0, 7);
   const match = /^(20\d{2})[-/](0[1-9]|1[0-2]|[1-9])(?=[-/T\s]|$)/.exec(String(value ?? ""));
@@ -204,9 +219,6 @@ function legacyRows(sheet) {
       }
       if (invoice) invoiceReferences.push({ sheet: sheet.name, row: index + 1, reference: String(detail[invoiceColumn]).trim() });
       const extraValue = Number(detail[contractColumn]);
-      if (Number.isFinite(extraValue) && extraValue > 0) {
-        contractComponents.push({ row: index + 1, amount: Math.round(extraValue * 100) / 100 });
-      }
       const amountCells = monthlyColumns.filter(({ index: col }) =>
         typeof detail[col] === "number" && Number.isFinite(detail[col]) && detail[col] !== 0);
       if (index === start) for (const { index: col, month, percentIndex } of monthlyColumns) {
@@ -216,11 +228,14 @@ function legacyRows(sheet) {
         }
       }
       // Los totales al pie de la hoja no son una continuación del último proyecto.
-      if (!invoice && !detail[descriptionColumn] && extraValue > 0 && amountCells.length > 3) continue;
+      if (index > start && !invoice && !detail[descriptionColumn] && extraValue > 0 && amountCells.length) continue;
+      if (Number.isFinite(extraValue) && extraValue > 0) {
+        contractComponents.push({ row: index + 1, amount: Math.round(extraValue * 100) / 100 });
+      }
       for (const { index: col, month, percentIndex } of amountCells) {
         const value = billedAmount(detail[col]);
         const key = invoice ? `${month}|${invoice}|${value}` : "";
-        if (key && seenInvoices.has(key)) { duplicate = true; continue; }
+        if (key && seenInvoices.has(key)) duplicate = true;
         if (key) seenInvoices.add(key);
         if (!invoice) unlabeled = true;
         monthly[month] = Math.round(((monthly[month] ?? 0) + value) * 100) / 100;
@@ -232,7 +247,7 @@ function legacyRows(sheet) {
     }
     if (contractComponents.length > 1) review.push("Varios valores contractuales en el centro; revisar ajustes o adiciones.");
     if (unlabeled) review.push("Facturación mensual sin número de factura en algunas filas.");
-    if (duplicate) review.push("Se excluyó una factura repetida con igual mes y valor.");
+    if (duplicate) review.push("El Excel repite número de factura, mes e importe en dos filas; ambas se conservaron en la suma literal. Verificar si es un duplicado real.");
     const billedTotal = Math.round(Object.values(monthly).reduce((sum, value) => sum + value, 0) * 100) / 100;
     if (Number(row[contractColumn]) > 0 && billedTotal > Number(row[contractColumn]) + 1) {
       review.push("Facturado mayor que el valor contractual principal; revisar ajustes.");
@@ -307,6 +322,13 @@ export function extractLegacyProjectRows(sheets) {
   const seen = new Set(), rows = [], issues = [];
   for (const { rows: candidates } of all) for (const row of candidates) {
     const cc = row["Centro de costo"];
+    if (ambiguous.has(cc) && row.__sourceSheet__ === primary.name) {
+      seen.add(cc);
+      rows.push(provisionalize(row, "El mismo centro identifica varias filas de proyecto en la hoja principal."));
+      issues.push({ costCenter: cc, rowNumber: row.__rowNum__ + 1, sourceSheet: row.__sourceSheet__,
+        reason: `Cargado provisionalmente como ${row["Centro de costo"]}; asignar un centro definitivo.` });
+      continue;
+    }
     if (seen.has(cc)) continue;
     seen.add(cc);
     if (ambiguous.has(cc)) {
@@ -321,22 +343,77 @@ export function extractLegacyProjectRows(sheets) {
     const byCenter = new Map();
     for (const row of august.rows) byCenter.set(row["Centro de costo"], [...(byCenter.get(row["Centro de costo"]) ?? []), row]);
     for (const [cc, matches] of byCenter) if (primaryCenters.has(cc) && matches.length > 1) {
-      const primaryNames = all[0].rows.filter((row) => row["Centro de costo"] === cc);
+      const primaryNames = all[0].rows.filter((row) => (row.__sourceCostCenter__ ?? row["Centro de costo"]) === cc);
       const extras = matches.filter((row) => !primaryNames.some((source) => {
         const original = headerKey(source["Nombre del proyecto"]);
         const candidate = headerKey(row["Nombre del proyecto"]);
         return candidate === original || candidate.startsWith(`${original}_`);
       }));
-      for (const extra of extras) issues.push({ costCenter: cc, rowNumber: extra.__rowNum__ + 1,
-        sourceSheet: extra.__sourceSheet__,
-        reason: `También figura como «${extra["Nombre del proyecto"].trim()}» con un centro ya asignado en PROYECTOS FV. Confirma su código antes de crear otra ficha.` });
+      for (const extra of extras) {
+        rows.push(provisionalize(extra, "Agosto reutiliza un centro que corresponde a otro proyecto en la hoja principal."));
+        issues.push({ costCenter: cc, rowNumber: extra.__rowNum__ + 1, sourceSheet: extra.__sourceSheet__,
+          reason: `«${extra["Nombre del proyecto"].trim()}» cargado provisionalmente como ${extra["Centro de costo"]}; asignar centro definitivo.` });
+      }
     }
+  }
+  // OTROS y VISITAS Y OTROS contienen meses complementarios de los centros
+  // auxiliares. Se unen solo para el mismo código Y nombre, sin duplicar meses.
+  const supporting = all.filter(({ sheet }) => ["OTROS", "VISITAS Y OTROS"].includes(sheet.name.toUpperCase()));
+  const unmatchedSupporting = new Map();
+  for (const row of rows) {
+    if (row.__sourceSheet__ === primary.name) continue;
+    for (const { rows: candidates } of supporting) for (const other of candidates) {
+      if (other === row || other["Centro de costo"] !== (row.__sourceCostCenter__ ?? row["Centro de costo"])) continue;
+      if (headerKey(other["Nombre del proyecto"]) !== headerKey(row["Nombre del proyecto"])) {
+        unmatchedSupporting.set(`${other.__sourceSheet__}:${other.__rowNum__}`, other);
+        issues.push({ costCenter: other["Centro de costo"], rowNumber: other.__rowNum__ + 1,
+          sourceSheet: other.__sourceSheet__,
+          reason: `El centro también figura como «${other["Nombre del proyecto"]}»; se conservó por separado de «${row["Nombre del proyecto"]}» para conciliar el código.` });
+        continue;
+      }
+      let included = false;
+      for (const [month, amount] of Object.entries(other.__monthlyBilled__)) {
+        if (!Object.hasOwn(row.__monthlyBilled__, month)) {
+          row.__monthlyBilled__[month] = amount;
+          included = true;
+        } else if (Math.abs(row.__monthlyBilled__[month] - amount) > 0.01) {
+          row.__financialReview__ += ` ${other.__sourceSheet__} contiene un importe distinto para ${month}; no se sumó por segunda vez.`;
+        }
+      }
+      for (const [month, percent] of Object.entries(other.__monthlyPercentages__)) {
+        if (!Object.hasOwn(row.__monthlyPercentages__, month)) row.__monthlyPercentages__[month] = percent;
+      }
+      row.__followupNotes__.push(...other.__followupNotes__);
+      row.__invoiceReferences__.push(...other.__invoiceReferences__);
+      row.__alternateSnapshots__.push({ sheet: other.__sourceSheet__, row: other.__rowNum__ + 1,
+        contractValue: contractValue(other["Valor del contrato"]), contractComponents: other.__contractComponents__,
+        billedTotal: other["Facturado acumulado"], monthlyBilled: other.__monthlyBilled__,
+        monthlyPercentages: other.__monthlyPercentages__, includedInTotal: included });
+      if (included) row.__financialReview__ += ` Meses de ${other.__sourceSheet__} incorporados al acumulado; los valores J de esa hoja se conservan por separado.`;
+    }
+    row["Facturado acumulado"] = Math.round(Object.values(row.__monthlyBilled__).reduce((sum, amount) => sum + amount, 0) * 100) / 100;
+  }
+  for (const other of unmatchedSupporting.values()) if (!rows.some((row) =>
+    row.__sourceSheet__ === other.__sourceSheet__ && row.__rowNum__ === other.__rowNum__)) {
+    rows.push(provisionalize(other, "La hoja auxiliar usa este centro para un nombre diferente."));
   }
   const alternate = all.find(({ sheet }) => sheet.name.toUpperCase() === "AVANCE DE PROYECTOS AGOSTO")?.rows ?? [];
   for (const row of rows) {
     if (row.__sourceSheet__ === primary.name && primary.name.toUpperCase() === "PROYECTOS FV") {
       const formula = primary.aiFormulas?.[row.__rowNum__ + 1] ?? "";
       const source = primary.rows[row.__rowNum__] ?? [];
+      const contractColumn = primary.rows.find((cells) => cells[0] === "C COSTO" && cells[1] === "NOMBRE")
+        ?.findIndex((value) => String(value ?? "").trim().toUpperCase() === "VALOR CONTRATO");
+      const contractRows = [...new Set([...formula.matchAll(/(?<![A-Z0-9_])J(\d+)/gi)].map((match) => Number(match[1])))];
+      const formulaContract = contractRows.reduce((sum, number) =>
+        sum + Number(primary.rows[number - 1]?.[contractColumn] || 0), 0);
+      const components = row.__contractComponents__ ?? [];
+      if (contractRows.length > 1 && contractRows.length >= components.length - 1
+        && contractRows.every((number) => components.some((component) => component.row === number))
+        && formulaContract > Number(row["Valor del contrato"] || 0) + 1) {
+        row["Valor del contrato"] = Math.round(formulaContract * 100) / 100;
+        row.__financialReview__ += ` Valor contractual combinado por la fórmula AI (${contractRows.map((number) => `J${number}`).join(" + ")}); las demás líneas J se conservan para revisión.`;
+      }
       const archiveReference = /'(?:PENDEINTE|PENDIENTE) 2024'!\$?AI\$?(\d+)/i.exec(formula);
       const prior = archiveReference ? archiveByRow.get(Number(archiveReference[1])) : null;
       if (prior && prior["Centro de costo"] === row["Centro de costo"]) {
@@ -352,30 +429,22 @@ export function extractLegacyProjectRows(sheets) {
       }
       // AI descuenta a veces una cifra literal que no figura en ningún mes.
       // Solo se incorpora cuando el valor coincide con la conciliación completa.
-      const literal = /-(\d+(?:\.\d+)?)\)?$/.exec(formula)?.[1];
+      const literal = /-\(?(\d+(?:\.\d+)?)\)?\s*$/.exec(formula)?.[1];
       if (literal && typeof source[34] === "number") {
-        const contractColumn = primary.rows.find((cells) => cells[0] === "C COSTO" && cells[1] === "NOMBRE")
-          ?.findIndex((value) => String(value ?? "").trim().toUpperCase() === "VALOR CONTRATO");
-        const refs = [...formula.matchAll(/(?<![A-Z0-9_])J(\d+)/gi)].map((match) => Number(match[1]));
-        const basis = refs.reduce((sum, number) => sum + Number(primary.rows[number - 1]?.[contractColumn] || 0), 0);
         const dated = Number(row["Facturado acumulado"]);
         const undated = Number(literal);
-        if (refs.length && Number.isFinite(basis) && undated > 0
-          && Math.abs(basis - source[34] - dated - undated) <= 1) {
+        if (contractRows.length && Number.isFinite(formulaContract) && undated > 0
+          && Math.abs(formulaContract - source[34] - dated - undated) <= 1) {
           row.__undatedBilled__ = undated;
           row["Facturado acumulado"] = Math.round((dated + undated) * 100) / 100;
         }
       }
       if (prior && typeof source[34] === "number") {
-        const refs = [...formula.matchAll(/(?<![A-Z0-9_])J(\d+)/gi)].map((match) => Number(match[1]));
-        const contractColumn = primary.rows.find((cells) => cells[0] === "C COSTO" && cells[1] === "NOMBRE")
-          ?.findIndex((value) => String(value ?? "").trim().toUpperCase() === "VALOR CONTRATO");
-        const basis = refs.reduce((sum, number) => sum + Number(primary.rows[number - 1]?.[contractColumn] || 0), 0);
-        const difference = Math.round((basis - source[34] - Number(row["Facturado acumulado"])) * 100) / 100;
+        const difference = Math.round((formulaContract - source[34] - Number(row["Facturado acumulado"])) * 100) / 100;
         if (Math.abs(difference) > 1) row.__financialReview__ +=
           ` La fórmula AI difiere en ${difference} COP de las facturas fechadas de 2024 y 2025; conciliar sin asignar un mes inventado.`;
       }
-      const matches = alternate.filter((other) => other["Centro de costo"] === row["Centro de costo"]
+      const matches = alternate.filter((other) => (other.__sourceCostCenter__ ?? other["Centro de costo"]) === (row.__sourceCostCenter__ ?? row["Centro de costo"])
         && headerKey(other["Nombre del proyecto"]) === headerKey(row["Nombre del proyecto"]));
       if (matches.length === 1) {
         const other = matches[0];
@@ -461,19 +530,28 @@ export function resolveProjectImportRows(rows, existingProjects = [], newId = ()
     if (Object.values(row).every((value) => value == null || String(value).trim() === "")) return;
     const rowNumber = Number.isInteger(row.__rowNum__) ? row.__rowNum__ + 1 : index + 2;
     const values = sourceValues(row);
-    const costCenter = String(field(values, columns.costCenter)).trim();
-    const key = centerKey(costCenter);
+    let costCenter = String(field(values, columns.costCenter)).trim();
+    let key = centerKey(costCenter);
     if (!key) { errors.push({ rowNumber, reason: "centro de costo vacío" }); return; }
     if (seen.has(key)) { errors.push({ rowNumber, reason: `centro ${costCenter} repetido en el archivo` }); return; }
     seen.add(key);
-    const matches = existing.get(key) ?? [];
+    let matches = existing.get(key) ?? [];
     if (matches.length > 1) { errors.push({ rowNumber, reason: `centro ${costCenter} coincide con varias fichas existentes` }); return; }
     if (matches.length === 1) {
       const importedName = String(field(values, columns.name)).trim();
       if (options.reviewNameConflicts && headerKey(importedName) !== headerKey(matches[0].projectName ?? matches[0].name)) {
-        conflicts.push({ rowNumber, costCenter, sourceSheet: row.__sourceSheet__,
-          reason: `Ya existe como «${matches[0].projectName ?? matches[0].name}»; el Excel dice «${importedName}».` });
-        return;
+        if (!options.provisionalizeConflicts || !row.__sourceSheet__) {
+          conflicts.push({ rowNumber, costCenter, sourceSheet: row.__sourceSheet__,
+            reason: `Ya existe como «${matches[0].projectName ?? matches[0].name}»; el Excel dice «${importedName}».` });
+          return;
+        }
+        const original = costCenter;
+        provisionalize(row, `Ya existe el centro ${original} como «${matches[0].projectName ?? matches[0].name}».`);
+        costCenter = row["Centro de costo"];
+        key = centerKey(costCenter);
+        matches = existing.get(key) ?? [];
+        conflicts.push({ rowNumber, costCenter: original, sourceSheet: row.__sourceSheet__,
+          reason: `«${importedName}» cargado como ${costCenter}; el centro ${original} sigue asignado a «${existing.get(centerKey(original))[0].projectName ?? existing.get(centerKey(original))[0].name}».` });
       }
       if (!options.updateExistingMatched) {
         skipped.push({ rowNumber, costCenter, projectName: matches[0].projectName ?? matches[0].name });
@@ -497,7 +575,7 @@ export function resolveProjectImportRows(rows, existingProjects = [], newId = ()
       const references = row.__invoiceReferences__ ?? String(field(values, columns.invoiceReferences)).split("\n")
         .map((reference) => reference.trim()).filter(Boolean)
         .map((reference) => ({ sheet: "Archivo de proyectos", row: rowNumber, reference }));
-      const notes = [sourceNotes,
+      const notes = [sourceNotes, row.__sourceCostCenter__ && `Centro A original: ${row.__sourceCostCenter__}; código provisional`,
         importedNumber && !/Contrato en archivo:/i.test(sourceNotes)
           ? `Contrato en archivo: ${importedNumber}` : ""
       ].filter(Boolean).join(" · ");

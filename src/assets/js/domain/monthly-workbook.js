@@ -65,7 +65,10 @@ export function historicalWorkbookSheet(projects = [], projectId = "") {
           percentage == null ? null : Number(percentage) / 100,
           Number(alternate.contractValue) > 0 && billed != null ? Number(billed) / Number(alternate.contractValue) : null,
           null, alternate.billedTotal ?? null, null, "", "", "",
-          "Cifras distintas: conciliar antes de incorporar", "Otra hoja; no sumada"]);
+          alternate.includedInTotal
+            ? "Meses nuevos de esta hoja ya incorporados al acumulado; no sumar de nuevo"
+            : "Cifras distintas: conciliar antes de incorporar",
+          alternate.includedInTotal ? "Otra hoja; meses nuevos incorporados" : "Otra hoja; no sumada"]);
       }
     }
   }
@@ -75,7 +78,7 @@ export function historicalWorkbookSheet(projects = [], projectId = "") {
     notes: [
       "El porcentaje facturado del Excel corresponde a la columna % junto a FACTURADO. El porcentaje calculado divide el importe mensual entre el valor contractual principal.",
       "El avance general del Excel se ubica en el mes MES y el año único de los encabezados del libro. No es ejecución mensual validada. Un importe descontado literalmente en AI sin fecha figura en una fila separada.",
-      "Las cifras de otra hoja se muestran para conciliación y no se suman a la fila principal. El archivo no acredita pagos."
+      "Las filas de otras hojas indican si sus meses nuevos ya se incorporaron al acumulado o si son alternativas sin sumar. No se deben sumar otra vez. El archivo no acredita pagos."
     ],
     headers: ["Centro de costo", "Proyecto", "Hoja / fuente", "Mes facturado", "Contrato principal (COP)",
       "Facturado mes (COP)", "% facturado Excel", "% importe / contrato", "Facturado acumulado (COP)",

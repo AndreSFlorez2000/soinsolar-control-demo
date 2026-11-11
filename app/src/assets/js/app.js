@@ -1,16 +1,17 @@
 import { buildMonthlySeries, calculateDashboardIndicators } from "./domain/dashboard.js?v=1.5.9";
-import { createDashboardUI } from "./dashboard-ui.js?v=1.18.10";
+import { createDashboardUI } from "./dashboard-ui.js?v=1.18.11";
 import { calculateProjectIndicators } from "./domain/project-analytics.js?v=1.4.1";
-import { buildManagementReport, buildMonthlyExecutionReport } from "./domain/reports.js?v=1.18.10";
-import { historicalProjectGroups, managementSummarySheet, monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.18.10";
+import { buildManagementReport, buildMonthlyExecutionReport } from "./domain/reports.js?v=1.18.11";
+import { historicalProjectGroups, managementSummarySheet, monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.18.11";
 import { createXlsx } from "./domain/xlsx-export.js?v=1.5.8";
 import { costWorkbookSheets } from "./domain/cost-workbook.js?v=1.5.8";
 import { canEditExecution } from "./domain/execution.js?v=1.9.0";
-import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=1.18.10";
-import { importedBillingRows, recognizedInvoices } from "./domain/finance-history.js?v=1.18.10";
+import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=1.18.11";
+import { importedBillingRows, recognizedInvoices } from "./domain/finance-history.js?v=1.18.11";
 import { invoicePendingAmount, isSampleProject, payableInvoicesForProject } from "./domain/payment-selection.js?v=1.5.1";
 import { forgetProject, hasProject, recallProject, rememberProject } from "./domain/project-context.js?v=1.8.0";
-import { createApplicationDataGateway } from "./services/application-data.js?v=1.18.10";
+import { displayProjectCenter } from "./domain/project-center.js?v=1.18.11";
+import { createApplicationDataGateway } from "./services/application-data.js?v=1.18.11";
 import { getCurrentSession, isDemoMode, registerAccount, signIn, signOut } from "./services/supabase.js?v=1.13.1";
 
 const loginView = document.querySelector("#loginView");
@@ -112,6 +113,7 @@ let selectedProjectHistory = [];
 let projectChart = null;
 const dashboardUI = createDashboardUI(dashboardView, {
   formatCop,
+  displayProjectCenter,
   onProjectOpen: (projectId) => openProjectDetail(projectId)
 });
 
@@ -127,10 +129,10 @@ function renderProjectContext() {
   const workspace = document.querySelector("#projectWorkspace");
   workspace.hidden = !project;
   if (!project) return;
-  document.querySelector("#projectWorkspaceName").textContent = `${project.costCenter} · ${project.projectName}`;
+  document.querySelector("#projectWorkspaceName").textContent = `${displayProjectCenter(project.costCenter)} · ${project.projectName}`;
   const options = [...currentProjects]
     .sort((left, right) => String(left.costCenter).localeCompare(String(right.costCenter), "es", { numeric: true }))
-    .map((item) => `<option value="${escapeHtml(item.projectId)}">${escapeHtml(item.costCenter)} · ${escapeHtml(item.projectName)}</option>`).join("");
+    .map((item) => `<option value="${escapeHtml(item.projectId)}">${escapeHtml(displayProjectCenter(item.costCenter))} · ${escapeHtml(item.projectName)}</option>`).join("");
   setSelectOptions(document.querySelector("#projectWorkspaceSelect"), "", options, selectedProjectId);
 }
 
@@ -471,7 +473,7 @@ function renderDashboard() {
     .sort((left, right) => String(left.costCenter).localeCompare(String(right.costCenter), "es", { numeric: true }))
     .map((project) => `
       <tr>
-        <td><span class="project-name-cell"><strong>${escapeHtml(project.projectName)}</strong><small>${escapeHtml(project.costCenter)}</small></span></td>
+        <td><span class="project-name-cell"><strong>${escapeHtml(project.projectName)}</strong><small>${escapeHtml(displayProjectCenter(project.costCenter))}</small></span></td>
         <td><div class="execution-progress-cell"><div class="execution-track"><span style="width:${Math.min(100, Math.max(0, Number(project.executedProgressPercentage) || 0))}%"></span></div><span><strong>${formatExecutionPercent(project.executedProgressPercentage)}</strong>${project.executionProgressSource === "excel" ? '<small>Excel histórico</small>' : ""}</span></div></td>
         <td>${project.executedProgressPercentage === null ? "—" : formatCop(Math.round(project.contractValue * project.executedProgressPercentage) / 100)}</td>
         <td>${formatCop(project.contractValue)}</td><td>${formatCop(project.totalInvoiced)}</td><td>${formatCop(project.totalPaid)}</td>
@@ -587,7 +589,7 @@ function renderGlobalSearch() {
   input.setAttribute("aria-expanded", "true");
   results.innerHTML = matches.length ? matches.map((project) => `
     <button class="global-search-result" type="button" data-action="open-global-project" data-project-id="${project.projectId}">
-      <span><strong>${escapeHtml(project.projectName)}</strong><small>${escapeHtml(project.costCenter)} · ${escapeHtml(project.municipality)}</small></span>
+      <span><strong>${escapeHtml(project.projectName)}</strong><small>${escapeHtml(displayProjectCenter(project.costCenter))} · ${escapeHtml(project.municipality)}</small></span>
       <span class="status-badge ${escapeHtml(project.status)}">${escapeHtml(capitalize(project.status))}</span>
     </button>`).join("") : `<div class="global-search-empty">No se encontraron proyectos para “${escapeHtml(input.value.trim())}”.</div>`;
 }
@@ -670,7 +672,7 @@ async function loadProjects(filters) {
     const rows = await (await ensureGateway()).listProjects(appliedFilters);
     document.querySelector("#projectResultCount").textContent = rows.length;
     document.querySelector("#projectsManagementRows").innerHTML = rows.map((project) => `
-      <tr><td><strong>${escapeHtml(project.costCenter)}</strong></td><td><span class="project-name-cell"><strong>${escapeHtml(project.projectName)}</strong><small>${escapeHtml(project.contractNumber || (project.contractValue > 0 ? "Valor según Excel; contrato por registrar" : "Sin contrato registrado"))}</small></span></td><td>${escapeHtml(project.municipality)}</td><td>${escapeHtml(project.serviceType)}</td><td><span class="status-badge ${escapeHtml(project.status)}">${escapeHtml(capitalize(project.status))}</span></td><td>${formatExecutionPercent(project.executedProgressPercentage)}${project.executionProgressSource === "excel" ? '<br><small>Excel histórico</small>' : ""}</td><td>${formatPercent(project.financialProgressPercentage)}</td><td><span class="table-actions"><button class="table-action" type="button" data-action="open-project" data-project-id="${project.projectId}">Abrir</button><button class="table-action" type="button" data-action="edit-project" data-project-id="${project.projectId}">Editar</button><button class="table-action danger" type="button" data-action="delete-project" data-project-id="${project.projectId}">Eliminar</button></span></td></tr>`).join("");
+      <tr><td><strong>${escapeHtml(displayProjectCenter(project.costCenter))}</strong></td><td><span class="project-name-cell"><strong>${escapeHtml(project.projectName)}</strong><small>${escapeHtml(project.contractNumber || (project.contractValue > 0 ? "Valor según Excel; contrato por registrar" : "Sin contrato registrado"))}</small></span></td><td>${escapeHtml(project.municipality)}</td><td>${escapeHtml(project.serviceType)}</td><td><span class="status-badge ${escapeHtml(project.status)}">${escapeHtml(capitalize(project.status))}</span></td><td>${formatExecutionPercent(project.executedProgressPercentage)}${project.executionProgressSource === "excel" ? '<br><small>Excel histórico</small>' : ""}</td><td>${formatPercent(project.financialProgressPercentage)}</td><td><span class="table-actions"><button class="table-action" type="button" data-action="open-project" data-project-id="${project.projectId}">Abrir</button><button class="table-action" type="button" data-action="edit-project" data-project-id="${project.projectId}">Editar</button><button class="table-action danger" type="button" data-action="delete-project" data-project-id="${project.projectId}">Eliminar</button></span></td></tr>`).join("");
     document.querySelector("#projectsEmpty").hidden = rows.length > 0;
     setMessage(message, rows.length ? "Consulta actualizada." : "");
   } catch (error) {
@@ -685,7 +687,7 @@ function populateParentProjectOptions(selected = "", excludedProjectId = "") {
   const options = currentProjects
     .filter((project) => project.projectId !== excludedProjectId)
     .sort((a, b) => a.costCenter.localeCompare(b.costCenter, "es"))
-    .map((project) => "<option value=\"" + project.projectId + "\">" + escapeHtml(project.costCenter) + " · " + escapeHtml(project.projectName) + "</option>")
+    .map((project) => "<option value=\"" + project.projectId + "\">" + escapeHtml(displayProjectCenter(project.costCenter)) + " · " + escapeHtml(project.projectName) + "</option>")
     .join("");
   setSelectOptions(document.querySelector("#projectParentProject"), '<option value="">Sin centro principal</option>', options, selected);
 }
@@ -873,7 +875,7 @@ async function openProjectDetail(projectId) {
   selectedProjectHistory = auditRows;
   activateProject(projectId);
 
-  document.querySelector("#detailCostCenter").textContent = project.costCenter;
+  document.querySelector("#detailCostCenter").textContent = displayProjectCenter(project.costCenter);
   document.querySelector("#detailProjectName").textContent = project.projectName;
   const status = document.querySelector("#detailProjectStatus");
   status.textContent = capitalize(project.status);
@@ -947,7 +949,7 @@ async function openContractDialog() {
   document.querySelector("#contractForm").reset();
   document.querySelector("#contractId").value = contract?.id ?? "";
   document.querySelector("#contractProjectId").value = selectedProjectId;
-  document.querySelector("#contractProjectLabel").value = `${project.costCenter} · ${project.name}`;
+  document.querySelector("#contractProjectLabel").value = `${displayProjectCenter(project.costCenter)} · ${project.name}`;
   document.querySelector("#contractDialogTitle").textContent = contract ? "Actualizar contrato" : "Registrar contrato";
   document.querySelector("#contractNumber").value = contract?.contractNumber ?? "";
   document.querySelector("#contractStatus").value = contract?.status ?? "vigente";
@@ -997,8 +999,8 @@ function setSelectOptions(select, firstOption, options, selectedValue = "") {
 }
 
 function populateProjectOptions() {
-  const options = currentProjects.map((project) => `<option value="${project.projectId}">${escapeHtml(project.costCenter)} · ${escapeHtml(project.projectName)}</option>`).join("");
-  const contractOptions = currentProjects.filter((project) => project.contractId).map((project) => `<option value="${project.projectId}">${escapeHtml(project.costCenter)} · ${escapeHtml(project.projectName)}</option>`).join("");
+  const options = currentProjects.map((project) => `<option value="${project.projectId}">${escapeHtml(displayProjectCenter(project.costCenter))} · ${escapeHtml(project.projectName)}</option>`).join("");
+  const contractOptions = currentProjects.filter((project) => project.contractId).map((project) => `<option value="${project.projectId}">${escapeHtml(displayProjectCenter(project.costCenter))} · ${escapeHtml(project.projectName)}</option>`).join("");
   ["costFilterProject", "monthlyFilterProject", "financeFilterProject", "reportFilterProject", "historyFilterProject"].forEach((id) => {
     const select = document.querySelector(`#${id}`);
     setSelectOptions(select, '<option value="">Todos</option>', options, select.value);
@@ -1083,7 +1085,7 @@ function renderMonthly() {
     const sourceNotes = source && months.some((item) => item.importedHistory)
       ? `${source.importedFinancialReview ? `<p>Pendiente de revisar: ${escapeHtml(source.importedFinancialReview)}</p>` : ""}${importedFollowupHtml(source)}` : "";
     const header = `<tr class="monthly-project-heading"><th colspan="15" scope="rowgroup"><div class="monthly-project-summary">
-      <div><strong>${escapeHtml(latest.costCenter)} · ${escapeHtml(latest.projectName)}</strong><small>Centro de costo / proyecto</small></div>
+      <div><strong>${escapeHtml(displayProjectCenter(latest.costCenter))} · ${escapeHtml(latest.projectName)}</strong><small>Centro de costo de Excel / proyecto</small></div>
       <div><span>Valor de contrato</span><strong>${formatCop(contract)}</strong></div>
       <div><span>Facturado total del proyecto</span><strong>${formatCop(project?.totalInvoiced ?? summary?.cumulativeInvoiced ?? 0)}</strong></div>
       <div><span>${summary?.executionRecorded ? "Ejecutado al último mes mostrado (referencia)" : "Avance general Excel (AK)"}</span><strong>${summary?.executionRecorded ? formatCop(summary.cumulativeEquivalent) : source?.importedExecutionSnapshotPercentage == null ? "—" : formatPercent(source.importedExecutionSnapshotPercentage)}</strong></div>
@@ -1128,11 +1130,13 @@ function importedFollowupHtml(project) {
   const notes = project.importedFollowupNotes ?? [];
   const references = project.importedInvoiceReferences ?? [];
   const alternates = project.importedAlternateSnapshots ?? [];
+  const components = project.importedContractComponents ?? [];
   const snapshot = project.importedExecutionSnapshotPercentage;
   return `${project.importedUndatedBilled > 0 ? `<p><strong>Facturado sin mes identificado en la fórmula AI:</strong> ${formatCop(project.importedUndatedBilled)}. Incluido en el total sin asignarlo a un mes.</p>` : ""}${snapshot == null ? "" : `<p><strong>Avance de ejecución general (columna AK del Excel):</strong> ${formatPercent(snapshot)}${project.importedExecutionMonthLabel ? ` · mes indicado «${escapeHtml(project.importedExecutionMonthLabel)}»` : ""}. Es una referencia general; si el libro mezcla años, no se asigna a un año sin evidencia. No equivale a un avance mensual validado.</p>`}
+    ${components.length > 1 ? `<details><summary>Valores contractuales por fila (${components.length})</summary><ul>${components.map((item) => `<li>Fila ${escapeHtml(item.row)}: ${formatCop(item.amount)}</li>`).join("")}</ul><p>Suma de líneas J: ${formatCop(components.reduce((sum, item) => sum + Number(item.amount || 0), 0))}. Algunas líneas son adiciones o contratos separados; consulta la fórmula AI y la revisión antes de usarlas como valor contractual único.</p></details>` : ""}
     ${notes.length ? `<h5>Notas de seguimiento del Excel</h5><ul>${notes.map((item) => `<li>${escapeHtml(item.text)} <small>(${escapeHtml(item.sheet)}, fila ${escapeHtml(item.row)})</small></li>`).join("")}</ul>` : ""}
     ${references.length ? `<p><strong>Referencias de factura en Excel:</strong> ${references.map((item) => escapeHtml(item.reference)).join("; ")}. No acreditan pagos.</p>` : ""}
-    ${alternates.length ? `<details><summary>Otra hoja con cifras distintas (${alternates.length}); pendiente de conciliar</summary>${alternates.map((item) => `<p>${escapeHtml(item.sheet)}, fila ${escapeHtml(item.row)}: contrato ${item.contractValue == null ? "sin valor" : formatCop(item.contractValue)}; facturado ${formatCop(item.billedTotal ?? 0)}. No sumado a la fila principal.</p>${Object.keys(item.monthlyBilled ?? {}).length ? `<ul>${Object.entries(item.monthlyBilled).sort(([left], [right]) => left.localeCompare(right)).map(([month, billed]) => `<li>${escapeHtml(month)}: ${formatCop(billed)}${item.monthlyPercentages?.[month] == null ? "" : ` (${formatPercent(item.monthlyPercentages[month])} en esa hoja)`}</li>`).join("")}</ul>` : ""}`).join("")}</details>` : ""}`;
+    ${alternates.length ? `<details><summary>Detalle de otras hojas (${alternates.length})</summary>${alternates.map((item) => `<p>${escapeHtml(item.sheet)}, fila ${escapeHtml(item.row)}: contrato principal ${item.contractValue == null ? "sin valor" : formatCop(item.contractValue)}; facturado de esa hoja ${formatCop(item.billedTotal ?? 0)}. ${item.includedInTotal ? "Los meses nuevos ya están incluidos en el acumulado; no volver a sumarlos." : "Versión alternativa no sumada a la ficha principal."}</p>${item.contractComponents?.length > 1 ? `<p>${item.contractComponents.length} líneas J en esa hoja: ${item.contractComponents.map((entry) => `fila ${escapeHtml(entry.row)} ${formatCop(entry.amount)}`).join("; ")}.</p>` : ""}${Object.keys(item.monthlyBilled ?? {}).length ? `<ul>${Object.entries(item.monthlyBilled).sort(([left], [right]) => left.localeCompare(right)).map(([month, billed]) => `<li>${escapeHtml(month)}: ${formatCop(billed)}${item.monthlyPercentages?.[month] == null ? "" : ` (${formatPercent(item.monthlyPercentages[month])} en esa hoja)`}</li>`).join("")}</ul>` : ""}`).join("")}</details>` : ""}`;
 }
 
 async function loadMonthlyModule(filters) {
@@ -1472,7 +1476,7 @@ function updatePaymentAvailable() {
 
 function populatePaymentProjectOptions(selectedProjectId = "") {
   const options = currentProjects.map((project) =>
-    `<option value="${project.projectId}">${escapeHtml(project.costCenter)} · ${escapeHtml(project.projectName)}${isSampleProject(project) ? " (Prueba)" : ""}</option>`
+    `<option value="${project.projectId}">${escapeHtml(displayProjectCenter(project.costCenter))} · ${escapeHtml(project.projectName)}${isSampleProject(project) ? " (Prueba)" : ""}</option>`
   ).join("");
   setSelectOptions(document.querySelector("#paymentProject"), '<option value="">Selecciona un centro de costo</option>', options, selectedProjectId);
 }
@@ -1527,7 +1531,7 @@ function renderFinance() {
   const importedRows = currentImportedBilling.map((row) => `<tr>
       <td><span class="reference-cell"><strong>Excel histórico</strong><small>Seguimiento por mes${row.importedBillingPercentage == null ? "" : ` · ${formatPercent(row.importedBillingPercentage)} según Excel`}</small></span></td>
       <td>—<br><small>Sin fecha de factura</small></td>
-      <td><span class="project-name-cell"><strong>${escapeHtml(row.projectName)}</strong><small>${escapeHtml(row.costCenter)}</small></span></td>
+      <td><span class="project-name-cell"><strong>${escapeHtml(row.projectName)}</strong><small>${escapeHtml(displayProjectCenter(row.costCenter))}</small></span></td>
       <td>${escapeHtml(`${monthNames[row.month - 1]} ${row.year}`)}</td>
       <td><span class="finance-status historico">Dato del Excel</span></td>
       <td><strong>${formatCop(row.importedBilledValue)}</strong></td>
@@ -1537,7 +1541,7 @@ function renderFinance() {
   const undatedRows = currentImportedUndated.map((project) => `<tr>
       <td><span class="reference-cell"><strong>Excel · fórmula AI</strong><small>Importe sin mes identificado</small></span></td>
       <td>—<br><small>Sin fecha de factura</small></td>
-      <td><span class="project-name-cell"><strong>${escapeHtml(project.name)}</strong><small>${escapeHtml(project.costCenter)}</small></span></td>
+      <td><span class="project-name-cell"><strong>${escapeHtml(project.name)}</strong><small>${escapeHtml(displayProjectCenter(project.costCenter))}</small></span></td>
       <td>Sin mes</td><td><span class="finance-status historico">Dato del Excel</span></td>
       <td><strong>${formatCop(project.importedUndatedBilled)}</strong></td><td>—</td>
       <td><button class="table-action" type="button" data-action="open-project" data-project-id="${escapeHtml(project.id)}">Abrir ficha</button></td>
@@ -1709,7 +1713,7 @@ function renderReports() {
   document.querySelector("#reportExecution").textContent = formatExecutionPercent(totals.executionProgress);
   document.querySelector("#reportResultCount").textContent = `${totals.projectCount} proyecto(s) · promedio avance de ejecución ${formatExecutionPercent(totals.executionProgress)} · facturación ${formatPercent(totals.financialProgress)}`;
   document.querySelector("#reportRows").innerHTML = currentReport.rows.map((row) => `<tr>
-    <td>${escapeHtml(row.costCenter)}</td><td>${escapeHtml(row.parentCostCenter || "—")}</td><td><strong>${escapeHtml(row.projectName)}</strong><br><small>${escapeHtml(row.municipality)}</small></td>
+    <td>${escapeHtml(displayProjectCenter(row.costCenter))}</td><td>${escapeHtml(row.parentCostCenter || "—")}</td><td><strong>${escapeHtml(row.projectName)}</strong><br><small>${escapeHtml(row.municipality)}</small></td>
     <td>${formatCop(row.contractValue)}</td><td>${formatExecutionPercent(row.executionProgress)}</td><td>${formatCop(row.invoiced)}</td><td>${formatCop(row.paid)}</td>
     <td>${formatCop(row.costsExpenses)}</td><td>${formatCop(row.profitability)}</td><td>${formatCop(row.contractualBalance)}</td><td>${formatCop(row.paymentPending)}</td>
     <td><strong>${formatPercent(row.financialProgress)}</strong></td>
@@ -1719,7 +1723,7 @@ function renderReports() {
   </tr>`).join("");
   document.querySelector("#reportEmpty").hidden = currentReport.rows.length > 0;
   document.querySelector("#reportMonthlyRows").innerHTML = currentReportMonthly.map((row) => `<tr>
-    <td><strong>${escapeHtml(row.projectName)}</strong><br><small>${escapeHtml(row.costCenter)}</small></td>
+    <td><strong>${escapeHtml(row.projectName)}</strong><br><small>${escapeHtml(displayProjectCenter(row.costCenter))}</small></td>
     <td>${escapeHtml(monthNames[row.month - 1])} ${row.year}</td>
     <td>${formatCop(row.contractValue)}</td>
     <td>${formatPercent(row.previousProgress)}<br><small>${row.previousExecutionPeriod
@@ -1901,7 +1905,7 @@ function historyFilters() {
 
 function projectNameForEvent(event) {
   const project = currentProjects.find((item) => item.projectId === event.projectId);
-  return project ? `${project.costCenter} · ${project.projectName}` : "Evento general";
+  return project ? `${displayProjectCenter(project.costCenter)} · ${project.projectName}` : "Evento general";
 }
 
 function changedFields(event) {

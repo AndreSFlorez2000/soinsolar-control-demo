@@ -102,7 +102,7 @@ export function buildDashboardChartModel(metric, projects = [], monthly = [], pr
   };
 }
 
-export function createDashboardUI(root, { onProjectOpen, formatCop }) {
+export function createDashboardUI(root, { onProjectOpen, formatCop, displayProjectCenter = (center) => center }) {
   const builder = root.querySelector("#dashboardBuilder");
   const grid = root.querySelector("#dashboardWidgetGrid");
   const extras = root.querySelector("#dashboardExtraIndicators");
@@ -143,7 +143,7 @@ export function createDashboardUI(root, { onProjectOpen, formatCop }) {
       new Option(({ line: "Línea", bar: "Barras", pie: "Torta" })[value], value)) : []));
     const selectedProject = projectSelect.value;
     projectSelect.replaceChildren(new Option("Todos los proyectos", ""), ...projects.map((project) =>
-      new Option(`${project.costCenter} · ${project.projectName}`, project.projectId)));
+      new Option(`${displayProjectCenter(project.costCenter)} · ${project.projectName}`, project.projectId)));
     if (projects.some((p) => p.projectId === selectedProject)) projectSelect.value = selectedProject;
   }
   function layoutMessage(text) { message.textContent = text; }
@@ -182,7 +182,7 @@ export function createDashboardUI(root, { onProjectOpen, formatCop }) {
       const name = document.createElement("h4");
       name.textContent = definition.name;
       const context = document.createElement("small");
-      context.textContent = project ? `Proyecto: ${project.costCenter} · ${project.projectName}`
+      context.textContent = project ? `Proyecto: ${displayProjectCenter(project.costCenter)} · ${project.projectName}`
         : definition.monthly ? "Últimos periodos con movimientos" : "Proyectos con registros";
       heading.append(name, context);
       const tools = document.createElement("div");
