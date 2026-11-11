@@ -48,6 +48,12 @@ export function historicalWorkbookSheet(projects = [], projectId = "") {
         index === 0 ? references : "", index === 0 ? notes : "",
         index === 0 ? project.importedFinancialReview || "" : "", "Fila principal"]);
     }
+    if (Number(project.importedUndatedBilled) > 0) rows.push([
+      project.costCenter, project.name, project.importedFinancialSource || "Excel histórico",
+      "Sin mes identificado", project.importedContractValue ?? null, Number(project.importedUndatedBilled),
+      null, null, project.importedBilledTotal ?? null, project.importedBilledTotal ?? null,
+      null, "", "", "", "Importe descontado literalmente en AI; fecha por conciliar", "Fórmula AI; sin mes"
+    ]);
     for (const alternate of project.importedAlternateSnapshots ?? []) {
       const altMonths = [...new Set([...Object.keys(alternate.monthlyBilled ?? {}),
         ...Object.keys(alternate.monthlyPercentages ?? {})])].sort();
@@ -68,7 +74,7 @@ export function historicalWorkbookSheet(projects = [], projectId = "") {
     title: "Seguimiento mensual y notas del libro histórico",
     notes: [
       "El porcentaje facturado del Excel corresponde a la columna % junto a FACTURADO. El porcentaje calculado divide el importe mensual entre el valor contractual principal.",
-      "El avance general del Excel se ubica en el mes MES y el año único de los encabezados del libro. No es ejecución mensual validada.",
+      "El avance general del Excel se ubica en el mes MES y el año único de los encabezados del libro. No es ejecución mensual validada. Un importe descontado literalmente en AI sin fecha figura en una fila separada.",
       "Las cifras de otra hoja se muestran para conciliación y no se suman a la fila principal. El archivo no acredita pagos."
     ],
     headers: ["Centro de costo", "Proyecto", "Hoja / fuente", "Mes facturado", "Contrato principal (COP)",

@@ -1,16 +1,16 @@
 import { buildMonthlySeries, calculateDashboardIndicators } from "./domain/dashboard.js?v=1.5.9";
-import { createDashboardUI } from "./dashboard-ui.js?v=1.18.7";
+import { createDashboardUI } from "./dashboard-ui.js?v=1.18.8";
 import { calculateProjectIndicators } from "./domain/project-analytics.js?v=1.4.1";
-import { buildManagementReport, buildMonthlyExecutionReport } from "./domain/reports.js?v=1.18.7";
-import { historicalProjectGroups, managementSummarySheet, monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.18.7";
+import { buildManagementReport, buildMonthlyExecutionReport } from "./domain/reports.js?v=1.18.8";
+import { historicalProjectGroups, managementSummarySheet, monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.18.8";
 import { createXlsx } from "./domain/xlsx-export.js?v=1.5.8";
 import { costWorkbookSheets } from "./domain/cost-workbook.js?v=1.5.8";
 import { canEditExecution } from "./domain/execution.js?v=1.9.0";
-import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=1.18.7";
-import { importedBillingRows, recognizedInvoices } from "./domain/finance-history.js?v=1.18.7";
+import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=1.18.8";
+import { importedBillingRows, recognizedInvoices } from "./domain/finance-history.js?v=1.18.8";
 import { invoicePendingAmount, isSampleProject, payableInvoicesForProject } from "./domain/payment-selection.js?v=1.5.1";
 import { forgetProject, hasProject, recallProject, rememberProject } from "./domain/project-context.js?v=1.8.0";
-import { createApplicationDataGateway } from "./services/application-data.js?v=1.18.7";
+import { createApplicationDataGateway } from "./services/application-data.js?v=1.18.8";
 import { getCurrentSession, isDemoMode, registerAccount, signIn, signOut } from "./services/supabase.js?v=1.13.1";
 
 const loginView = document.querySelector("#loginView");
@@ -99,6 +99,7 @@ let payableInvoices = [];
 let currentPayments = [];
 let balancePayments = [];
 let currentImportedBilling = [];
+let currentImportedUndated = [];
 let financeProjectDetails = [];
 let currentProfiles = [];
 let currentUserProfile = null;
@@ -358,6 +359,7 @@ function closeApp() {
   currentPayments = [];
   balancePayments = [];
   currentImportedBilling = [];
+  currentImportedUndated = [];
   financeProjectDetails = [];
   currentProfiles = [];
   selectedProjectId = null;
@@ -909,6 +911,11 @@ async function openProjectDetail(projectId) {
     document.querySelector("#detailImportedContract").textContent = projectRecord.importedContractValue == null
       ? "Sin valor" : formatCop(projectRecord.importedContractValue);
     document.querySelector("#detailImportedBilled").textContent = formatCop(projectRecord.importedBilledTotal || 0);
+    document.querySelector("#detailImportedUndatedWrap").hidden = !projectRecord.importedUndatedBilled;
+    document.querySelector("#detailImportedUndated").textContent = formatCop(projectRecord.importedUndatedBilled);
+    document.querySelector("#detailImportedPendingWrap").hidden = projectRecord.importedPendingToInvoice == null;
+    document.querySelector("#detailImportedPending").textContent = projectRecord.importedPendingToInvoice == null
+      ? "—" : `${formatCop(projectRecord.importedPendingToInvoice)}${projectRecord.importedPendingPercentage == null ? "" : ` · ${formatPercent(projectRecord.importedPendingPercentage)}`}`;
     const review = document.querySelector("#detailImportedReview");
     review.hidden = !projectRecord.importedFinancialReview;
     review.textContent = projectRecord.importedFinancialReview || "";
@@ -1122,7 +1129,7 @@ function importedFollowupHtml(project) {
   const references = project.importedInvoiceReferences ?? [];
   const alternates = project.importedAlternateSnapshots ?? [];
   const snapshot = project.importedExecutionSnapshotPercentage;
-  return `${snapshot == null ? "" : `<p><strong>Avance de ejecución general informado en Excel:</strong> ${formatPercent(snapshot)}${project.importedExecutionMonthLabel ? ` · mes «${escapeHtml(project.importedExecutionMonthLabel)}» (año inferido del encabezado del Excel cuando es único)` : ""}. Referencia sin validación mensual.</p>`}
+  return `${project.importedUndatedBilled > 0 ? `<p><strong>Facturado sin mes identificado en la fórmula AI:</strong> ${formatCop(project.importedUndatedBilled)}. Incluido en el total sin asignarlo a un mes.</p>` : ""}${snapshot == null ? "" : `<p><strong>Avance de ejecución general informado en Excel:</strong> ${formatPercent(snapshot)}${project.importedExecutionMonthLabel ? ` · mes «${escapeHtml(project.importedExecutionMonthLabel)}» (año inferido del encabezado del Excel cuando es único)` : ""}. Referencia sin validación mensual.</p>`}
     ${notes.length ? `<h5>Notas de seguimiento del Excel</h5><ul>${notes.map((item) => `<li>${escapeHtml(item.text)} <small>(${escapeHtml(item.sheet)}, fila ${escapeHtml(item.row)})</small></li>`).join("")}</ul>` : ""}
     ${references.length ? `<p><strong>Referencias de factura en Excel:</strong> ${references.map((item) => escapeHtml(item.reference)).join("; ")}. No acreditan pagos.</p>` : ""}
     ${alternates.length ? `<details><summary>Otra hoja con cifras distintas (${alternates.length}); pendiente de conciliar</summary>${alternates.map((item) => `<p>${escapeHtml(item.sheet)}, fila ${escapeHtml(item.row)}: contrato ${item.contractValue == null ? "sin valor" : formatCop(item.contractValue)}; facturado ${formatCop(item.billedTotal ?? 0)}. No sumado a la fila principal.</p>${Object.keys(item.monthlyBilled ?? {}).length ? `<ul>${Object.entries(item.monthlyBilled).sort(([left], [right]) => left.localeCompare(right)).map(([month, billed]) => `<li>${escapeHtml(month)}: ${formatCop(billed)}${item.monthlyPercentages?.[month] == null ? "" : ` (${formatPercent(item.monthlyPercentages[month])} en esa hoja)`}</li>`).join("")}</ul>` : ""}`).join("")}</details>` : ""}`;
@@ -1489,8 +1496,11 @@ async function loadFinance(filters) {
       data.listProjectDetails()
     ]);
     currentImportedBilling = importedBillingRows(allMonthlyRows, applied);
+    currentImportedUndated = !applied.periodId && !applied.dateFrom && !applied.dateTo
+      ? financeProjectDetails.filter((project) => project.importedUndatedBilled > 0
+        && (!applied.projectId || project.id === applied.projectId)) : [];
     renderFinance();
-    setMessage(message, currentInvoices.length || currentPayments.length || currentImportedBilling.length ? "Consulta actualizada." : "");
+    setMessage(message, currentInvoices.length || currentPayments.length || currentImportedBilling.length || currentImportedUndated.length ? "Consulta actualizada." : "");
   } catch (error) {
     setMessage(message, error.message || "No fue posible consultar facturas y pagos.", true);
   }
@@ -1500,7 +1510,8 @@ function renderFinance() {
   const activeInvoices = recognizedInvoices(currentInvoices, financeProjectDetails);
   const activePayments = currentPayments.filter((payment) => payment.status !== "anulado");
   const invoiced = activeInvoices.reduce((sum, invoice) => sum + invoice.amount, 0)
-    + currentImportedBilling.reduce((sum, row) => sum + row.importedBilledValue, 0);
+    + currentImportedBilling.reduce((sum, row) => sum + row.importedBilledValue, 0)
+    + currentImportedUndated.reduce((sum, project) => sum + project.importedUndatedBilled, 0);
   const paid = activePayments.reduce((sum, payment) => sum + payment.amount, 0);
   const pendingInvoices = activeInvoices.filter((invoice) => invoicePendingAmount(invoice, balancePayments) > 0);
   const countedInvoiceIds = new Set(activeInvoices.map((invoice) => invoice.id));
@@ -1520,7 +1531,15 @@ function renderFinance() {
       <td>—</td>
       <td><button class="table-action" type="button" data-action="open-project" data-project-id="${escapeHtml(row.projectId)}">Abrir ficha</button></td>
     </tr>`).join("");
-  document.querySelector("#invoiceRows").innerHTML = importedRows + currentInvoices.map((invoice) => {
+  const undatedRows = currentImportedUndated.map((project) => `<tr>
+      <td><span class="reference-cell"><strong>Excel · fórmula AI</strong><small>Importe sin mes identificado</small></span></td>
+      <td>—<br><small>Sin fecha de factura</small></td>
+      <td><span class="project-name-cell"><strong>${escapeHtml(project.name)}</strong><small>${escapeHtml(project.costCenter)}</small></span></td>
+      <td>Sin mes</td><td><span class="finance-status historico">Dato del Excel</span></td>
+      <td><strong>${formatCop(project.importedUndatedBilled)}</strong></td><td>—</td>
+      <td><button class="table-action" type="button" data-action="open-project" data-project-id="${escapeHtml(project.id)}">Abrir ficha</button></td>
+    </tr>`).join("");
+  document.querySelector("#invoiceRows").innerHTML = importedRows + undatedRows + currentInvoices.map((invoice) => {
     const pending = invoice.status === "anulada" ? 0 : invoicePendingAmount(invoice, balancePayments);
     const included = countedInvoiceIds.has(invoice.id);
     const canPay = invoice.status !== "anulada" && pending > 0;
@@ -1544,7 +1563,7 @@ function renderFinance() {
     <td><span class="finance-status ${escapeHtml(payment.status)}">${escapeHtml(payment.status)}</span></td>
     <td><strong>${formatCop(payment.amount)}</strong></td>
   </tr>`).join("");
-  document.querySelector("#invoiceEmpty").hidden = currentInvoices.length + currentImportedBilling.length > 0;
+  document.querySelector("#invoiceEmpty").hidden = currentInvoices.length + currentImportedBilling.length + currentImportedUndated.length > 0;
   document.querySelector("#paymentEmpty").hidden = currentPayments.length > 0;
 }
 

@@ -1,4 +1,4 @@
-import { PROJECT_IMPORT_HEADERS, extractLegacyProjectRows, parseProjectCsv, referencedContractValue, resolveProjectImportRows } from "./domain/project-import.js?v=1.18.4";
+import { PROJECT_IMPORT_HEADERS, changedHistoricalUpdates, extractLegacyProjectRows, parseProjectCsv, referencedContractValue, resolveProjectImportRows } from "./domain/project-import.js?v=1.18.8";
 import { createXlsx } from "./domain/xlsx-export.js?v=1.17.0";
 
 const $ = (selector) => document.querySelector(selector);
@@ -21,8 +21,8 @@ function projectSheet(rows, months = []) {
   const headers = [...PROJECT_IMPORT_HEADERS, ...months.flatMap((month) => [`Facturado ${month}`, `Porcentaje facturado ${month}`])];
   return { name: "Proyectos", headers, rows,
     types: headers.map((_, index) => index === 6 || index === 15 || (index >= PROJECT_IMPORT_HEADERS.length && (index - PROJECT_IMPORT_HEADERS.length) % 2 === 1)
-      ? "number" : [11, 13].includes(index) || index >= PROJECT_IMPORT_HEADERS.length ? "money" : "text"),
-    freezeColumns: 2, columnWidths: [20, 34, 22, 28, 16, 26, 16, 18, 18, 20, 44, 22, 28, 22, 18, 25, 24, 56, 36, ...months.flatMap(() => [22, 26])] };
+      ? "number" : [11, 13, 19].includes(index) || index >= PROJECT_IMPORT_HEADERS.length ? "money" : "text"),
+    freezeColumns: 2, columnWidths: [20, 34, 22, 28, 16, 26, 16, 18, 18, 20, 44, 22, 28, 22, 18, 25, 24, 56, 36, 25, ...months.flatMap(() => [22, 26])] };
 }
 
 function download(blob, fileName) {
@@ -36,23 +36,26 @@ async function readRows(file) {
   if (/\.csv$/i.test(file.name)) return { rows: parseProjectCsv(await file.text()), issues: [], legacy: false };
   if (!/\.(xlsx|xls)$/i.test(file.name)) throw new Error("Selecciona un archivo CSV o Excel de proyectos.");
   if (!window.XLSX) throw new Error("No se pudo cargar el lector de Excel.");
-  const book = window.XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true });
+  const book = window.XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true, cellFormula: true });
   if (book.SheetNames.length === 1 && !/^PROYECTOS FV$/i.test(book.SheetNames[0])) {
     return { rows: window.XLSX.utils.sheet_to_json(book.Sheets[book.SheetNames[0]],
       { defval: "", blankrows: false, raw: true }), issues: [], legacy: false };
   }
   const names = book.SheetNames.filter((name) => /^PROYECTOS FV$|^AVANCE DE PROYECTOS|^PENDEINTE 2024$|^PENDIENTE 2024$|^OTROS$|^VISITAS Y OTROS$/i.test(name));
   const sheets = names.map((name) => ({ name, rows: window.XLSX.utils.sheet_to_json(book.Sheets[name],
-    { header: 1, defval: "", blankrows: true, raw: true }) }));
+    { header: 1, defval: "", blankrows: true, raw: true }),
+    aiFormulas: Object.fromEntries(Object.entries(book.Sheets[name]).filter(([address, cell]) =>
+      /^AI\d+$/i.test(address) && typeof cell?.f === "string")
+      .map(([address, cell]) => [Number(address.slice(2)), cell.f])) }));
   return { ...extractLegacyProjectRows(sheets), legacy: true };
 }
 
 function showPreview(result, fileName, legacy, issues) {
-  pending = { rows: result.sourceRows, valid: result.valid, skipped: result.skipped, fileName, legacy, issues };
+  pending = { rows: result.sourceRows, valid: result.valid, updates: result.updates, skipped: result.skipped, fileName, legacy, issues };
   const contracts = result.valid.filter((row) => row.contractValue != null).length;
   const billed = result.valid.filter((row) => row.importedBilledTotal !== 0).length;
-  $("#projectImportSummary").textContent = `${fileName}: ${result.valid.length} proyecto(s) nuevo(s); ${contracts} valor(es) contractuales y ${billed} registro(s) con facturación en campos financieros; ${result.skipped.length} existente(s) sin cambios; ${issues.length} caso(s) para revisar. ${result.valid.length > 12 ? "Vista previa de los primeros 12; se guardarán todos los válidos." : ""}`;
-  $("#projectImportRows").innerHTML = result.valid.slice(0, 12).map((row) => `<tr>
+  $("#projectImportSummary").textContent = `${fileName}: ${result.valid.length} proyecto(s) nuevo(s), ${result.updates.length} histórico(s) por actualizar; ${contracts} valor(es) contractuales y ${billed} registro(s) con facturación en las fichas nuevas; ${result.skipped.length} existente(s) sin cambios; ${issues.length} caso(s) para revisar. ${result.valid.length + result.updates.length > 12 ? "Vista previa de los primeros 12; se guardarán todos los válidos." : ""}`;
+  $("#projectImportRows").innerHTML = [...result.valid, ...result.updates].slice(0, 12).map((row) => `<tr>
     <td>${escapeHtml(row.sourceSheet || "Proyectos")} · ${row.rowNumber}</td><td><strong>${escapeHtml(row.costCenter)}</strong></td>
     <td>${escapeHtml(row.name)}</td><td>${escapeHtml(row.municipality)}</td>
     <td>${escapeHtml(row.serviceType)}</td><td>${row.contractValue == null ? "Sin valor" : escapeHtml(new Intl.NumberFormat("es-CO").format(row.contractValue))}</td><td>${escapeHtml(new Intl.NumberFormat("es-CO").format(row.importedBilledTotal))}</td>
@@ -63,8 +66,9 @@ function showPreview(result, fileName, legacy, issues) {
     (issues.length > 5 ? `\n… y ${issues.length - 5} más. Descarga la lista completa.` : "");
   $("#projectImportDownloadIssues").hidden = !issues.length;
   message("", false, "#projectImportPreviewMessage");
-  $("#projectImportSave").disabled = !result.valid.length;
-  $("#projectImportSave").textContent = result.valid.length ? `Guardar ${result.valid.length} proyecto(s)` : "No hay proyectos nuevos";
+  $("#projectImportSave").disabled = !(result.valid.length + result.updates.length);
+  $("#projectImportSave").textContent = result.valid.length + result.updates.length
+    ? `Guardar ${result.valid.length} nuevo(s) y ${result.updates.length} actualización(es)` : "Sin cambios para guardar";
   $("#projectImportDialog").showModal();
 }
 
@@ -120,6 +124,7 @@ async function exportProjects() {
         project.importedExecutionSnapshotPercentage ?? "", project.importedExecutionMonthLabel ?? "",
         (project.importedFollowupNotes ?? []).map((item) => item.text).join("\n"),
         (project.importedInvoiceReferences ?? []).map((item) => item.reference).join("\n"),
+        project.importedUndatedBilled || "",
         ...months.flatMap((month) => [monthly[month] ?? "", project.importedMonthlyBilledPercentages?.[month] ?? ""])];
     });
     download(createXlsx([projectSheet(rows, months)]), `proyectos-soinsolar-${new Date().toISOString().slice(0, 10)}.xlsx`);
@@ -142,8 +147,11 @@ async function importFile(event) {
     const source = await readRows(file);
     const rows = source.rows;
     if (rows.length > 1000) throw new Error("El archivo tiene más de 1.000 filas. Divide la lista de proyectos en archivos más pequeños.");
-    const result = resolveProjectImportRows(rows, api.projects(), () => crypto.randomUUID(),
-      { reviewNameConflicts: source.legacy });
+    const existing = await (await api.gateway()).listProjectDetails();
+    const excel = /\.(xlsx|xls)$/i.test(file.name);
+    const result = resolveProjectImportRows(rows, existing, () => crypto.randomUUID(),
+      { reviewNameConflicts: excel, updateExistingMatched: excel });
+    result.updates = changedHistoricalUpdates(result.updates, existing);
     if (result.errors.length && !source.legacy) {
       const sample = result.errors.slice(0, 6).map((error) => `Fila ${error.rowNumber}: ${error.reason}`).join(" · ");
       throw new Error(`${result.errors.length} fila(s) por corregir. No se guardó ninguna. ${sample}`);
@@ -156,7 +164,7 @@ async function importFile(event) {
 }
 
 async function save() {
-  if (!pending || busy || !pending.valid.length) return;
+  if (!pending || busy || !(pending.valid.length + pending.updates.length)) return;
   busy = true;
   const button = $("#projectImportSave");
   button.disabled = true;
@@ -165,16 +173,22 @@ async function save() {
     const api = window.SOINSOLAR_APP_API;
     const gateway = await api.gateway();
     // Otra cuenta pudo crear una ficha desde que se abrió la vista previa.
-    const fresh = resolveProjectImportRows(pending.rows, await gateway.listProjects(), () => crypto.randomUUID(),
-      { reviewNameConflicts: pending.legacy });
-    if ((!pending.legacy && fresh.errors.length) || fresh.valid.length !== pending.valid.length || fresh.skipped.length !== pending.skipped.length) {
+    const existing = await gateway.listProjectDetails();
+    const excel = /\.(xlsx|xls)$/i.test(pending.fileName);
+    const fresh = resolveProjectImportRows(pending.rows, existing, () => crypto.randomUUID(),
+      { reviewNameConflicts: excel, updateExistingMatched: excel });
+    fresh.updates = changedHistoricalUpdates(fresh.updates, existing);
+    if ((!pending.legacy && fresh.errors.length) || fresh.valid.length !== pending.valid.length || fresh.updates.length !== pending.updates.length || fresh.skipped.length !== pending.skipped.length) {
       throw new Error("La lista de proyectos cambió. Selecciona el archivo de nuevo para revisar los centros antes de guardar.");
     }
-    const count = await gateway.createProjects(fresh.valid);
+    const withSource = (row) => ({ ...row, importedFinancialSource: row.sourceSheet
+      ? `${pending.fileName} · ${row.importedFinancialSource}` : row.importedFinancialSource });
+    const updated = fresh.updates.length ? await gateway.updateImportedHistory(fresh.updates.map(withSource)) : 0;
+    const count = fresh.valid.length ? await gateway.createProjects(fresh.valid.map(withSource)) : 0;
     $("#projectImportDialog").close();
     $("#projectReviewIssuesButton").hidden = !pending.issues.length;
-    message(`${count} proyecto(s) importados. Las fichas existentes quedaron intactas. ${pending.issues.length ? `${pending.issues.length} centro(s) requieren revisión; descarga la lista.` : ""}`);
-    pending = { ...pending, valid: [] };
+    message(`${count} proyecto(s) nuevos y ${updated} histórico(s) actualizado(s). ${pending.issues.length ? `${pending.issues.length} caso(s) requieren revisión; descarga la lista.` : ""}`);
+    pending = { ...pending, valid: [], updates: [] };
     await api.refresh();
   } catch (error) { message(error.message || "No se pudieron guardar los proyectos.", true, "#projectImportPreviewMessage"); }
   finally { busy = false; button.disabled = false; }

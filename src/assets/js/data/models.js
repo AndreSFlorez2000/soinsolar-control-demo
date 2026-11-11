@@ -143,6 +143,9 @@ export function normalizeProject(record) {
     notes: record.notes || null,
     importedContractValue: record.imported_contract_value == null ? null : Number(record.imported_contract_value),
     importedBilledTotal: record.imported_billed_total == null ? null : Number(record.imported_billed_total),
+    importedUndatedBilled: Number(record.imported_undated_billed ?? 0),
+    importedPendingToInvoice: record.imported_pending_to_invoice == null ? null : Number(record.imported_pending_to_invoice),
+    importedPendingPercentage: record.imported_pending_percentage == null ? null : Number(record.imported_pending_percentage),
     importedMonthlyBilled: record.imported_monthly_billed || {},
     importedMonthlyBilledPercentages: record.imported_monthly_billed_percentages || {},
     importedContractComponents: record.imported_contract_components || [],
@@ -391,6 +394,11 @@ export function projectInputToRecord(input, userId) {
       throw new ValidationError("El facturado importado es inválido.", "importedBilledTotal");
     }
     record.imported_billed_total = Math.round(billed * 100) / 100;
+    record.imported_undated_billed = assertMoney(input.importedUndatedBilled ?? 0, "facturado sin mes");
+    record.imported_pending_to_invoice = input.importedPendingToInvoice == null
+      ? null : signedMoney(input.importedPendingToInvoice, "pendiente facturar Excel");
+    record.imported_pending_percentage = input.importedPendingPercentage == null
+      ? null : Number(input.importedPendingPercentage);
     record.imported_monthly_billed = input.importedMonthlyBilled || {};
     record.imported_monthly_billed_percentages = input.importedMonthlyBilledPercentages || {};
     record.imported_contract_components = input.importedContractComponents || [];

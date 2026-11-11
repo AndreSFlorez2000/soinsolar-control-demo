@@ -22,7 +22,7 @@ import {
   INVOICE_STATUSES,
   PAYMENT_STATUSES,
   VALIDATION_STATUSES
-} from "./models.js?v=1.18.6";
+} from "./models.js?v=1.18.8";
 
 export class DataAccessError extends Error {
   constructor(message, cause = null) {
@@ -180,6 +180,24 @@ export class ProjectRepository {
     // Una sola inserción: si cualquier fila infringe la base, ninguna se guarda.
     await unwrap(this.client.from("projects").insert(records), "No fue posible importar los proyectos");
     return records.length;
+  }
+
+  async updateImportedHistoryMany(inputs, userId) {
+    const user = userId ? assertUuid(userId, "usuario") : null;
+    let completed = 0;
+    for (const input of inputs) {
+      const record = projectInputToRecord(input, user);
+      const history = Object.fromEntries(Object.entries(record).filter(([key]) =>
+        key.startsWith("imported_") && !["imported_pending_to_invoice", "imported_pending_percentage"].includes(key)));
+      const rows = await unwrap(this.client.from("projects")
+        .update({ ...history, updated_by: user })
+        .eq("id", assertUuid(input.id, "proyecto"))
+        .eq("cost_center", input.costCenter).select("id"),
+      `No fue posible actualizar el histórico del centro ${input.costCenter}`);
+      if (rows.length !== 1) throw new DataAccessError(`El centro ${input.costCenter} cambió durante la importación. Se actualizaron ${completed} fichas; vuelve a cargar el archivo para continuar.`);
+      completed++;
+    }
+    return completed;
   }
 
   async update(projectId, input, userId) {

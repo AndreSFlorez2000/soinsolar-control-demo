@@ -1,4 +1,4 @@
-import { projectInputToRecord } from "../data/models.js?v=1.18.6";
+import { projectInputToRecord } from "../data/models.js?v=1.18.8";
 import { parseCostCsv } from "./cost-import.js?v=1.16.0";
 import { centerKey } from "./accounting-projects.js?v=1.16.0";
 
@@ -7,7 +7,8 @@ export const PROJECT_IMPORT_HEADERS = Object.freeze([
   "Estado", "Cliente", "Potencia kWp", "Fecha de inicio", "Fecha de finalización",
   "Centro principal", "Observaciones", "Valor del contrato", "Número de contrato",
   "Facturado acumulado", "Corte de facturación", "Avance ejecución Excel (%)",
-  "Mes informado de ejecución", "Notas de seguimiento Excel", "Referencias factura Excel"
+  "Mes informado de ejecución", "Notas de seguimiento Excel", "Referencias factura Excel",
+  "Facturado sin mes (Excel)"
 ]);
 
 // Compatibilidad con las exportaciones anteriores, que dejaban el valor en notas.
@@ -36,7 +37,8 @@ const columns = {
   executionSnapshot: ["avance_ejecucion_excel", "avance_ejecucion_excel_", "avance_de_ejecucion_excel"],
   executionMonth: ["mes_informado_de_ejecucion"],
   followupNotes: ["notas_de_seguimiento_excel"],
-  invoiceReferences: ["referencias_factura_excel"]
+  invoiceReferences: ["referencias_factura_excel"],
+  undatedBilled: ["facturado_sin_mes_excel", "facturado_sin_mes"]
 };
 
 const headerKey = (value) => String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
@@ -135,12 +137,15 @@ function readMonthlyBilling(row, values) {
     const amount = billedAmount(value);
     if (amount) monthly[month] = amount;
   }
-  const total = Math.round(Object.values(monthly).reduce((sum, amount) => sum + amount, 0) * 100) / 100;
+  const monthlyTotal = Math.round(Object.values(monthly).reduce((sum, amount) => sum + amount, 0) * 100) / 100;
+  const undated = billedAmount(row.__undatedBilled__ ?? field(values, columns.undatedBilled));
+  if (undated < 0) throw new Error("el facturado sin mes debe ser positivo");
+  const total = Math.round((monthlyTotal + undated) * 100) / 100;
   const stated = field(values, columns.billedTotal);
   if (stated !== "" && Object.keys(monthly).length && Math.abs(billedAmount(stated) - total) > 0.01) {
     throw new Error("el facturado acumulado no coincide con la suma de los meses");
   }
-  return { monthly, total: Object.keys(monthly).length ? total : billedAmount(stated) };
+  return { monthly, total: Object.keys(monthly).length || undated ? total : billedAmount(stated), undated };
 }
 
 function readMonthlyPercentages(row, values) {
@@ -281,6 +286,9 @@ export function extractLegacyProjectRows(sheets) {
       ["PENDEINTE 2024", "PENDIENTE 2024", "OTROS", "VISITAS Y OTROS"].includes(sheet.name.toUpperCase())));
   const ordered = [primary, ...supplemental];
   const all = ordered.map((sheet) => ({ sheet, rows: legacyRows(sheet) }));
+  const primaryCenters = new Set(all[0].rows.map((row) => row["Centro de costo"]));
+  const archive = all.find(({ sheet }) => /^(?:PENDEINTE|PENDIENTE) 2024$/i.test(sheet.name));
+  const archiveByRow = new Map((archive?.rows ?? []).map((row) => [row.__rowNum__ + 1, row]));
   const ambiguous = new Map();
   for (const { sheet, rows } of all) {
     const grouped = new Map();
@@ -289,6 +297,9 @@ export function extractLegacyProjectRows(sheets) {
       grouped.set(cc, [...(grouped.get(cc) ?? []), row]);
     }
     for (const [cc, matches] of grouped) {
+      // Una lista auxiliar puede reutilizar centros de la hoja principal para
+      // proyectos diferentes; no descartar por eso la fila principal inequívoca.
+      if (sheet !== primary && primaryCenters.has(cc)) continue;
       if (matches.length > 1) ambiguous.set(cc, `${sheet.name}: ${matches.map((row) =>
         `fila ${row.__rowNum__ + 1}, ${row["Nombre del proyecto"].replace(/\s+/g, " ").slice(0, 65)}`).join("; ")}`);
     }
@@ -303,9 +314,67 @@ export function extractLegacyProjectRows(sheets) {
         reason: `Centro repetido para varios proyectos (${ambiguous.get(cc)}). Corrige el centro de costo en el Excel.` });
     } else rows.push(row);
   }
+  // Algunas filas finales de agosto reutilizan centros de la lista principal.
+  // La ficha principal es inequívoca; la otra necesita un código propio.
+  const august = all.find(({ sheet }) => sheet.name.toUpperCase() === "AVANCE DE PROYECTOS AGOSTO");
+  if (august) {
+    const byCenter = new Map();
+    for (const row of august.rows) byCenter.set(row["Centro de costo"], [...(byCenter.get(row["Centro de costo"]) ?? []), row]);
+    for (const [cc, matches] of byCenter) if (primaryCenters.has(cc) && matches.length > 1) {
+      const primaryNames = all[0].rows.filter((row) => row["Centro de costo"] === cc);
+      const extras = matches.filter((row) => !primaryNames.some((source) => {
+        const original = headerKey(source["Nombre del proyecto"]);
+        const candidate = headerKey(row["Nombre del proyecto"]);
+        return candidate === original || candidate.startsWith(`${original}_`);
+      }));
+      for (const extra of extras) issues.push({ costCenter: cc, rowNumber: extra.__rowNum__ + 1,
+        sourceSheet: extra.__sourceSheet__,
+        reason: `También figura como «${extra["Nombre del proyecto"].trim()}» con un centro ya asignado en PROYECTOS FV. Confirma su código antes de crear otra ficha.` });
+    }
+  }
   const alternate = all.find(({ sheet }) => sheet.name.toUpperCase() === "AVANCE DE PROYECTOS AGOSTO")?.rows ?? [];
   for (const row of rows) {
     if (row.__sourceSheet__ === primary.name && primary.name.toUpperCase() === "PROYECTOS FV") {
+      const formula = primary.aiFormulas?.[row.__rowNum__ + 1] ?? "";
+      const source = primary.rows[row.__rowNum__] ?? [];
+      const archiveReference = /'(?:PENDEINTE|PENDIENTE) 2024'!\$?AI\$?(\d+)/i.exec(formula);
+      const prior = archiveReference ? archiveByRow.get(Number(archiveReference[1])) : null;
+      if (prior && prior["Centro de costo"] === row["Centro de costo"]) {
+        row.__monthlyBilled__ = { ...prior.__monthlyBilled__, ...row.__monthlyBilled__ };
+        row.__monthlyPercentages__ = { ...prior.__monthlyPercentages__, ...row.__monthlyPercentages__ };
+        row.__followupNotes__.push(...prior.__followupNotes__);
+        row.__invoiceReferences__.push(...prior.__invoiceReferences__);
+        row["Facturado acumulado"] = Math.round(Object.values(row.__monthlyBilled__).reduce((sum, amount) => sum + amount, 0) * 100) / 100;
+      }
+      if (typeof source[34] === "number" && Number.isFinite(source[34])) {
+        row.__sourcePendingToInvoice__ = Math.round(source[34] * 100) / 100;
+        if (typeof source[35] === "number") row.__sourcePendingPercentage__ = Math.round(source[35] * 10000) / 100;
+      }
+      // AI descuenta a veces una cifra literal que no figura en ningún mes.
+      // Solo se incorpora cuando el valor coincide con la conciliación completa.
+      const literal = /-(\d+(?:\.\d+)?)\)?$/.exec(formula)?.[1];
+      if (literal && typeof source[34] === "number") {
+        const contractColumn = primary.rows.find((cells) => cells[0] === "C COSTO" && cells[1] === "NOMBRE")
+          ?.findIndex((value) => String(value ?? "").trim().toUpperCase() === "VALOR CONTRATO");
+        const refs = [...formula.matchAll(/(?<![A-Z0-9_])J(\d+)/gi)].map((match) => Number(match[1]));
+        const basis = refs.reduce((sum, number) => sum + Number(primary.rows[number - 1]?.[contractColumn] || 0), 0);
+        const dated = Number(row["Facturado acumulado"]);
+        const undated = Number(literal);
+        if (refs.length && Number.isFinite(basis) && undated > 0
+          && Math.abs(basis - source[34] - dated - undated) <= 1) {
+          row.__undatedBilled__ = undated;
+          row["Facturado acumulado"] = Math.round((dated + undated) * 100) / 100;
+        }
+      }
+      if (prior && typeof source[34] === "number") {
+        const refs = [...formula.matchAll(/(?<![A-Z0-9_])J(\d+)/gi)].map((match) => Number(match[1]));
+        const contractColumn = primary.rows.find((cells) => cells[0] === "C COSTO" && cells[1] === "NOMBRE")
+          ?.findIndex((value) => String(value ?? "").trim().toUpperCase() === "VALOR CONTRATO");
+        const basis = refs.reduce((sum, number) => sum + Number(primary.rows[number - 1]?.[contractColumn] || 0), 0);
+        const difference = Math.round((basis - source[34] - Number(row["Facturado acumulado"])) * 100) / 100;
+        if (Math.abs(difference) > 1) row.__financialReview__ +=
+          ` La fórmula AI difiere en ${difference} COP de las facturas fechadas de 2024 y 2025; conciliar sin asignar un mes inventado.`;
+      }
       const matches = alternate.filter((other) => other["Centro de costo"] === row["Centro de costo"]
         && headerKey(other["Nombre del proyecto"]) === headerKey(row["Nombre del proyecto"]));
       if (matches.length === 1) {
@@ -350,6 +419,23 @@ export function parseProjectCsv(text) {
   return rows;
 }
 
+// Una segunda carga del mismo libro no debe generar cientos de auditorías sin cambios.
+// AI/AJ se dejan fuera de esta actualización hasta conciliar su significado.
+export function changedHistoricalUpdates(updates, existingProjects) {
+  const fields = ["importedContractValue", "importedBilledTotal", "importedUndatedBilled",
+    "importedMonthlyBilled", "importedMonthlyBilledPercentages", "importedContractComponents",
+    "importedExecutionSnapshotPercentage", "importedExecutionMonthLabel", "importedFollowupNotes",
+    "importedInvoiceReferences", "importedAlternateSnapshots", "importedAsOf", "importedFinancialReview"];
+  const canonical = (value) => Array.isArray(value) ? value.map(canonical)
+    : value && typeof value === "object" ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonical(value[key])]))
+    : value === "" || value == null ? null : value;
+  const byId = new Map(existingProjects.map((project) => [project.id ?? project.projectId, project]));
+  return updates.filter((input) => {
+    const existing = byId.get(input.id);
+    return !existing || fields.some((field) => JSON.stringify(canonical(input[field])) !== JSON.stringify(canonical(existing[field])));
+  });
+}
+
 export function resolveProjectImportRows(rows, existingProjects = [], newId = () => crypto.randomUUID(), options = {}) {
   if (!Array.isArray(rows) || !rows.length) throw new Error("El archivo de proyectos no contiene filas.");
   const headers = Object.keys(rows[0]).map(headerKey);
@@ -370,7 +456,7 @@ export function resolveProjectImportRows(rows, existingProjects = [], newId = ()
     const key = centerKey(project.costCenter);
     existing.set(key, [...(existing.get(key) ?? []), project]);
   }
-  const seen = new Set(), valid = [], skipped = [], errors = [], conflicts = [];
+  const seen = new Set(), valid = [], updates = [], skipped = [], errors = [], conflicts = [];
   rows.forEach((row, index) => {
     if (Object.values(row).every((value) => value == null || String(value).trim() === "")) return;
     const rowNumber = Number.isInteger(row.__rowNum__) ? row.__rowNum__ + 1 : index + 2;
@@ -387,8 +473,12 @@ export function resolveProjectImportRows(rows, existingProjects = [], newId = ()
       if (options.reviewNameConflicts && headerKey(importedName) !== headerKey(matches[0].projectName ?? matches[0].name)) {
         conflicts.push({ rowNumber, costCenter, sourceSheet: row.__sourceSheet__,
           reason: `Ya existe como «${matches[0].projectName ?? matches[0].name}»; el Excel dice «${importedName}».` });
-      } else skipped.push({ rowNumber, costCenter, projectName: matches[0].projectName ?? matches[0].name });
-      return;
+        return;
+      }
+      if (!options.updateExistingMatched) {
+        skipped.push({ rowNumber, costCenter, projectName: matches[0].projectName ?? matches[0].name });
+        return;
+      }
     }
     try {
       const importedValue = contractValue(field(values, columns.contractValue));
@@ -412,7 +502,7 @@ export function resolveProjectImportRows(rows, existingProjects = [], newId = ()
           ? `Contrato en archivo: ${importedNumber}` : ""
       ].filter(Boolean).join(" · ");
       const input = {
-        id: newId(), costCenter,
+        id: matches.length ? matches[0].id ?? matches[0].projectId : newId(), costCenter,
         name: String(field(values, columns.name)).trim(),
         municipality: String(field(values, columns.municipality)).trim(),
         serviceType: String(field(values, columns.serviceType)).trim(),
@@ -428,6 +518,9 @@ export function resolveProjectImportRows(rows, existingProjects = [], newId = ()
         sourceSheet: row.__sourceSheet__ ?? "",
         importedContractValue: importedValue,
         importedBilledTotal: billed.total,
+        importedUndatedBilled: billed.undated,
+        importedPendingToInvoice: row.__sourcePendingToInvoice__ ?? null,
+        importedPendingPercentage: row.__sourcePendingPercentage__ ?? null,
         importedMonthlyBilled: billed.monthly,
         importedMonthlyBilledPercentages: billedPercentages,
         importedContractComponents: row.__contractComponents__ ?? [],
@@ -443,7 +536,7 @@ export function resolveProjectImportRows(rows, existingProjects = [], newId = ()
       };
       if (input.clientName.length > 180 || input.notes.length > 500 || input.contractNumber.length > 80) throw new Error("cliente, contrato u observaciones demasiado largos");
       projectInputToRecord(input, null);
-      valid.push({ rowNumber, ...input });
+      (matches.length ? updates : valid).push({ rowNumber, ...input });
     } catch (error) { errors.push({ rowNumber, reason: error.message }); }
   });
 
@@ -470,5 +563,5 @@ export function resolveProjectImportRows(rows, existingProjects = [], newId = ()
     }
     if (current) errors.push({ rowNumber: row.rowNumber, reason: "ciclo entre centros principales" });
   }
-  return { valid, skipped, errors, conflicts };
+  return { valid, updates, skipped, errors, conflicts };
 }

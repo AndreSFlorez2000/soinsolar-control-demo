@@ -1,4 +1,4 @@
-import { createDataService } from "./data.js?v=1.18.6";
+import { createDataService } from "./data.js?v=1.18.8";
 import { getCurrentUser, isDemoMode, requireSupabaseClient } from "./supabase.js?v=1.4.0";
 
 export async function createApplicationDataGateway() {
@@ -28,6 +28,7 @@ export async function createApplicationDataGateway() {
     getProjectSummary: (id) => data.projects.getSummary(id),
     createProject: (input) => data.projects.create(input, userId),
     createProjects: (inputs) => data.projects.createMany(inputs, userId),
+    updateImportedHistory: (inputs) => data.projects.updateImportedHistoryMany(inputs, userId),
     updateProject: (id, input) => data.projects.update(id, input, userId),
     removeProject: (id) => data.projects.remove(id),
     listContracts: (projectId) => data.contracts.listByProject(projectId),

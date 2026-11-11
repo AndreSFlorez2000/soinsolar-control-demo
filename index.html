@@ -11,7 +11,7 @@
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.18.7" />
+    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.18.8" />
   </head>
   <body>
     <section id="loginView" class="login-shell">
@@ -247,9 +247,11 @@
               <div class="summary-grid">
                 <div><span>Valor contractual de la fila principal</span><strong id="detailImportedContract">—</strong></div>
                 <div><span>Facturado hasta el corte</span><strong id="detailImportedBilled">—</strong></div>
+                <div id="detailImportedUndatedWrap" hidden><span>Facturado sin mes en la fórmula AI</span><strong id="detailImportedUndated">—</strong></div>
+                <div id="detailImportedPendingWrap" hidden><span>Saldo de AI según el Excel</span><strong id="detailImportedPending">—</strong></div>
               </div>
               <p id="detailImportedReview" hidden></p>
-              <p>El archivo no acredita pagos. El pago pendiente corresponde únicamente a las facturas registradas en el sistema.</p>
+              <p>El encabezado de AI dice «Pendiente facturar». Sus deducciones sin mes se muestran aparte; el archivo no acredita pagos.</p>
               <div id="detailImportedMonths"></div>
               <div id="detailImportedFollowup"></div>
             </article>
@@ -934,11 +936,11 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="src/assets/js/config.js?v=1.12.0"></script>
-    <script type="module" src="src/assets/js/app.js?v=1.18.7"></script>
-    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.18.7"></script>
-    <script type="module" src="src/assets/js/accounting-ui.js?v=1.18.7"></script>
-    <script type="module" src="src/assets/js/project-import-ui.js?v=1.18.7"></script>
-    <script type="module" src="src/assets/js/assistant-ui.js?v=1.18.7"></script>
+    <script type="module" src="src/assets/js/app.js?v=1.18.8"></script>
+    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.18.8"></script>
+    <script type="module" src="src/assets/js/accounting-ui.js?v=1.18.8"></script>
+    <script type="module" src="src/assets/js/project-import-ui.js?v=1.18.8"></script>
+    <script type="module" src="src/assets/js/assistant-ui.js?v=1.18.8"></script>
   </body>
 </html>
 
