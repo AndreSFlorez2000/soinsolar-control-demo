@@ -12,6 +12,14 @@ function message(value, error = false, selector = "#projectImportMessage") {
   node.classList.toggle("error", error);
 }
 
+function separateUnchanged(result, existing) {
+  const changed = changedHistoricalUpdates(result.updates, existing);
+  const changedIds = new Set(changed.map((row) => row.id));
+  result.skipped.push(...result.updates.filter((row) => !changedIds.has(row.id)));
+  result.updates = changed;
+  return result;
+}
+
 function template() {
   const blob = createXlsx([projectSheet([])]);
   download(blob, "formato-proyectos-soinsolar.xlsx");
@@ -55,10 +63,10 @@ function showPreview(result, fileName, legacy, issues) {
   const contracts = result.valid.filter((row) => row.contractValue != null).length;
   const billed = result.valid.filter((row) => row.importedBilledTotal !== 0).length;
   $("#projectImportSummary").textContent = `${fileName}: ${result.valid.length} proyecto(s) nuevo(s), ${result.updates.length} histórico(s) por actualizar; ${contracts} valor(es) contractuales y ${billed} registro(s) con facturación en las fichas nuevas; ${result.skipped.length} existente(s) sin cambios; ${issues.length} caso(s) para revisar. ${result.valid.length + result.updates.length > 12 ? "Vista previa de los primeros 12; se guardarán todos los válidos." : ""}`;
-  $("#projectImportRows").innerHTML = [...result.valid, ...result.updates].slice(0, 12).map((row) => `<tr>
+  $("#projectImportRows").innerHTML = [...result.valid, ...result.updates, ...result.skipped].slice(0, 12).map((row) => `<tr>
     <td>${escapeHtml(row.sourceSheet || "Proyectos")} · ${row.rowNumber}</td><td><strong>${escapeHtml(row.costCenter)}</strong></td>
-    <td>${escapeHtml(row.name)}</td><td>${escapeHtml(row.municipality)}</td>
-    <td>${escapeHtml(row.serviceType)}</td><td>${row.contractValue == null ? "Sin valor" : escapeHtml(new Intl.NumberFormat("es-CO").format(row.contractValue))}</td><td>${escapeHtml(new Intl.NumberFormat("es-CO").format(row.importedBilledTotal))}</td>
+    <td>${escapeHtml(row.name || row.projectName)}</td><td>${escapeHtml(row.municipality || "—")}</td>
+    <td>${escapeHtml(row.serviceType || "—")}</td><td>${row.contractValue == null ? "Sin valor" : escapeHtml(new Intl.NumberFormat("es-CO").format(row.contractValue))}</td><td>${row.importedBilledTotal == null ? "—" : escapeHtml(new Intl.NumberFormat("es-CO").format(row.importedBilledTotal))}</td>
   </tr>`).join("");
   $("#projectImportIssues").hidden = !issues.length;
   $("#projectImportIssues").textContent = issues.slice(0, 5).map((issue) =>
@@ -149,9 +157,8 @@ async function importFile(event) {
     if (rows.length > 1000) throw new Error("El archivo tiene más de 1.000 filas. Divide la lista de proyectos en archivos más pequeños.");
     const existing = await (await api.gateway()).listProjectDetails();
     const excel = /\.(xlsx|xls)$/i.test(file.name);
-    const result = resolveProjectImportRows(rows, existing, () => crypto.randomUUID(),
-      { reviewNameConflicts: excel, updateExistingMatched: excel });
-    result.updates = changedHistoricalUpdates(result.updates, existing);
+    const result = separateUnchanged(resolveProjectImportRows(rows, existing, () => crypto.randomUUID(),
+      { reviewNameConflicts: excel, updateExistingMatched: excel }), existing);
     if (result.errors.length && !source.legacy) {
       const sample = result.errors.slice(0, 6).map((error) => `Fila ${error.rowNumber}: ${error.reason}`).join(" · ");
       throw new Error(`${result.errors.length} fila(s) por corregir. No se guardó ninguna. ${sample}`);
@@ -175,9 +182,8 @@ async function save() {
     // Otra cuenta pudo crear una ficha desde que se abrió la vista previa.
     const existing = await gateway.listProjectDetails();
     const excel = /\.(xlsx|xls)$/i.test(pending.fileName);
-    const fresh = resolveProjectImportRows(pending.rows, existing, () => crypto.randomUUID(),
-      { reviewNameConflicts: excel, updateExistingMatched: excel });
-    fresh.updates = changedHistoricalUpdates(fresh.updates, existing);
+    const fresh = separateUnchanged(resolveProjectImportRows(pending.rows, existing, () => crypto.randomUUID(),
+      { reviewNameConflicts: excel, updateExistingMatched: excel }), existing);
     if ((!pending.legacy && fresh.errors.length) || fresh.valid.length !== pending.valid.length || fresh.updates.length !== pending.updates.length || fresh.skipped.length !== pending.skipped.length) {
       throw new Error("La lista de proyectos cambió. Selecciona el archivo de nuevo para revisar los centros antes de guardar.");
     }
