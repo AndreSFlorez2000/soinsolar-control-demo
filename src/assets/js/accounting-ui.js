@@ -197,8 +197,9 @@ async function loadBatch() {
   centers = centerRows;
   unified = unifyCostMovements(costEntries, manualRows, window.SOINSOLAR_APP_API.projects());
   projectCenters = projectAccountingCenters(centers, costRows, window.SOINSOLAR_APP_API.projects(), unified.unmatchedManual);
-  const activeProject = window.SOINSOLAR_APP_API.projects().find((item) => item.projectId === window.SOINSOLAR_APP_API.selectedProjectId());
-  const preferredCenter = accountingCenterForProject(projectCenters, activeProject);
+  const filteredProjectId = $("#costFilterProject").value;
+  const activeProject = window.SOINSOLAR_APP_API.projects().find((item) => item.projectId === filteredProjectId);
+  const preferredCenter = accountingCenterForProject(projectCenters, activeProject) || $("#accountingCenter").value;
   $("#accountingExportButton").disabled = !batch || batch.status !== "complete";
   if (displayedCenter !== preferredCenter) $("#accountingParty").value = "";
   renderCenters(preferredCenter);
@@ -356,7 +357,7 @@ function wire() {
   });
   $("#accountingClear").addEventListener("click", () => {
     clearDetailedFilters();
-    const projectId = window.SOINSOLAR_APP_API.selectedProjectId();
+    const projectId = $("#costFilterProject").value;
     const active = window.SOINSOLAR_APP_API.projects().find((row) => row.projectId === projectId);
     const projectCenter = projectCenters.find((row) => active && row.key === centerKey(active.costCenter));
     selectCenter(projectCenter?.costCenter ?? "");

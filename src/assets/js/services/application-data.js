@@ -1,4 +1,4 @@
-import { createDataService } from "./data.js?v=1.18.8";
+import { createDataService } from "./data.js?v=1.18.9";
 import { getCurrentUser, isDemoMode, requireSupabaseClient } from "./supabase.js?v=1.4.0";
 
 export async function createApplicationDataGateway() {
