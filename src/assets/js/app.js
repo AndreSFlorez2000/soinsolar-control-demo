@@ -1,17 +1,18 @@
 import { buildMonthlySeries, calculateDashboardIndicators } from "./domain/dashboard.js?v=1.5.9";
-import { createDashboardUI } from "./dashboard-ui.js?v=1.18.11";
+import { createDashboardUI } from "./dashboard-ui.js?v=1.18.12";
 import { calculateProjectIndicators } from "./domain/project-analytics.js?v=1.4.1";
-import { buildManagementReport, buildMonthlyExecutionReport } from "./domain/reports.js?v=1.18.11";
-import { historicalProjectGroups, managementSummarySheet, monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.18.11";
+import { buildManagementReport, buildMonthlyExecutionReport } from "./domain/reports.js?v=1.18.12";
+import { historicalProjectGroups, managementSummarySheet, monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.18.12";
+import { hasMonthlyActivity, monthlyDisplayCounts, monthlyDisplayRows } from "./domain/monthly-display.js?v=1.18.12";
 import { createXlsx } from "./domain/xlsx-export.js?v=1.5.8";
 import { costWorkbookSheets } from "./domain/cost-workbook.js?v=1.5.8";
 import { canEditExecution } from "./domain/execution.js?v=1.9.0";
-import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=1.18.11";
-import { importedBillingRows, recognizedInvoices } from "./domain/finance-history.js?v=1.18.11";
+import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=1.18.12";
+import { importedBillingRows, recognizedInvoices } from "./domain/finance-history.js?v=1.18.12";
 import { invoicePendingAmount, isSampleProject, payableInvoicesForProject } from "./domain/payment-selection.js?v=1.5.1";
 import { forgetProject, hasProject, recallProject, rememberProject } from "./domain/project-context.js?v=1.8.0";
-import { displayProjectCenter } from "./domain/project-center.js?v=1.18.11";
-import { createApplicationDataGateway } from "./services/application-data.js?v=1.18.11";
+import { displayProjectCenter } from "./domain/project-center.js?v=1.18.12";
+import { createApplicationDataGateway } from "./services/application-data.js?v=1.18.12";
 import { getCurrentSession, isDemoMode, registerAccount, signIn, signOut } from "./services/supabase.js?v=1.13.1";
 
 const loginView = document.querySelector("#loginView");
@@ -1057,6 +1058,14 @@ function renderPeriods() {
   }).join("");
 }
 
+function monthlyMoney(value) {
+  return Number(value) === 0 ? '<span class="monthly-muted">—</span>' : formatCop(value);
+}
+
+function monthlyPercent(value) {
+  return Number(value) === 0 ? '<span class="monthly-muted">—</span>' : formatPercent(value);
+}
+
 function renderMonthly() {
   const reportRows = new Map(buildMonthlyExecutionReport(currentProjects, currentMonthly, allMonthlyRows)
     .map((row) => [`${row.projectId}:${row.year}:${row.month}`, row]));
@@ -1075,52 +1084,87 @@ function renderMonthly() {
       || left.projectName.localeCompare(right.projectName, "es");
   });
   const historicalById = new Map(historicalProjectDetails.map((item) => [item.id, item]));
+  const selectedPeriod = Boolean(document.querySelector("#monthlyFilterPeriod").value);
+  const showQuiet = document.querySelector("#monthlyShowEmpty").checked || selectedPeriod;
+  const counts = monthlyDisplayCounts([...grouped.values()].flat());
+  document.querySelector("#monthlyDisplayCount").textContent =
+    `${showQuiet ? counts.total : counts.activity} de ${counts.total} meses mostrados · ${counts.quiet} sin movimiento${showQuiet ? " visibles" : " ocultos"}. Cada 0 original se puede consultar en el detalle.`;
   document.querySelector("#monthlyRows").innerHTML = orderedProjects.map((projectId) => {
     const months = grouped.get(projectId).sort((a, b) => a.year - b.year || a.month - b.month);
+    const visibleMonths = monthlyDisplayRows(months, {
+      includeQuiet: document.querySelector("#monthlyShowEmpty").checked, selectedPeriod
+    });
     const project = currentProjects.find((item) => item.projectId === projectId);
     const latest = months.at(-1);
     const contract = project?.contractValue ?? latest.contractValue;
-    const summary = reportRows.get(`${latest.projectId}:${latest.year}:${latest.month}`);
     const source = historicalById.get(projectId);
-    const sourceNotes = source && months.some((item) => item.importedHistory)
-      ? `${source.importedFinancialReview ? `<p>Pendiente de revisar: ${escapeHtml(source.importedFinancialReview)}</p>` : ""}${importedFollowupHtml(source)}` : "";
-    const header = `<tr class="monthly-project-heading"><th colspan="15" scope="rowgroup"><div class="monthly-project-summary">
-      <div><strong>${escapeHtml(displayProjectCenter(latest.costCenter))} · ${escapeHtml(latest.projectName)}</strong><small>Centro de costo de Excel / proyecto</small></div>
-      <div><span>Valor de contrato</span><strong>${formatCop(contract)}</strong></div>
-      <div><span>Facturado total del proyecto</span><strong>${formatCop(project?.totalInvoiced ?? summary?.cumulativeInvoiced ?? 0)}</strong></div>
-      <div><span>${summary?.executionRecorded ? "Ejecutado al último mes mostrado (referencia)" : "Avance general Excel (AK)"}</span><strong>${summary?.executionRecorded ? formatCop(summary.cumulativeEquivalent) : source?.importedExecutionSnapshotPercentage == null ? "—" : formatPercent(source.importedExecutionSnapshotPercentage)}</strong></div>
-      <div><span>Recaudado al último mes mostrado</span><strong>${formatCop(summary?.cumulativePaid ?? 0)}</strong></div>
-    </div>${sourceNotes}</th></tr>`;
-    return header + months.map((tracking) => {
-    const payment = reportRows.get(`${tracking.projectId}:${tracking.year}:${tracking.month}`);
-    const locked = tracking.importedHistory || tracking.periodStatus === "cerrado";
-    const canValidate = !locked && tracking.trackingId && tracking.validationStatus !== "validado";
-    const mayEdit = canEditExecution(currentUserProfile);
-    const actions = tracking.trackingId
-      ? `${mayEdit && !locked ? `<button class="table-action" data-action="edit-monthly" data-tracking-id="${tracking.trackingId}">Sumar avance</button>` : ""}${canValidate ? `<button class="table-action success" data-action="validate-monthly" data-tracking-id="${tracking.trackingId}">Validar</button>` : ""}`
-      : mayEdit && !locked ? `<button class="table-action" data-action="new-monthly-preset" data-project-id="${tracking.projectId}" data-period-id="${tracking.periodId}">Registrar avance</button>` : "";
-    const periodAction = locked && !tracking.importedHistory && mayEdit
-      ? `<button class="table-action" data-action="reopen-period" data-period-id="${tracking.periodId}">Reabrir para corregir</button>` : "";
-    const openAction = `<button class="table-action" type="button" data-action="open-project" data-project-id="${escapeHtml(tracking.projectId)}">Abrir ficha</button>`;
-    return `<tr>
-      <td><strong>${escapeHtml(`${monthNames[tracking.month - 1]} ${tracking.year}`)}</strong><br><small>${tracking.importedHistory ? "Excel histórico" : capitalize(tracking.periodStatus)}</small></td>
-      <td>${tracking.monthlyProgressPercentage == null ? "—" : formatPercent(tracking.monthlyProgressPercentage)}</td>
-      <td>${tracking.cumulativeProgressPercentage == null
-        ? tracking.importedExecutionPercentage == null ? "—" : `${formatPercent(tracking.importedExecutionPercentage)}<br><small>Referencia Excel</small>`
-        : formatPercent(tracking.cumulativeProgressPercentage)}</td>
-      <td>${payment?.executionRecorded ? formatCop(payment.cumulativeEquivalent) : "—"}</td>
-      <td>${formatCop(tracking.invoicedValue)}</td>
-      <td>${tracking.importedBillingPercentage == null ? "—" : formatPercent(tracking.importedBillingPercentage)}</td>
-      <td>${formatCop(payment?.cumulativeInvoiced ?? tracking.cumulativeInvoicedValue)}</td>
-      <td>${formatPercent(payment?.cumulativeBilling ?? tracking.cumulativeBillingPercentage)}</td>
-      <td>${formatCop(tracking.paidValue)}</td>
-      <td>${formatCop(payment?.cumulativePaid ?? 0)}</td>
-      <td>${contract > 0 ? formatPercent((payment?.cumulativePaid ?? 0) / contract * 100) : "—"}</td>
-      <td>${formatCop(tracking.costsExpensesValue)}</td>
-      <td>${tracking.executionIssue ? escapeHtml(tracking.executionIssue) : "—"}</td>
-      <td><span class="validation-badge ${tracking.importedHistory ? "borrador" : escapeHtml(tracking.validationStatus || "borrador")}">${tracking.importedHistory ? "Dato del Excel" : escapeHtml(tracking.validationStatus || "sin registro")}</span></td>
-      <td><span class="table-actions">${openAction}${actions || periodAction}</span></td>
-    </tr>`;
+    const sourceContent = source ? importedFollowupHtml(source) : "";
+    const sourceNotes = source && (sourceContent.trim() || source.importedFinancialReview)
+      ? `<details class="monthly-source-details"><summary>Notas, facturas y valores del Excel</summary>${source.importedFinancialReview ? `<p><strong>Por conciliar:</strong> ${escapeHtml(source.importedFinancialReview)}</p>` : ""}${sourceContent}</details>` : "";
+    const executed = project?.executedProgressPercentage ?? source?.importedExecutionSnapshotPercentage;
+    const executionLabel = project?.executionProgressSource === "sistema"
+      ? "Avance registrado" : "Avance general Excel (AK)";
+    const activityCount = months.filter(hasMonthlyActivity).length;
+    const header = `<tr class="monthly-project-heading"><th colspan="8" scope="rowgroup">
+      <div class="monthly-project-summary">
+        <div class="monthly-project-title"><strong>${escapeHtml(displayProjectCenter(latest.costCenter))} · ${escapeHtml(latest.projectName)}</strong><small>${activityCount} mes(es) con datos · ${months.length} periodo(s) disponibles</small></div>
+        <div><span>Contrato</span><strong>${monthlyMoney(contract)}</strong></div>
+        <div><span>Facturado total</span><strong>${monthlyMoney(project?.totalInvoiced ?? 0)}</strong></div>
+        <div><span>${executionLabel}</span><strong>${executed == null ? "—" : formatPercent(executed)}</strong></div>
+        <div><span>Recaudado total</span><strong>${monthlyMoney(project?.totalPaid ?? 0)}</strong></div>
+        <button class="table-action" type="button" data-action="open-project" data-project-id="${escapeHtml(projectId)}">Ver ficha</button>
+      </div>${sourceNotes}</th></tr>`;
+    if (!visibleMonths.length) return header + `<tr class="monthly-no-activity"><td colspan="8">Sin movimientos en los periodos consultados. Puedes mostrar los meses vacíos o registrar un seguimiento.</td></tr>`;
+    return header + visibleMonths.map((tracking) => {
+      const payment = reportRows.get(`${tracking.projectId}:${tracking.year}:${tracking.month}`);
+      const cumulativeBilled = payment?.cumulativeInvoiced ?? tracking.cumulativeInvoicedValue;
+      const cumulativePaid = payment?.cumulativePaid ?? 0;
+      const locked = tracking.importedHistory || tracking.periodStatus === "cerrado";
+      const canValidate = !locked && tracking.trackingId && tracking.validationStatus !== "validado";
+      const mayEdit = canEditExecution(currentUserProfile);
+      const actions = tracking.trackingId
+        ? `${mayEdit && !locked ? `<button class="table-action" data-action="edit-monthly" data-tracking-id="${tracking.trackingId}">Sumar avance</button>` : ""}${canValidate ? `<button class="table-action success" data-action="validate-monthly" data-tracking-id="${tracking.trackingId}">Validar</button>` : ""}`
+        : mayEdit && !locked ? `<button class="table-action" data-action="new-monthly-preset" data-project-id="${tracking.projectId}" data-period-id="${tracking.periodId}">Registrar avance</button>` : "";
+      const periodAction = locked && !tracking.importedHistory && mayEdit
+        ? `<button class="table-action" data-action="reopen-period" data-period-id="${tracking.periodId}">Reabrir para corregir</button>` : "";
+      const advance = tracking.monthlyProgressPercentage != null
+        ? `<strong>${formatPercent(tracking.monthlyProgressPercentage)}</strong><small>Acum. ${formatPercent(tracking.cumulativeProgressPercentage)}</small>`
+        : tracking.importedExecutionPercentage != null
+          ? `<strong>${formatPercent(tracking.importedExecutionPercentage)}</strong><small>AK del Excel · referencia</small>`
+          : '<span class="monthly-muted">—</span>';
+      const billedExcel = tracking.importedBillingPercentage != null
+        && (Number(tracking.invoicedValue) !== 0 || Number(tracking.importedBillingPercentage) !== 0)
+        ? `<small>${formatPercent(tracking.importedBillingPercentage)} Excel</small>` : "";
+      const status = tracking.importedHistory ? "Dato del Excel" : tracking.validationStatus || "sin registro";
+      const detailRows = [
+        ["Ejecución del mes", tracking.monthlyProgressPercentage == null ? "—" : formatPercent(tracking.monthlyProgressPercentage)],
+        ["Ejecución acumulada", tracking.cumulativeProgressPercentage == null ? "—" : formatPercent(tracking.cumulativeProgressPercentage)],
+        ["Equivalente ejecutado", payment?.executionRecorded ? formatCop(payment.cumulativeEquivalent) : "—"],
+        ["Avance general AK", tracking.importedExecutionPercentage == null ? "—" : formatPercent(tracking.importedExecutionPercentage)],
+        ["Facturado del mes", formatCop(tracking.invoicedValue)],
+        ["% facturado Excel", tracking.importedBillingPercentage == null ? "—" : formatPercent(tracking.importedBillingPercentage)],
+        ["Facturado acumulado", formatCop(cumulativeBilled)],
+        ["Facturación %", formatPercent(payment?.cumulativeBilling ?? tracking.cumulativeBillingPercentage)],
+        ["Recaudado del mes", formatCop(tracking.paidValue)],
+        ["Recaudado acumulado", formatCop(cumulativePaid)],
+        ["Recaudo / contrato", contract > 0 ? formatPercent(cumulativePaid / contract * 100) : "—"],
+        ["Costos y gastos", formatCop(tracking.costsExpensesValue)],
+        ["Novedad de ejecución", tracking.executionIssue ? escapeHtml(tracking.executionIssue) : "—"],
+        ["Observaciones", tracking.observations ? escapeHtml(tracking.observations) : "—"],
+        ["Validación", escapeHtml(status)]
+      ];
+      const details = `<details class="monthly-month-details"><summary>Ver todos los datos</summary><dl>${detailRows.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${value}</dd></div>`).join("")}</dl></details>`;
+      const openAction = `<button class="table-action" type="button" data-action="open-project" data-project-id="${escapeHtml(tracking.projectId)}">Abrir ficha</button>`;
+      return `<tr class="monthly-data-row">
+        <td><strong>${escapeHtml(`${monthNames[tracking.month - 1]} ${tracking.year}`)}</strong><small>${tracking.importedHistory ? "Excel histórico" : capitalize(tracking.periodStatus)}</small></td>
+        <td class="monthly-value">${advance}</td>
+        <td class="monthly-value"><strong>${monthlyMoney(tracking.invoicedValue)}</strong>${billedExcel}</td>
+        <td class="monthly-value"><strong>${monthlyMoney(cumulativeBilled)}</strong><small>${monthlyPercent(payment?.cumulativeBilling ?? tracking.cumulativeBillingPercentage)} facturado</small></td>
+        <td class="monthly-value"><strong>${monthlyMoney(tracking.paidValue)}</strong><small>Acum. ${monthlyMoney(cumulativePaid)}</small></td>
+        <td class="monthly-value">${monthlyMoney(tracking.costsExpensesValue)}</td>
+        <td class="monthly-state"><span class="validation-badge ${tracking.importedHistory ? "borrador" : escapeHtml(tracking.validationStatus || "borrador")}">${escapeHtml(status)}</span>${tracking.executionIssue ? `<small class="monthly-issue">${escapeHtml(tracking.executionIssue)}</small>` : ""}${details}</td>
+        <td><span class="table-actions">${openAction}${actions || periodAction}</span></td>
+      </tr>`;
     }).join("");
   }).join("");
   document.querySelector("#monthlyEmpty").hidden = orderedProjects.length > 0;
@@ -1158,11 +1202,11 @@ async function loadMonthlyModule(filters) {
     allMonthlyRows = allRows;
     currentMonthly = shownRows;
     historicalProjectDetails = historicalDetails;
-    document.querySelector("#monthlyCount").textContent = allRows.length;
+    document.querySelector("#monthlyCount").textContent = monthlyDisplayCounts(allRows).activity;
     document.querySelector("#monthlyPendingCount").textContent = allRows.filter((row) => row.trackingId && row.validationStatus !== "validado").length;
     renderPeriods();
     renderMonthly();
-    setMessage(message, shownRows.length ? "Consulta actualizada. Los meses importados del Excel aparecen en la tabla con su origen y porcentaje." : "");
+    setMessage(message, shownRows.length ? "Consulta actualizada. Abre el detalle de un mes o las notas del Excel para ver todas sus cifras." : "");
   } catch (error) {
     setMessage(message, error.message || "No fue posible consultar el seguimiento mensual.", true);
   }
@@ -2150,8 +2194,9 @@ document.querySelector("#reloadProfilesButton").addEventListener("click", loadPr
 document.querySelector("#projectFilters").addEventListener("submit", (event) => { event.preventDefault(); loadProjects(); });
 document.querySelector("#clearProjectFilters").addEventListener("click", () => { document.querySelector("#projectFilters").reset(); loadProjects(); });
 document.querySelector("#monthlyFilters").addEventListener("submit", (event) => { event.preventDefault(); loadMonthlyModule(); });
-document.querySelector("#clearMonthlyFilters").addEventListener("click", () => { document.querySelector("#monthlyFilters").reset(); document.querySelector("#monthlyHistoricalSearch").value = ""; loadMonthlyModule({}); });
+document.querySelector("#clearMonthlyFilters").addEventListener("click", () => { document.querySelector("#monthlyFilters").reset(); document.querySelector("#monthlyHistoricalSearch").value = ""; document.querySelector("#monthlyShowEmpty").checked = false; loadMonthlyModule({}); });
 document.querySelector("#monthlyHistoricalSearch").addEventListener("input", renderMonthly);
+document.querySelector("#monthlyShowEmpty").addEventListener("change", renderMonthly);
 document.querySelector("#financeFilters").addEventListener("submit", (event) => { event.preventDefault(); loadFinance(); });
 document.querySelector("#clearFinanceFilters").addEventListener("click", () => { document.querySelector("#financeFilters").reset(); loadFinance({}); });
 document.addEventListener("soinsolar:accounting-center-selected", (event) => {
