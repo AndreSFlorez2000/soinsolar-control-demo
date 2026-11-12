@@ -18,3 +18,10 @@ export function monthlyDisplayCounts(rows) {
   const activity = rows.filter(hasMonthlyActivity).length;
   return { activity, quiet: rows.length - activity, total: rows.length };
 }
+
+// Las 12 columnas de porcentaje 0 % de la plantilla no forman una cronología
+// de facturación. Quedan disponibles al abrir el detalle del archivo.
+export function historicalMonthVisibility(months = []) {
+  const active = months.filter((row) => Number(row.billed) !== 0 || Number(row.sourcePercent) !== 0);
+  return { active, quiet: months.filter((row) => !active.includes(row)) };
+}

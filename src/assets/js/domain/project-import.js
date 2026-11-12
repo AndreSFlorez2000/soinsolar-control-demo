@@ -1,4 +1,4 @@
-import { projectInputToRecord } from "../data/models.js?v=1.18.13";
+import { projectInputToRecord } from "../data/models.js?v=1.18.14";
 import { parseCostCsv } from "./cost-import.js?v=1.16.0";
 import { centerKey } from "./accounting-projects.js?v=1.16.0";
 
@@ -76,6 +76,16 @@ function powerValue(value) {
   if (!Number.isFinite(power) || power < 0 || power > 999999999.999) throw new Error("potencia inválida");
   if (Math.abs(power * 1000 - Math.round(power * 1000)) > 1e-6) throw new Error("la potencia admite hasta tres decimales");
   return power;
+}
+
+// Solo se asigna potencia cuando el texto trae una cifra y la unidad explícita.
+// kW y kWp se conservan distintos; una cifra sin unidad no se convierte.
+export function extractExcelPower(description) {
+  const matches = [...String(description ?? "").matchAll(/(?<!\d)(\d{1,5}(?:[.,]\d{1,3})?)\s*(kWp|kW|kilovatio\s+pico(?:\s*\(kWp\))?)(?![a-z])/gi)];
+  if (matches.length !== 1) return null;
+  const value = Number(matches[0][1].replace(",", "."));
+  if (!Number.isFinite(value) || value <= 0) return null;
+  return { value, unit: /pico|kwp/i.test(matches[0][2]) ? "kWp" : "kW" };
 }
 
 function contractValue(value) {
@@ -207,6 +217,7 @@ function legacyRows(sheet) {
     if (!name) continue; // Las filas de centros vacíos terminan el bloque anterior.
     const description = String(row[descriptionColumn] ?? "").trim();
     const serviceCode = String(row[descriptionColumn + 1] ?? "").trim();
+    const sourcePower = extractExcelPower(description);
     const monthly = {}, monthlyPercentages = {}, contractComponents = [], review = [];
     const followupNotes = [], invoiceReferences = [];
     const seenInvoices = new Set();
@@ -265,6 +276,7 @@ function legacyRows(sheet) {
       "Nombre del proyecto": name,
       "Municipio": String(row[2] ?? "").trim() || "Sin municipio registrado",
       "Tipo de servicio": ({ SER: "Servicio", SUM: "Suministro", AIU: "Servicio" })[serviceCode.toUpperCase()] || "Servicio por clasificar",
+      "Potencia kWp": sourcePower?.unit === "kWp" ? sourcePower.value : "",
       "Estado": "planeado", // El ESTADO del libro es de facturación, no de ejecución.
       "Observaciones": extras.slice(0, 500),
       "Valor del contrato": row[contractColumn] ?? "",
@@ -283,7 +295,14 @@ function legacyRows(sheet) {
       __invoiceReferences__: invoiceReferences,
       __alternateSnapshots__: [],
       __importedAsOf__: asOf,
-      __financialReview__: review.join(" ")
+      __financialReview__: review.join(" "),
+      __importedDescription__: description,
+      __importedServiceCode__: serviceCode,
+      __importedProjectType__: String(row[descriptionColumn + 2] ?? "").trim(),
+      __importedSourceStatus__: String(row[descriptionColumn + 3] ?? "").trim(),
+      __importedOrderReference__: orderColumn >= 0 ? String(row[orderColumn] ?? "").trim() : "",
+      __importedInvoiceMarker__: invoiceColumn >= 0 ? String(row[invoiceColumn] ?? "").trim() : "",
+      __importedPower__: sourcePower
     });
   }
   return entries;
@@ -494,14 +513,17 @@ export function changedHistoricalUpdates(updates, existingProjects) {
   const fields = ["importedContractValue", "importedBilledTotal", "importedUndatedBilled",
     "importedMonthlyBilled", "importedMonthlyBilledPercentages", "importedContractComponents",
     "importedExecutionSnapshotPercentage", "importedExecutionMonthLabel", "importedFollowupNotes",
-    "importedInvoiceReferences", "importedAlternateSnapshots", "importedAsOf", "importedFinancialReview"];
+    "importedInvoiceReferences", "importedAlternateSnapshots", "importedAsOf", "importedFinancialReview",
+    "importedProjectDescription", "importedServiceCode", "importedProjectType", "importedSourceStatus",
+    "importedOrderReference", "importedInvoiceMarker", "importedPowerValue", "importedPowerUnit"];
   const canonical = (value) => Array.isArray(value) ? value.map(canonical)
     : value && typeof value === "object" ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonical(value[key])]))
     : value === "" || value == null ? null : value;
   const byId = new Map(existingProjects.map((project) => [project.id ?? project.projectId, project]));
   return updates.filter((input) => {
     const existing = byId.get(input.id);
-    return !existing || fields.some((field) => JSON.stringify(canonical(input[field])) !== JSON.stringify(canonical(existing[field])));
+    return !existing || fields.some((field) => Object.hasOwn(input, field)
+      && JSON.stringify(canonical(input[field])) !== JSON.stringify(canonical(existing[field])));
   });
 }
 
@@ -612,6 +634,16 @@ export function resolveProjectImportRows(rows, existingProjects = [], newId = ()
           ? `${row.__sourceSheet__}, fila ${rowNumber}` : "Archivo de proyectos",
         importedFinancialReview: row.__financialReview__ ?? null
       };
+      if (row.__sourceSheet__) Object.assign(input, {
+        importedProjectDescription: row.__importedDescription__ || null,
+        importedServiceCode: row.__importedServiceCode__ || null,
+        importedProjectType: row.__importedProjectType__ || null,
+        importedSourceStatus: row.__importedSourceStatus__ || null,
+        importedOrderReference: row.__importedOrderReference__ || null,
+        importedInvoiceMarker: row.__importedInvoiceMarker__ || null,
+        importedPowerValue: row.__importedPower__?.value ?? null,
+        importedPowerUnit: row.__importedPower__?.unit ?? null
+      });
       if (input.clientName.length > 180 || input.notes.length > 500 || input.contractNumber.length > 80) throw new Error("cliente, contrato u observaciones demasiado largos");
       projectInputToRecord(input, null);
       (matches.length ? updates : valid).push({ rowNumber, ...input });

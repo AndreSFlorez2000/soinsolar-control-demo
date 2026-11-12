@@ -11,7 +11,7 @@
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.18.13" />
+    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.18.14" />
   </head>
   <body>
     <section id="loginView" class="login-shell">
@@ -231,31 +231,43 @@
               <article class="panel">
                 <h4>Información del proyecto</h4>
                 <dl class="project-info-grid">
-                  <div><dt>Cliente</dt><dd id="detailClient">Sin registrar</dd></div>
+                  <div id="detailExcelDescriptionWrap" class="span-2" hidden><dt>Descripción del proyecto en el Excel</dt><dd id="detailExcelDescription">—</dd></div>
+                  <div id="detailClientWrap"><dt>Cliente</dt><dd id="detailClient">Sin registrar</dd></div>
                   <div><dt>Contrato</dt><dd id="detailContractNumber">Sin registrar</dd></div>
-                  <div><dt>Potencia</dt><dd id="detailPower">Sin registrar</dd></div>
-                  <div><dt>Fecha de inicio</dt><dd id="detailStartDate">Sin fecha</dd></div>
-                  <div><dt>Fecha de finalización</dt><dd id="detailEndDate">Sin fecha</dd></div>
-                  <div class="span-2"><dt>Observaciones</dt><dd id="detailNotes">Sin observaciones</dd></div>
+                  <div id="detailPowerWrap"><dt>Potencia</dt><dd id="detailPower">Sin registrar</dd></div>
+                  <div id="detailStartDateWrap"><dt>Fecha de inicio</dt><dd id="detailStartDate">Sin fecha</dd></div>
+                  <div id="detailEndDateWrap"><dt>Fecha de finalización</dt><dd id="detailEndDate">Sin fecha</dd></div>
+                  <div id="detailExcelTypeWrap" hidden><dt>Tipo en el Excel</dt><dd id="detailExcelType">—</dd></div>
+                  <div id="detailExcelStatusWrap" hidden><dt>Estado indicado en el Excel</dt><dd id="detailExcelStatus">—</dd></div>
+                  <div id="detailExcelInvoiceWrap" hidden><dt>Columna N.º FAC del Excel</dt><dd id="detailExcelInvoice">—</dd></div>
+                  <div id="detailExcelOrderWrap" hidden><dt>O.C. / referencia del Excel</dt><dd id="detailExcelOrder">—</dd></div>
+                  <div id="detailNotesWrap" class="span-2"><dt>Observaciones</dt><dd id="detailNotes">Sin observaciones</dd></div>
                 </dl>
+                <p id="detailMissingFields" class="project-missing-fields" hidden></p>
               </article>
             </div>
 
             <article id="detailImportedFinance" class="panel" hidden>
-              <h4>Cifras del Excel histórico</h4>
-              <p id="detailImportedSource"></p>
-              <div class="summary-grid">
-                <div><span>Valor contractual de la fila principal</span><strong id="detailImportedContract">—</strong></div>
-                <div><span>Facturado hasta el corte</span><strong id="detailImportedBilled">—</strong></div>
+              <h4>Seguimiento del Excel</h4>
+              <p id="detailImportedSource" class="source-caption"></p>
+              <p id="detailImportedOverview" class="excel-overview"></p>
+              <div class="summary-grid imported-exceptions">
                 <div id="detailImportedUndatedWrap" hidden><span>Facturado sin mes en la fórmula AI</span><strong id="detailImportedUndated">—</strong></div>
                 <div id="detailImportedPendingWrap" hidden><span>Saldo de AI según el Excel</span><strong id="detailImportedPending">—</strong></div>
-                <div><span>Recaudo registrado con importe</span><strong id="detailImportedPaid">—</strong></div>
-                <div><span>Pago indicado en notas del Excel</span><strong id="detailImportedPaymentStatus">—</strong></div>
+                <div id="detailImportedPaymentStatusWrap" hidden><span>Pago indicado en notas del Excel</span><strong id="detailImportedPaymentStatus">—</strong></div>
               </div>
               <p id="detailImportedReview" hidden></p>
-              <p>Las columnas mensuales dicen «Facturado». Las notas de pago se muestran como referencia: no indican importe y fecha suficientes para sumarlas al recaudo mensual. AI se titula «Pendiente facturar» y sus deducciones sin mes aparecen aparte.</p>
               <div id="detailImportedMonths"></div>
-              <div id="detailImportedFollowup"></div>
+              <details class="excel-source-details"><summary>Ver cifras y notas originales del archivo</summary>
+                <div class="summary-grid">
+                  <div><span>Valor contractual de la fila principal</span><strong id="detailImportedContract">—</strong></div>
+                  <div><span>Facturado hasta el corte</span><strong id="detailImportedBilled">—</strong></div>
+                  <div><span>Recaudo registrado con importe</span><strong id="detailImportedPaid">—</strong></div>
+                </div>
+                <p>Las columnas mensuales indican facturación. AK indica avance general. Las notas de pago sin importe y fecha no se suman como recaudo. AI se titula «Pendiente facturar».</p>
+                <p id="detailOriginalNotes"></p>
+                <div id="detailImportedFollowup"></div>
+              </details>
             </article>
 
             <article class="panel execution-issues-panel">
@@ -938,11 +950,11 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="src/assets/js/config.js?v=1.12.0"></script>
-    <script type="module" src="src/assets/js/app.js?v=1.18.13"></script>
-    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.18.13"></script>
-    <script type="module" src="src/assets/js/accounting-ui.js?v=1.18.13"></script>
-    <script type="module" src="src/assets/js/project-import-ui.js?v=1.18.13"></script>
-    <script type="module" src="src/assets/js/assistant-ui.js?v=1.18.13"></script>
+    <script type="module" src="src/assets/js/app.js?v=1.18.14"></script>
+    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.18.14"></script>
+    <script type="module" src="src/assets/js/accounting-ui.js?v=1.18.14"></script>
+    <script type="module" src="src/assets/js/project-import-ui.js?v=1.18.14"></script>
+    <script type="module" src="src/assets/js/assistant-ui.js?v=1.18.14"></script>
   </body>
 </html>
 

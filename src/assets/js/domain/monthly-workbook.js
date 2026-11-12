@@ -32,9 +32,11 @@ export function historicalWorkbookSheet(projects = [], projectId = "") {
   const groups = historicalProjectGroups(projects, projectId);
   const rows = [];
   for (const { project, months } of groups) {
+    const firstRow = rows.length;
     const notes = (project.importedFollowupNotes ?? []).map((item) =>
       `${item.sheet || "Excel"} fila ${item.row || "?"}: ${item.text}`).join("\n");
-    const references = (project.importedInvoiceReferences ?? []).map((item) => item.reference).join("; ");
+    const references = (project.importedInvoiceReferences ?? [])
+      .map((item) => item.reference).filter((value) => !/^pendiente\s*$/i.test(String(value ?? "").trim())).join("; ");
     const entries = months.length ? months : [{ month: "", billed: null, cumulative: null, sourcePercent: null, calculatedPercent: null }];
     for (const [index, item] of entries.entries()) {
       rows.push([project.costCenter, project.name, project.importedFinancialSource || "Excel histórico",
@@ -71,6 +73,12 @@ export function historicalWorkbookSheet(projects = [], projectId = "") {
           alternate.includedInTotal ? "Otra hoja; meses nuevos incorporados" : "Otra hoja; no sumada"]);
       }
     }
+    for (const [index, row] of rows.slice(firstRow).entries()) row.push(...(index === 0
+      ? [project.importedProjectDescription || "", project.importedServiceCode || "",
+        project.importedProjectType || "", project.importedSourceStatus || "",
+        project.importedOrderReference || "", project.importedInvoiceMarker || "",
+        project.importedPowerValue ?? null, project.importedPowerUnit || ""]
+      : ["", "", "", "", "", "", null, ""]));
   }
   return {
     name: "Histórico del Excel",
@@ -78,15 +86,20 @@ export function historicalWorkbookSheet(projects = [], projectId = "") {
     notes: [
       "El porcentaje facturado del Excel corresponde a la columna % junto a FACTURADO. El porcentaje calculado divide el importe mensual entre el valor contractual principal.",
       "El avance general del Excel se ubica en el mes MES y el año único de los encabezados del libro. No es ejecución mensual validada. Un importe descontado literalmente en AI sin fecha figura en una fila separada.",
-      "Las filas de otras hojas indican si sus meses nuevos ya se incorporaron al acumulado o si son alternativas sin sumar. No se deben sumar otra vez. El archivo no acredita pagos."
+      "Las filas de otras hojas indican si sus meses nuevos ya se incorporaron al acumulado o si son alternativas sin sumar. No se deben sumar otra vez. El archivo no acredita pagos.",
+      "Los datos originales del proyecto y su potencia se muestran en columnas separadas. kW y kWp conservan la unidad que consta en la descripción; no se convierten."
     ],
     headers: ["Centro de costo", "Proyecto", "Hoja / fuente", "Mes facturado", "Contrato principal (COP)",
       "Facturado mes (COP)", "% facturado Excel", "% importe / contrato", "Facturado acumulado (COP)",
       "Facturado al corte (COP)", "Avance ejecución general Excel", "Mes de ejecución (sin año)",
-      "Referencias de factura", "Notas de seguimiento", "Pendiente de revisión", "Procedencia"],
-    types: ["text", "text", "text", "text", "money", "money", "percent", "percent", "money", "money", "percent", "text", "text", "text", "text", "text"],
-    rows, freezeColumns: 2, wrapColumns: [12, 13, 14], tabColor: "8053A0",
-    columnWidths: [18, 36, 32, 17, 23, 23, 20, 22, 27, 26, 27, 23, 32, 55, 55, 24]
+      "Referencias de factura", "Notas de seguimiento", "Pendiente de revisión", "Procedencia",
+      "Descripción del proyecto", "T.S. Excel", "Tipo Excel", "Estado Excel", "O.C. Excel",
+      "Columna N.º FAC", "Potencia Excel", "Unidad potencia"],
+    types: ["text", "text", "text", "text", "money", "money", "percent", "percent", "money", "money", "percent", "text", "text", "text", "text", "text",
+      "text", "text", "text", "text", "text", "text", "number", "text"],
+    rows, freezeColumns: 2, wrapColumns: [12, 13, 14, 16], tabColor: "8053A0",
+    columnWidths: [18, 36, 32, 17, 23, 23, 20, 22, 27, 26, 27, 23, 32, 55, 55, 24,
+      48, 18, 24, 20, 24, 22, 18, 18]
   };
 }
 

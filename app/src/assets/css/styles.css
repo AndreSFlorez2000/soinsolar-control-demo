@@ -301,6 +301,15 @@ button, input, select, textarea { font: inherit; }
 .project-info-grid .span-2 { grid-column: 1 / -1; }
 .project-info-grid dt { margin-bottom: 4px; color: var(--muted); font-size: 11px; font-weight: 700; }
 .project-info-grid dd { margin: 0; overflow-wrap: anywhere; font-size: 13px; font-weight: 650; }
+.project-missing-fields { margin: 18px 0 0; padding: 10px 12px; border-radius: 8px; background: #f4f8fb; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.source-caption { margin: 3px 0 0; color: var(--muted); font-size: 11px; }
+.excel-overview { margin: 16px 0; padding: 14px 17px; border-left: 3px solid var(--blue); border-radius: 7px; background: #f5f9fd; color: var(--text); font-size: 13px; line-height: 1.6; }
+.imported-exceptions { margin: 14px 0 20px; }
+.excel-source-details, .excel-empty-months { margin-top: 15px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.excel-source-details > summary, .excel-empty-months > summary { width: fit-content; color: #245f8b; cursor: pointer; font-weight: 700; }
+.excel-source-details .summary-grid { margin: 15px 0; }
+.excel-source-details p { margin: 12px 0; }
+.excel-month-note { margin: 14px 0 5px; color: var(--muted); font-size: 12px; }
 .project-actions-panel { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-top: 17px; padding: 20px 24px; }
 .project-actions-panel p { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
 .quick-action-grid { display: grid; grid-template-columns: repeat(3, minmax(150px, 1fr)); gap: 10px; }

@@ -1,7 +1,7 @@
 import { planExecutionChange } from "./domain/execution.js?v=1.9.0";
 import { parseCostCsv, resolveCostImportRows } from "./domain/cost-import.js?v=1.5.8";
-import { buildMonthlyExecutionReport } from "./domain/reports.js?v=1.18.13";
-import { historicalWorkbookSheet, monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.18.13";
+import { buildMonthlyExecutionReport } from "./domain/reports.js?v=1.18.14";
+import { historicalWorkbookSheet, monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.18.14";
 import { createXlsx } from "./domain/xlsx-export.js?v=1.5.8";
 
 function api() {

@@ -1,4 +1,4 @@
-import { extractPaymentEvidence } from "../domain/excel-payment-evidence.js?v=1.18.13";
+import { extractPaymentEvidence } from "../domain/excel-payment-evidence.js?v=1.18.14";
 
 export class ValidationError extends Error {
   constructor(message, field) {
@@ -160,7 +160,15 @@ export function normalizeProject(record) {
     importedAlternateSnapshots: record.imported_alternate_snapshots || [],
     importedAsOf: record.imported_as_of || null,
     importedFinancialSource: record.imported_financial_source || null,
-    importedFinancialReview: record.imported_financial_review || null
+    importedFinancialReview: record.imported_financial_review || null,
+    importedProjectDescription: record.imported_project_description || null,
+    importedServiceCode: record.imported_service_code || null,
+    importedProjectType: record.imported_project_type || null,
+    importedSourceStatus: record.imported_source_status || null,
+    importedOrderReference: record.imported_order_reference || null,
+    importedInvoiceMarker: record.imported_invoice_marker || null,
+    importedPowerValue: record.imported_power_value == null ? null : Number(record.imported_power_value),
+    importedPowerUnit: record.imported_power_unit || null
   });
 }
 
@@ -415,6 +423,27 @@ export function projectInputToRecord(input, userId) {
     record.imported_as_of = input.importedAsOf ? assertDate(input.importedAsOf, "corte de facturación") : null;
     record.imported_financial_source = input.importedFinancialSource || null;
     record.imported_financial_review = input.importedFinancialReview || null;
+    for (const [field, column, max] of [
+      ["importedProjectDescription", "imported_project_description", 500],
+      ["importedServiceCode", "imported_service_code", 80],
+      ["importedProjectType", "imported_project_type", 120],
+      ["importedSourceStatus", "imported_source_status", 80],
+      ["importedOrderReference", "imported_order_reference", 180],
+      ["importedInvoiceMarker", "imported_invoice_marker", 120]
+    ]) {
+      if (Object.hasOwn(input, field)) {
+        const value = String(input[field] ?? "").trim();
+        record[column] = value ? assertText(value, field, { min: 1, max }) : null;
+      }
+    }
+    if (Object.hasOwn(input, "importedPowerValue")) {
+      record.imported_power_value = input.importedPowerValue == null ? null : assertPower(input.importedPowerValue);
+      record.imported_power_unit = input.importedPowerUnit == null ? null
+        : assertEnum(input.importedPowerUnit, ["kW", "kWp"], "unidad de potencia del Excel");
+      if ((record.imported_power_value == null) !== (record.imported_power_unit == null)) {
+        throw new ValidationError("La potencia del Excel necesita su unidad explícita.", "importedPowerUnit");
+      }
+    }
   }
   return record;
 }
