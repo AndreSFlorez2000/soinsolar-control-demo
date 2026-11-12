@@ -36,8 +36,8 @@ export function buildManagementReport(projects = []) {
       paid,
       costsExpenses,
       contractualBalance: Math.max(contractValue - invoiced, 0),
-      // El histórico facturado no acredita recaudo. La vista de base calcula
-      // cartera solo sobre facturas formales; no inventar deuda del Excel.
+      // La cartera formal solo incluye facturas del sistema. El recaudo
+      // histórico se conserva aparte de los pagos con comprobante.
       paymentPending: project.paymentPending == null
         ? Math.max(invoiced - paid, 0) : amount(project.paymentPending),
       financialProgress: percentage(invoiced, contractValue),
@@ -140,6 +140,7 @@ export function buildMonthlyExecutionReport(projects = [], monthlyRows = [], all
         monthlyBilling: Number(row.monthlyBillingPercentage ?? 0),
         cumulativeBilling: contractValue > 0 ? Math.round(cumulativeInvoiced / contractValue * 10000) / 100 : 0,
         monthlyPaid: amount(row.paidValue),
+        collectionRecorded: !row.importedHistory || row.importedCollectedValue != null || amount(row.paidValue) > 0,
         cumulativePaid,
         monthlyCosts: amount(row.costsExpensesValue),
         cumulativeCosts: running?.costs ?? amount(row.costsExpensesValue),

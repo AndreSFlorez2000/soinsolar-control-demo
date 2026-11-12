@@ -20,6 +20,8 @@ export function historicalProjectGroups(projects = [], projectId = "") {
           cumulative = Math.round((cumulative + billed) * 100) / 100;
           const sourcePercent = project.importedMonthlyBilledPercentages?.[month];
           return { month, billed, cumulative,
+            collected: project.importedMonthlyCollected?.[month] == null
+              ? null : Number(project.importedMonthlyCollected[month]),
             sourcePercent: sourcePercent == null ? null : Number(sourcePercent),
             calculatedPercent: Number(project.importedContractValue) > 0
               ? billed / Number(project.importedContractValue) * 100 : null };
@@ -50,11 +52,11 @@ export function historicalWorkbookSheet(projects = [], projectId = "") {
         index === 0 ? references : "", index === 0 ? notes : "",
         index === 0 ? project.importedFinancialReview || "" : "", "Fila principal"]);
     }
-    if (Number(project.importedUndatedBilled) > 0) rows.push([
+    if (Number(project.importedUndatedBilled) > 0 || Number(project.importedUndatedCollected) > 0) rows.push([
       project.costCenter, project.name, project.importedFinancialSource || "Excel histórico",
-      "Sin mes identificado", project.importedContractValue ?? null, Number(project.importedUndatedBilled),
+      "Sin mes identificado", project.importedContractValue ?? null, Number(project.importedUndatedBilled) || null,
       null, null, project.importedBilledTotal ?? null, project.importedBilledTotal ?? null,
-      null, "", "", "", "Importe descontado literalmente en AI; fecha por conciliar", "Fórmula AI; sin mes"
+      null, "", "", "", "Importe sin periodo; fecha por conciliar", "Excel; sin mes"
     ]);
     for (const alternate of project.importedAlternateSnapshots ?? []) {
       const altMonths = [...new Set([...Object.keys(alternate.monthlyBilled ?? {}),
@@ -73,12 +75,19 @@ export function historicalWorkbookSheet(projects = [], projectId = "") {
           alternate.includedInTotal ? "Otra hoja; meses nuevos incorporados" : "Otra hoja; no sumada"]);
       }
     }
-    for (const [index, row] of rows.slice(firstRow).entries()) row.push(...(index === 0
+    for (const [index, row] of rows.slice(firstRow).entries()) {
+      row.push(...(index === 0
       ? [project.importedProjectDescription || "", project.importedServiceCode || "",
         project.importedProjectType || "", project.importedSourceStatus || "",
         project.importedOrderReference || "", project.importedInvoiceMarker || "",
         project.importedPowerValue ?? null, project.importedPowerUnit || ""]
       : ["", "", "", "", "", "", null, ""]));
+      row.push(index === 0 ? project.importedCollectedTotal ?? null : null,
+        row[15] === "Fila principal" ? project.importedMonthlyCollected?.[row[3]] ?? null : null,
+        row[15] === "Excel; sin mes" ? project.importedUndatedCollected ?? null : null,
+        index === 0 ? project.importedCollectionBasis || "" : "",
+        index === 0 ? project.importedCollectionReview || "" : "");
+    }
   }
   return {
     name: "Histórico del Excel",
@@ -86,7 +95,8 @@ export function historicalWorkbookSheet(projects = [], projectId = "") {
     notes: [
       "El porcentaje facturado del Excel corresponde a la columna % junto a FACTURADO. El porcentaje calculado divide el importe mensual entre el valor contractual principal.",
       "El avance general del Excel se ubica en el mes MES y el año único de los encabezados del libro. No es ejecución mensual validada. Un importe descontado literalmente en AI sin fecha figura en una fila separada.",
-      "Las filas de otras hojas indican si sus meses nuevos ya se incorporaron al acumulado o si son alternativas sin sumar. No se deben sumar otra vez. El archivo no acredita pagos.",
+      "El recaudo se carga con el criterio de SOINSOLAR para este libro. Las notas de pago sin mes se muestran en el total sin distribuirlas entre meses; una nota pendiente prevalece sobre un ajuste sin mes de AI.",
+      "Las filas de otras hojas indican si sus meses nuevos ya se incorporaron al acumulado o si son alternativas sin sumar. No se deben sumar otra vez.",
       "Los datos originales del proyecto y su potencia se muestran en columnas separadas. kW y kWp conservan la unidad que consta en la descripción; no se convierten."
     ],
     headers: ["Centro de costo", "Proyecto", "Hoja / fuente", "Mes facturado", "Contrato principal (COP)",
@@ -94,12 +104,13 @@ export function historicalWorkbookSheet(projects = [], projectId = "") {
       "Facturado al corte (COP)", "Avance ejecución general Excel", "Mes de ejecución (sin año)",
       "Referencias de factura", "Notas de seguimiento", "Pendiente de revisión", "Procedencia",
       "Descripción del proyecto", "T.S. Excel", "Tipo Excel", "Estado Excel", "O.C. Excel",
-      "Columna N.º FAC", "Potencia Excel", "Unidad potencia"],
+      "Columna N.º FAC", "Potencia Excel", "Unidad potencia", "Recaudado al corte Excel (COP)",
+      "Recaudado mes Excel (COP)", "Recaudo sin mes Excel (COP)", "Base del recaudo", "Revisión recaudo"],
     types: ["text", "text", "text", "text", "money", "money", "percent", "percent", "money", "money", "percent", "text", "text", "text", "text", "text",
-      "text", "text", "text", "text", "text", "text", "number", "text"],
-    rows, freezeColumns: 2, wrapColumns: [12, 13, 14, 16], tabColor: "8053A0",
+      "text", "text", "text", "text", "text", "text", "number", "text", "money", "money", "money", "text", "text"],
+    rows, freezeColumns: 2, wrapColumns: [12, 13, 14, 16, 27, 28], tabColor: "8053A0",
     columnWidths: [18, 36, 32, 17, 23, 23, 20, 22, 27, 26, 27, 23, 32, 55, 55, 24,
-      48, 18, 24, 20, 24, 22, 18, 18]
+      48, 18, 24, 20, 24, 22, 18, 18, 26, 25, 26, 55, 50]
   };
 }
 
@@ -142,7 +153,7 @@ export function monthlyWorkbookSheets(rows = []) {
     });
     const group = groups.get(key);
     group.months[row.month - 1] = row.monthlyProgress / 100;
-    group.paymentMonths[row.month - 1] = row.monthlyPaid;
+    group.paymentMonths[row.month - 1] = row.collectionRecorded === false ? null : row.monthlyPaid;
     if (row.month >= group.last.month) group.last = row;
   }
 
@@ -176,7 +187,7 @@ export function monthlyWorkbookSheets(rows = []) {
       notes: [
         "Lee F → G → H: avance anterior 15 %; avance actual 50 %; diferencia de octubre = 35 p.p. (puntos porcentuales). H se recalcula en Excel como (G − F) × 100.",
         "El valor equivalente del mes = contrato × H ÷ 100. Es una referencia física: no es una factura, un pago ni un costo.",
-        "Facturado y recaudo registrado son movimientos distintos. Los acumulados suman los periodos anteriores. El Excel histórico no confirma importes ni fechas de recaudo.",
+        "Facturado y recaudo registrado son movimientos distintos. Los importes del Excel se importan según el criterio de SOINSOLAR; los pagos sin mes no se asignan a un periodo.",
         "Sin registro físico: 0 p.p. consignados no equivale a una verificación de obra sin avance. Los meses del Excel muestran su facturación y avance general en columnas propias; ese avance aún no está validado."
       ],
       headers: [
@@ -199,7 +210,9 @@ export function monthlyWorkbookSheets(rows = []) {
         row.contractValue, row.previousProgress / 100, row.cumulativeProgress / 100,
         row.monthlyProgress, row.monthlyEquivalent, row.cumulativeEquivalent,
         row.monthlyInvoiced, row.cumulativeInvoiced, row.monthlyBilling / 100, row.cumulativeBilling / 100,
-        row.monthlyPaid, row.cumulativePaid, row.monthlyCosts, row.cumulativeCosts,
+        row.collectionRecorded === false ? null : row.monthlyPaid,
+        row.collectionRecorded === false && !row.cumulativePaid ? null : row.cumulativePaid,
+        row.monthlyCosts, row.cumulativeCosts,
         row.receivable, row.contractBalance,
         row.executionRecorded ? "Avance registrado" : row.importedExecutionPercentage == null
           ? "Sin seguimiento físico" : "Referencia Excel sin validar",
@@ -235,18 +248,20 @@ export function monthlyWorkbookSheets(rows = []) {
       title: "Pagos registrados mes a mes",
       notes: [
         "$0: periodo incluido sin pagos. Celda vacía: periodo fuera de esta exportación.",
-        "Pagado en el año suma los meses incluidos; pagado acumulado incluye también los años anteriores hasta el último periodo mostrado."
+      "Pagado en el año suma los meses identificados; pagado acumulado con mes incluye también los años anteriores. El recaudo sin mes está en Histórico del Excel y en el resumen del proyecto."
       ],
       headers: [
         "Centro de costo", "Proyecto", "Año", ...monthNames,
-        "Último mes incluido", "Pagado en el año (COP)", "Pagado acumulado (COP)"
+        "Último mes incluido", "Pagado en el año (COP)", "Pagado acumulado con mes (COP)"
       ],
       types: ["text", "text", "number", ...monthNames.map(() => "money0"), "text", "money0", "money0"],
       rows: [...groups.values()]
         .sort((a, b) => a.project.projectName.localeCompare(b.project.projectName, "es") || a.project.year - b.project.year)
         .map(({ project, paymentMonths, last }) => [
           project.costCenter, project.projectName, project.year, ...paymentMonths,
-          monthNames[last.month - 1], paymentMonths.reduce((sum, value) => sum + (value ?? 0), 0), last.cumulativePaid
+          monthNames[last.month - 1], paymentMonths.every((value) => value == null)
+            ? null : paymentMonths.reduce((sum, value) => sum + (value ?? 0), 0),
+          paymentMonths.every((value) => value == null) && !last.cumulativePaid ? null : last.cumulativePaid
         ]),
       freezeColumns: 3,
       highlightColumns: [16, 17],

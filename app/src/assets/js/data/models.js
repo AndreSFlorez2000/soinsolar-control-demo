@@ -1,4 +1,4 @@
-import { extractPaymentEvidence } from "../domain/excel-payment-evidence.js?v=1.18.14";
+import { extractPaymentEvidence } from "../domain/excel-payment-evidence.js?v=1.18.15";
 
 export class ValidationError extends Error {
   constructor(message, field) {
@@ -145,6 +145,11 @@ export function normalizeProject(record) {
     notes: record.notes || null,
     importedContractValue: record.imported_contract_value == null ? null : Number(record.imported_contract_value),
     importedBilledTotal: record.imported_billed_total == null ? null : Number(record.imported_billed_total),
+    importedCollectedTotal: record.imported_collected_total == null ? null : Number(record.imported_collected_total),
+    importedMonthlyCollected: record.imported_monthly_collected || {},
+    importedUndatedCollected: Number(record.imported_undated_collected ?? 0),
+    importedCollectionBasis: record.imported_collection_basis || null,
+    importedCollectionReview: record.imported_collection_review || null,
     importedUndatedBilled: Number(record.imported_undated_billed ?? 0),
     importedPendingToInvoice: record.imported_pending_to_invoice == null ? null : Number(record.imported_pending_to_invoice),
     importedPendingPercentage: record.imported_pending_percentage == null ? null : Number(record.imported_pending_percentage),
@@ -267,6 +272,8 @@ export function normalizeMonthlySummary(record) {
       (contractValue > 0 ? (cumulativeInvoicedValue / contractValue) * 100 : 0)
     ),
     importedBilledValue: signedMoney(record.imported_billed_value ?? 0, "facturado del Excel"),
+    importedCollectedValue: record.imported_collected_value == null ? null
+      : assertMoney(record.imported_collected_value, "recaudo del Excel"),
     importedBillingPercentage: record.imported_billing_percentage == null
       ? null : Number(record.imported_billing_percentage),
     importedExecutionPercentage: record.imported_execution_percentage == null
@@ -405,6 +412,14 @@ export function projectInputToRecord(input, userId) {
       throw new ValidationError("El facturado importado es inválido.", "importedBilledTotal");
     }
     record.imported_billed_total = Math.round(billed * 100) / 100;
+    if (Object.hasOwn(input, "importedCollectedTotal")) {
+      record.imported_collected_total = input.importedCollectedTotal == null ? null
+        : assertMoney(input.importedCollectedTotal, "recaudo histórico");
+      record.imported_monthly_collected = input.importedMonthlyCollected || {};
+      record.imported_undated_collected = assertMoney(input.importedUndatedCollected ?? 0, "recaudo sin mes");
+      record.imported_collection_basis = input.importedCollectionBasis || null;
+      record.imported_collection_review = input.importedCollectionReview || null;
+    }
     record.imported_undated_billed = assertMoney(input.importedUndatedBilled ?? 0, "facturado sin mes");
     record.imported_pending_to_invoice = input.importedPendingToInvoice == null
       ? null : signedMoney(input.importedPendingToInvoice, "pendiente facturar Excel");

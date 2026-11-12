@@ -1,6 +1,7 @@
-import { projectInputToRecord } from "../data/models.js?v=1.18.14";
+import { projectInputToRecord } from "../data/models.js?v=1.18.15";
 import { parseCostCsv } from "./cost-import.js?v=1.16.0";
 import { centerKey } from "./accounting-projects.js?v=1.16.0";
+import { deriveHistoricalCollection } from "./excel-payment-evidence.js?v=1.18.15";
 
 export const PROJECT_IMPORT_HEADERS = Object.freeze([
   "Centro de costo", "Nombre del proyecto", "Municipio", "Tipo de servicio",
@@ -417,6 +418,11 @@ export function extractLegacyProjectRows(sheets) {
     rows.push(provisionalize(other, "La hoja auxiliar usa este centro para un nombre diferente."));
   }
   const alternate = all.find(({ sheet }) => sheet.name.toUpperCase() === "AVANCE DE PROYECTOS AGOSTO")?.rows ?? [];
+  // Junio conserva algunos pagos que la hoja principal no repite. Solo sirven
+  // como evidencia subsidiaria cuando no hay otra nota de pago y el proyecto
+  // aún no tiene anticipos mensuales en las hojas usadas para el acumulado.
+  const juneSheet = sheets.find((sheet) => sheet.name.toUpperCase() === "AVANCE PROYECTOS JUNIO");
+  const juneRows = juneSheet ? legacyRows(juneSheet) : [];
   for (const row of rows) {
     if (row.__sourceSheet__ === primary.name && primary.name.toUpperCase() === "PROYECTOS FV") {
       const formula = primary.aiFormulas?.[row.__rowNum__ + 1] ?? "";
@@ -489,6 +495,14 @@ export function extractLegacyProjectRows(sheets) {
           row.__financialReview__ += " Otra hoja del libro contiene cifras distintas para este centro; conciliar ambas versiones.";
         }
       }
+      if (!row["Facturado acumulado"] && !row.__followupNotes__.some((note) => /pago|pag[oó]|cobrar|recibi[oó]/i.test(note.text))) {
+        const older = juneRows.filter((item) => item["Centro de costo"] === (row.__sourceCostCenter__ ?? row["Centro de costo"])
+          && headerKey(item["Nombre del proyecto"]) === headerKey(row["Nombre del proyecto"]));
+        if (older.length === 1) {
+          const olderNotes = older[0].__followupNotes__.filter((note) => /pago|pag[oó]|cobrar|recibi[oó]/i.test(note.text));
+          row.__followupNotes__.unshift(...olderNotes);
+        }
+      }
     }
     const value = contractValue(row["Valor del contrato"]);
     const mismatches = Object.entries(row.__monthlyBilled__).filter(([month, amount]) =>
@@ -511,6 +525,7 @@ export function parseProjectCsv(text) {
 // AI/AJ se dejan fuera de esta actualización hasta conciliar su significado.
 export function changedHistoricalUpdates(updates, existingProjects) {
   const fields = ["importedContractValue", "importedBilledTotal", "importedUndatedBilled",
+    "importedCollectedTotal", "importedMonthlyCollected", "importedUndatedCollected", "importedCollectionBasis", "importedCollectionReview",
     "importedMonthlyBilled", "importedMonthlyBilledPercentages", "importedContractComponents",
     "importedExecutionSnapshotPercentage", "importedExecutionMonthLabel", "importedFollowupNotes",
     "importedInvoiceReferences", "importedAlternateSnapshots", "importedAsOf", "importedFinancialReview",
@@ -597,6 +612,9 @@ export function resolveProjectImportRows(rows, existingProjects = [], newId = ()
       const references = row.__invoiceReferences__ ?? String(field(values, columns.invoiceReferences)).split("\n")
         .map((reference) => reference.trim()).filter(Boolean)
         .map((reference) => ({ sheet: "Archivo de proyectos", row: rowNumber, reference }));
+      const collection = row.__sourceSheet__ ? deriveHistoricalCollection({
+        contractValue: importedValue, billedTotal: billed.total, monthlyBilled: billed.monthly, notes: followup
+      }) : null;
       const notes = [sourceNotes, row.__sourceCostCenter__ && `Centro A original: ${row.__sourceCostCenter__}; código provisional`,
         importedNumber && !/Contrato en archivo:/i.test(sourceNotes)
           ? `Contrato en archivo: ${importedNumber}` : ""
@@ -618,6 +636,11 @@ export function resolveProjectImportRows(rows, existingProjects = [], newId = ()
         sourceSheet: row.__sourceSheet__ ?? "",
         importedContractValue: importedValue,
         importedBilledTotal: billed.total,
+        ...(collection ? { importedCollectedTotal: collection.collectedTotal,
+          importedMonthlyCollected: collection.monthlyCollected,
+          importedUndatedCollected: collection.undatedCollected,
+          importedCollectionBasis: collection.basis,
+          importedCollectionReview: collection.review } : {}),
         importedUndatedBilled: billed.undated,
         importedPendingToInvoice: row.__sourcePendingToInvoice__ ?? null,
         importedPendingPercentage: row.__sourcePendingPercentage__ ?? null,

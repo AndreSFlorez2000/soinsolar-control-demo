@@ -11,7 +11,7 @@
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.18.14" />
+    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.18.15" />
   </head>
   <body>
     <section id="loginView" class="login-shell">
@@ -256,15 +256,16 @@
                 <div id="detailImportedPendingWrap" hidden><span>Saldo de AI según el Excel</span><strong id="detailImportedPending">—</strong></div>
                 <div id="detailImportedPaymentStatusWrap" hidden><span>Pago indicado en notas del Excel</span><strong id="detailImportedPaymentStatus">—</strong></div>
               </div>
+              <p id="detailImportedCollectionBasis" class="source-caption"></p>
               <p id="detailImportedReview" hidden></p>
               <div id="detailImportedMonths"></div>
               <details class="excel-source-details"><summary>Ver cifras y notas originales del archivo</summary>
                 <div class="summary-grid">
                   <div><span>Valor contractual de la fila principal</span><strong id="detailImportedContract">—</strong></div>
                   <div><span>Facturado hasta el corte</span><strong id="detailImportedBilled">—</strong></div>
-                  <div><span>Recaudo registrado con importe</span><strong id="detailImportedPaid">—</strong></div>
+                  <div><span>Recaudo histórico según Excel</span><strong id="detailImportedPaid">—</strong></div>
                 </div>
-                <p>Las columnas mensuales indican facturación. AK indica avance general. Las notas de pago sin importe y fecha no se suman como recaudo. AI se titula «Pendiente facturar».</p>
+                <p>Las columnas mensuales indican facturación y los anticipos que SOINSOLAR considera recibidos. AK indica el avance de ejecución. Las notas sin fecha se muestran como recaudo sin mes. AI se titula «Pendiente facturar».</p>
                 <p id="detailOriginalNotes"></p>
                 <div id="detailImportedFollowup"></div>
               </details>
@@ -950,11 +951,11 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="src/assets/js/config.js?v=1.12.0"></script>
-    <script type="module" src="src/assets/js/app.js?v=1.18.14"></script>
-    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.18.14"></script>
-    <script type="module" src="src/assets/js/accounting-ui.js?v=1.18.14"></script>
-    <script type="module" src="src/assets/js/project-import-ui.js?v=1.18.14"></script>
-    <script type="module" src="src/assets/js/assistant-ui.js?v=1.18.14"></script>
+    <script type="module" src="src/assets/js/app.js?v=1.18.15"></script>
+    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.18.15"></script>
+    <script type="module" src="src/assets/js/accounting-ui.js?v=1.18.15"></script>
+    <script type="module" src="src/assets/js/project-import-ui.js?v=1.18.15"></script>
+    <script type="module" src="src/assets/js/assistant-ui.js?v=1.18.15"></script>
   </body>
 </html>
 
