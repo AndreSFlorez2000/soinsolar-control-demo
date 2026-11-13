@@ -1,5 +1,5 @@
-import { PROJECT_IMPORT_HEADERS, changedHistoricalUpdates, extractLegacyProjectRows, parseProjectCsv, referencedContractValue, resolveProjectImportRows } from "./domain/project-import.js?v=1.18.19";
-import { displayProjectCenter } from "./domain/project-center.js?v=1.18.19";
+import { PROJECT_IMPORT_HEADERS, changedHistoricalUpdates, extractLegacyProjectRows, parseProjectCsv, referencedContractValue, resolveProjectImportRows } from "./domain/project-import.js?v=1.18.20";
+import { displayProjectCenter } from "./domain/project-center.js?v=1.18.20";
 import { createXlsx } from "./domain/xlsx-export.js?v=1.17.0";
 
 const $ = (selector) => document.querySelector(selector);
@@ -51,7 +51,7 @@ async function readRows(file) {
     return { rows: window.XLSX.utils.sheet_to_json(book.Sheets[book.SheetNames[0]],
       { defval: "", blankrows: false, raw: true }), issues: [], legacy: false };
   }
-  const names = book.SheetNames.filter((name) => /^PROYECTOS FV$|^AVANCE DE PROYECTOS|^PENDEINTE 2024$|^PENDIENTE 2024$|^OTROS$|^VISITAS Y OTROS$/i.test(name));
+  const names = book.SheetNames.filter((name) => /^PROYECTOS FV$|^AVANCE DE PROYECTOS|^AVANCE PROYECTOS JUNIO$|^PENDEINTE 2024$|^PENDIENTE 2024$|^OTROS$|^VISITAS Y OTROS$/i.test(name));
   const sheets = names.map((name) => ({ name, rows: window.XLSX.utils.sheet_to_json(book.Sheets[name],
     { header: 1, defval: "", blankrows: true, raw: true }),
     aiFormulas: Object.fromEntries(Object.entries(book.Sheets[name]).filter(([address, cell]) =>

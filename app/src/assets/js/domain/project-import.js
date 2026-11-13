@@ -1,7 +1,7 @@
-import { projectInputToRecord } from "../data/models.js?v=1.18.19";
+import { projectInputToRecord } from "../data/models.js?v=1.18.20";
 import { parseCostCsv } from "./cost-import.js?v=1.16.0";
 import { centerKey } from "./accounting-projects.js?v=1.16.0";
-import { deriveHistoricalCollection } from "./excel-payment-evidence.js?v=1.18.19";
+import { deriveHistoricalCollection } from "./excel-payment-evidence.js?v=1.18.20";
 
 export const PROJECT_IMPORT_HEADERS = Object.freeze([
   "Centro de costo", "Nombre del proyecto", "Municipio", "Tipo de servicio",
@@ -120,6 +120,7 @@ const projectCenter = (value) => {
 export function provisionalExcelCenter(sourceCenter, sheet, rowNumber) {
   const tag = /^PROYECTOS FV$/i.test(sheet) ? "FV"
     : /^AVANCE DE PROYECTOS/i.test(sheet) ? "AGO"
+      : /^AVANCE PROYECTOS JUNIO$/i.test(sheet) ? "JUN"
       : /^VISITAS Y OTROS$/i.test(sheet) ? "VIS" : "AUX";
   return `${sourceCenter}-EXCEL-${tag}${rowNumber}`;
 }
@@ -462,11 +463,32 @@ export function extractLegacyProjectRows(sheets) {
     rows.push(provisionalize(other, "La hoja auxiliar usa este centro para un nombre diferente."));
   }
   const alternate = all.find(({ sheet }) => sheet.name.toUpperCase() === "AVANCE DE PROYECTOS AGOSTO")?.rows ?? [];
+  // Junio puede contener una ficha independiente cuyo centro fue reutilizado
+  // después. Exigir municipio distinto, contrato y facturas evita duplicar una
+  // variante de nombre o una fila vacía de una versión anterior.
+  const juneSheet = sheets.find((sheet) => sheet.name.toUpperCase() === "AVANCE PROYECTOS JUNIO");
+  const juneRows = juneSheet ? legacyRows(juneSheet) : [];
+  for (const other of juneRows) {
+    const name = headerKey(other["Nombre del proyecto"]);
+    if (rows.some((row) => headerKey(row["Nombre del proyecto"]) === name)) continue;
+    const sameCenter = rows.filter((row) =>
+      (row.__sourceCostCenter__ ?? row["Centro de costo"]) === other["Centro de costo"]);
+    if (!sameCenter.length || !Number(other["Valor del contrato"]) ||
+      Number(other["Facturado acumulado"]) <= 0 ||
+      !sameCenter.every((row) => headerKey(row["Municipio"]) !== headerKey(other["Municipio"]))) continue;
+    const overlappingMonths = Object.entries(other.__monthlyBilled__).filter(([month, amount]) =>
+      sameCenter.some((row) => Math.abs(Number(row.__monthlyBilled__[month]) - Number(amount)) <= 0.01))
+      .map(([month]) => month);
+    rows.push(provisionalize(other, "Junio registra otro proyecto y el centro se reutiliza en la hoja principal."));
+    if (overlappingMonths.length) other.__financialReview__ +=
+      ` El mismo centro presenta un importe mensual igual en otro proyecto (${overlappingMonths.join(", ")}); verificar si corresponde a la misma factura antes de consolidar ambos.`;
+    issues.push({ costCenter: other.__sourceCostCenter__, rowNumber: other.__rowNum__ + 1,
+      sourceSheet: other.__sourceSheet__,
+      reason: `«${other["Nombre del proyecto"]}» cargado como ${other["Centro de costo"]}; confirmar el centro definitivo.` });
+  }
   // Junio conserva algunos pagos que la hoja principal no repite. Solo sirven
   // como evidencia subsidiaria cuando no hay otra nota de pago y el proyecto
   // aún no tiene anticipos mensuales en las hojas usadas para el acumulado.
-  const juneSheet = sheets.find((sheet) => sheet.name.toUpperCase() === "AVANCE PROYECTOS JUNIO");
-  const juneRows = juneSheet ? legacyRows(juneSheet) : [];
   for (const row of rows) {
     if (row.__sourceSheet__ === primary.name && primary.name.toUpperCase() === "PROYECTOS FV") {
       const formula = primary.aiFormulas?.[row.__rowNum__ + 1] ?? "";
@@ -517,8 +539,15 @@ export function extractLegacyProjectRows(sheets) {
         === (row.__sourceCostCenter__ ?? row["Centro de costo"]));
       const originalName = headerKey(row["Nombre del proyecto"]);
       const exact = sameCenter.filter((other) => headerKey(other["Nombre del proyecto"]) === originalName);
-      const matches = exact.length ? exact : sameCenter.filter((other) =>
-        headerKey(other["Nombre del proyecto"]).startsWith(`${originalName}_`));
+      const matches = exact.length ? exact : sameCenter.filter((other) => {
+        const name = headerKey(other["Nombre del proyecto"]);
+        if (name.startsWith(`${originalName}_`)) return true;
+        return name.length >= 10 && originalName.startsWith(`${name}_`)
+          && Number(other["Valor del contrato"]) > 0
+          && Math.abs(Number(other["Valor del contrato"]) - Number(row["Valor del contrato"])) <= 1
+          && headerKey(other["Municipio"]) === headerKey(row["Municipio"])
+          && headerKey(other.__importedDescription__) === headerKey(row.__importedDescription__);
+      });
       if (matches.length === 1) {
         const other = matches[0];
         const previousExecution = row.__executionSnapshotPercentage__;
