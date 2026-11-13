@@ -1,7 +1,7 @@
-import { projectInputToRecord } from "../data/models.js?v=1.18.18";
+import { projectInputToRecord } from "../data/models.js?v=1.18.19";
 import { parseCostCsv } from "./cost-import.js?v=1.16.0";
 import { centerKey } from "./accounting-projects.js?v=1.16.0";
-import { deriveHistoricalCollection } from "./excel-payment-evidence.js?v=1.18.18";
+import { deriveHistoricalCollection } from "./excel-payment-evidence.js?v=1.18.19";
 
 export const PROJECT_IMPORT_HEADERS = Object.freeze([
   "Centro de costo", "Nombre del proyecto", "Municipio", "Tipo de servicio",
@@ -142,6 +142,37 @@ const lastDayOfMonth = (month) => {
   const [year, number] = month.split("-").map(Number);
   return new Date(Date.UTC(year, number, 0)).toISOString().slice(0, 10);
 };
+
+const spanishMonths = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
+  "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
+const executionMonthNumber = (label) => spanishMonths.indexOf(String(label ?? "").trim().toUpperCase()) + 1;
+
+function datedProjectRange(name) {
+  const match = /\bINI(?:CIO)?\s+(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})\s*[-–]\s*(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})\b/i.exec(String(name ?? ""));
+  if (!match) return null;
+  const date = (day, month, year) => {
+    const y = Number(year.length === 2 ? `20${year}` : year), m = Number(month), d = Number(day);
+    const result = new Date(Date.UTC(y, m - 1, d));
+    return result.getUTCFullYear() === y && result.getUTCMonth() === m - 1 && result.getUTCDate() === d
+      ? result.toISOString().slice(0, 10) : null;
+  };
+  const start = date(match[1], match[2], match[3]);
+  const end = date(match[4], match[5], match[6]);
+  return start && end && start <= end ? { start, end } : null;
+}
+
+function moreCompleteBilling(main, other) {
+  const earlier = main.__monthlyBilled__ ?? {}, later = other.__monthlyBilled__ ?? {};
+  const contract = contractValue(other["Valor del contrato"]);
+  const mainContract = contractValue(main["Valor del contrato"]);
+  return !main.__undatedBilled__ && contract != null && mainContract != null
+    && Math.abs(contract - mainContract) <= 1
+    && Number(other["Facturado acumulado"]) > Number(main["Facturado acumulado"]) + 1
+    && Object.entries(earlier).every(([month, amount]) =>
+      Object.hasOwn(later, month) && Math.abs(Number(later[month]) - Number(amount)) <= 0.01)
+    && other.__sourcePendingToInvoice__ != null
+    && Math.abs(contract - Number(other["Facturado acumulado"]) - other.__sourcePendingToInvoice__) <= 1;
+}
 
 function billedAmount(value) {
   if (value === "" || value == null || value === 0 || value === "0") return 0;
@@ -490,10 +521,17 @@ export function extractLegacyProjectRows(sheets) {
         headerKey(other["Nombre del proyecto"]).startsWith(`${originalName}_`));
       if (matches.length === 1) {
         const other = matches[0];
-        if (row.__executionSnapshotPercentage__ == null && other.__executionSnapshotPercentage__ != null) {
+        const previousExecution = row.__executionSnapshotPercentage__;
+        const previousExecutionMonth = row.__executionMonthLabel__;
+        const mainExecutionMonth = executionMonthNumber(row.__executionMonthLabel__);
+        const otherExecutionMonth = executionMonthNumber(other.__executionMonthLabel__);
+        if (other.__executionSnapshotPercentage__ != null &&
+          (row.__executionSnapshotPercentage__ == null || otherExecutionMonth > mainExecutionMonth)) {
           row.__executionSnapshotPercentage__ = other.__executionSnapshotPercentage__;
           row.__executionMonthLabel__ = other.__executionMonthLabel__;
-          row.__financialReview__ += ` AK ausente en la hoja principal; se tomó de ${other.__sourceSheet__}, fila ${other.__rowNum__ + 1}.`;
+          row.__financialReview__ += previousExecution == null
+            ? ` AK ausente en la hoja principal; se tomó de ${other.__sourceSheet__}, fila ${other.__rowNum__ + 1}.`
+            : ` Avance general actualizado con ${other.__sourceSheet__}, fila ${other.__rowNum__ + 1}; conserva su carácter histórico sin validación mensual.`;
         }
         const notes = new Set(row.__followupNotes__.map(({ text }) => headerKey(text)));
         for (const item of other.__followupNotes__) if (!notes.has(headerKey(item.text))) {
@@ -510,7 +548,55 @@ export function extractLegacyProjectRows(sheets) {
         const differs = contract !== originalContract ||
           Math.abs(other["Facturado acumulado"] - row["Facturado acumulado"]) > 0.01 ||
           JSON.stringify(other.__monthlyBilled__) !== JSON.stringify(row.__monthlyBilled__);
-        if (differs) {
+        if (moreCompleteBilling(row, other)) {
+          const previous = { sheet: row.__sourceSheet__, row: row.__rowNum__ + 1,
+            contractValue: originalContract, billedTotal: row["Facturado acumulado"],
+            monthlyBilled: row.__monthlyBilled__, monthlyPercentages: row.__monthlyPercentages__,
+            pendingToInvoice: row.__sourcePendingToInvoice__, pendingPercentage: row.__sourcePendingPercentage__,
+            executionPercentage: previousExecution, executionMonth: previousExecutionMonth,
+            includedInTotal: false };
+          row.__alternateSnapshots__.push(previous);
+          row.__monthlyBilled__ = { ...other.__monthlyBilled__ };
+          row.__monthlyPercentages__ = { ...other.__monthlyPercentages__ };
+          row["Facturado acumulado"] = other["Facturado acumulado"];
+          row.__sourcePendingToInvoice__ = other.__sourcePendingToInvoice__;
+          row.__sourcePendingPercentage__ = other.__sourcePendingPercentage__;
+          row.__importedAsOf__ = other.__importedAsOf__;
+          row.__importedInvoiceMarker__ = other.__importedInvoiceMarker__ || row.__importedInvoiceMarker__;
+          if (other.__financialReview__ && !row.__financialReview__.includes(other.__financialReview__)) {
+            row.__financialReview__ += ` ${other.__financialReview__}`;
+          }
+          const range = datedProjectRange(other["Nombre del proyecto"]);
+          if (range) {
+            row.__startDate__ = range.start;
+            row.__endDate__ = range.end;
+            const year = range.start.slice(0, 4);
+            const month = executionMonthNumber(other.__executionMonthLabel__);
+            if (year === range.end.slice(0, 4) && month) {
+              row.__importedAsOf__ = lastDayOfMonth(`${year}-${String(month).padStart(2, "0")}`);
+              const billedMonths = Object.keys(row.__monthlyBilled__);
+              if (billedMonths.length === 1 && billedMonths[0].slice(0, 4) !== year) {
+                const original = billedMonths[0];
+                const actual = `${year}-${original.slice(5)}`;
+                if (Number(original.slice(5)) === month && actual >= range.start.slice(0, 7)
+                  && actual <= range.end.slice(0, 7)) {
+                  row.__monthlyBilled__ = { [actual]: row.__monthlyBilled__[original] };
+                  row.__monthlyPercentages__ = Object.hasOwn(row.__monthlyPercentages__, original)
+                    ? { [actual]: row.__monthlyPercentages__[original] } : {};
+                  row.__financialReview__ += ` La plantilla rotula ${original}, pero la fecha de inicio y el mes de seguimiento sitúan este importe en ${actual}; año inferido.`;
+                } else {
+                  row.__undatedBilled__ = row["Facturado acumulado"];
+                  row.__monthlyBilled__ = {};
+                  row.__monthlyPercentages__ = {};
+                  row.__financialReview__ += ` La plantilla rotula ${original}, anterior al inicio ${range.start}, y el seguimiento indica ${other.__executionMonthLabel__}; el periodo de facturación queda por conciliar.`;
+                }
+              }
+            }
+          }
+          row.__financialReview__ += ` Facturación más completa tomada de ${other.__sourceSheet__}, fila ${other.__rowNum__ + 1}; la versión anterior se conserva en el detalle de origen.`;
+          row.__sourceSheet__ = other.__sourceSheet__;
+          row.__rowNum__ = other.__rowNum__;
+        } else if (differs) {
           row.__alternateSnapshots__.push({ sheet: other.__sourceSheet__, row: other.__rowNum__ + 1,
             contractValue: contract, billedTotal: other["Facturado acumulado"],
             monthlyBilled: other.__monthlyBilled__, monthlyPercentages: other.__monthlyPercentages__ });
@@ -650,8 +736,8 @@ export function resolveProjectImportRows(rows, existingProjects = [], newId = ()
         status: String(field(values, columns.status) || "planeado").trim().toLowerCase(),
         clientName: String(field(values, columns.clientName)).trim(),
         powerKwp: powerValue(field(values, columns.powerKwp)),
-        startDate: dateValue(field(values, columns.startDate)),
-        endDate: dateValue(field(values, columns.endDate)),
+        startDate: dateValue(row.__startDate__ ?? field(values, columns.startDate)),
+        endDate: dateValue(row.__endDate__ ?? field(values, columns.endDate)),
         notes,
         parentCenter: String(field(values, columns.parentCenter)).trim(),
         contractValue: importedValue,
