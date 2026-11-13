@@ -11,7 +11,7 @@
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.18.20" />
+    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.18.21" />
   </head>
   <body>
     <section id="loginView" class="login-shell">
@@ -768,11 +768,38 @@
               <div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Última actualización</th><th>Acción</th></tr></thead><tbody id="profileRows"></tbody></table></div>
               <div id="profileEmpty" class="inline-empty" hidden>No hay perfiles disponibles para esta sesión.</div>
             </article>
+            <section id="adminCleanupPanel" class="panel admin-cleanup" hidden aria-labelledby="adminCleanupTitle">
+              <div><h4 id="adminCleanupTitle">Borrado de datos</h4><p>Revisa los registros afectados antes de confirmar. Estas acciones dejan constancia en el historial.</p></div>
+              <div class="admin-cleanup-grid">
+                <div class="admin-cleanup-card">
+                  <h5>Eliminar datos de un archivo importado</h5>
+                  <p>Selecciona la carga de proyectos del Excel o un auxiliar contable concreto.</p>
+                  <label>Archivo<select id="cleanupImportType" class="form-select"><option value="excel">Proyectos del Excel histórico</option></select></label>
+                  <button id="previewImportCleanupButton" class="btn btn-outline-danger" type="button">Revisar archivo</button>
+                </div>
+                <div class="admin-cleanup-card">
+                  <h5>Borrar datos de un centro de costo</h5>
+                  <p>Elimina su ficha y los registros operativos vinculados. El auxiliar contable original se conserva.</p>
+                  <label>Centro de costo exacto<input id="cleanupCostCenter" class="form-control" list="cleanupCenterOptions" placeholder="Ej. 277" autocomplete="off" /><datalist id="cleanupCenterOptions"></datalist></label>
+                  <button id="previewCenterCleanupButton" class="btn btn-outline-danger" type="button">Revisar centro</button>
+                </div>
+              </div>
+              <div id="cleanupModuleMessage" class="module-message module-message-block" role="status" aria-live="polite"></div>
+            </section>
           </section>
         </div>
       </main>
     </div>
 
+    <dialog id="adminCleanupDialog" class="app-dialog">
+      <div class="history-dialog-content">
+        <div class="dialog-heading"><div><p class="eyebrow">Administración</p><h3 id="cleanupDialogTitle">Revisar borrado</h3></div><button class="dialog-close" type="button" data-close-dialog="adminCleanupDialog" aria-label="Cerrar">×</button></div>
+        <div id="cleanupPreviewDetails" class="cleanup-preview-details"></div>
+        <label>Escribe <strong id="cleanupConfirmationLabel"></strong> para confirmar<input id="cleanupConfirmationInput" class="form-control" autocomplete="off" spellcheck="false" /></label>
+        <p id="cleanupDialogMessage" class="form-message" role="alert"></p>
+        <div class="dialog-actions"><button class="btn btn-outline-secondary" type="button" data-close-dialog="adminCleanupDialog">Cancelar</button><button id="executeCleanupButton" class="btn btn-danger" type="button" disabled>Eliminar datos</button></div>
+      </div>
+    </dialog>
     <dialog id="projectDialog" class="app-dialog">
       <form id="projectForm" method="dialog" novalidate>
         <div class="dialog-heading"><div><p class="eyebrow">Gestión de proyectos</p><h3 id="projectDialogTitle">Nuevo proyecto</h3></div><button class="dialog-close" type="button" data-close-dialog="projectDialog" aria-label="Cerrar">×</button></div>
@@ -951,11 +978,11 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="src/assets/js/config.js?v=1.12.0"></script>
-    <script type="module" src="src/assets/js/app.js?v=1.18.20"></script>
-    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.18.20"></script>
-    <script type="module" src="src/assets/js/accounting-ui.js?v=1.18.20"></script>
-    <script type="module" src="src/assets/js/project-import-ui.js?v=1.18.20"></script>
-    <script type="module" src="src/assets/js/assistant-ui.js?v=1.18.20"></script>
+    <script type="module" src="src/assets/js/app.js?v=1.18.21"></script>
+    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.18.21"></script>
+    <script type="module" src="src/assets/js/accounting-ui.js?v=1.18.21"></script>
+    <script type="module" src="src/assets/js/project-import-ui.js?v=1.18.21"></script>
+    <script type="module" src="src/assets/js/assistant-ui.js?v=1.18.21"></script>
   </body>
 </html>
 

@@ -15,6 +15,11 @@ export async function createApplicationDataGateway() {
 
   const data = createDataService(client);
   const userId = user.id;
+  async function cleanupRpc(name, args) {
+    const { data: result, error } = await client.rpc(name, args);
+    if (error) throw new Error(error.message || "No fue posible completar la acción de administración.");
+    return result;
+  }
 
   return Object.freeze({
     mode: "supabase",
@@ -22,6 +27,12 @@ export async function createApplicationDataGateway() {
     getCurrentProfile: () => data.profiles.get(userId),
     listProfiles: () => data.profiles.list(),
     updateProfile: (id, input) => data.profiles.update(id, input),
+    previewAdminCleanup: (kind, identifier = null) => cleanupRpc("admin_cleanup_preview", {
+      p_kind: kind, p_identifier: identifier
+    }),
+    executeAdminCleanup: (kind, identifier, token, confirmation) => cleanupRpc("admin_cleanup_execute", {
+      p_kind: kind, p_identifier: identifier, p_token: token, p_confirmation: confirmation
+    }),
     listProjects: (filters) => data.projects.list(filters),
     listProjectDetails: () => data.projects.listDetails(),
     getProject: (id) => data.projects.get(id),

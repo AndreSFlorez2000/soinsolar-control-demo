@@ -1,19 +1,19 @@
 import { buildMonthlySeries, calculateDashboardIndicators } from "./domain/dashboard.js?v=1.5.9";
-import { createDashboardUI } from "./dashboard-ui.js?v=1.18.20";
+import { createDashboardUI } from "./dashboard-ui.js?v=1.18.21";
 import { calculateProjectIndicators } from "./domain/project-analytics.js?v=1.4.1";
-import { buildManagementReport, buildMonthlyExecutionReport } from "./domain/reports.js?v=1.18.20";
-import { historicalProjectGroups, historicalWorkbookSheet, managementSummarySheet, monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.18.20";
-import { hasMonthlyActivity, historicalMonthVisibility, monthlyDisplayCounts, monthlyDisplayRows } from "./domain/monthly-display.js?v=1.18.20";
-import { contractPosition, paymentEvidenceHeadline } from "./domain/excel-payment-evidence.js?v=1.18.20";
+import { buildManagementReport, buildMonthlyExecutionReport } from "./domain/reports.js?v=1.18.21";
+import { historicalProjectGroups, historicalWorkbookSheet, managementSummarySheet, monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.18.21";
+import { hasMonthlyActivity, historicalMonthVisibility, monthlyDisplayCounts, monthlyDisplayRows } from "./domain/monthly-display.js?v=1.18.21";
+import { contractPosition, paymentEvidenceHeadline } from "./domain/excel-payment-evidence.js?v=1.18.21";
 import { createXlsx } from "./domain/xlsx-export.js?v=1.5.8";
 import { costWorkbookSheets } from "./domain/cost-workbook.js?v=1.5.8";
 import { canEditExecution } from "./domain/execution.js?v=1.9.0";
-import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=1.18.20";
-import { importedBillingRows, recognizedInvoices } from "./domain/finance-history.js?v=1.18.20";
+import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=1.18.21";
+import { importedBillingRows, recognizedInvoices } from "./domain/finance-history.js?v=1.18.21";
 import { invoicePendingAmount, isSampleProject, payableInvoicesForProject } from "./domain/payment-selection.js?v=1.5.1";
 import { forgetProject, hasProject, recallProject, rememberProject } from "./domain/project-context.js?v=1.8.0";
-import { displayProjectCenter } from "./domain/project-center.js?v=1.18.20";
-import { createApplicationDataGateway } from "./services/application-data.js?v=1.18.20";
+import { displayProjectCenter } from "./domain/project-center.js?v=1.18.21";
+import { createApplicationDataGateway } from "./services/application-data.js?v=1.18.21";
 import { getCurrentSession, isDemoMode, registerAccount, signIn, signOut } from "./services/supabase.js?v=1.13.1";
 
 const loginView = document.querySelector("#loginView");
@@ -106,6 +106,7 @@ let currentImportedUndated = [];
 let financeProjectDetails = [];
 let currentProfiles = [];
 let currentUserProfile = null;
+let pendingCleanup = null;
 let currentReport = buildManagementReport([]);
 let currentReportMonthly = [];
 let reportProgressProjectId = null;
@@ -376,6 +377,8 @@ async function openApp() {
 }
 
 function closeApp() {
+  pendingCleanup = null;
+  if (document.querySelector("#adminCleanupDialog").open) document.querySelector("#adminCleanupDialog").close();
   window.dispatchEvent(new Event("soinsolar:logout"));
   dashboardUI.close();
   appView.hidden = true;
@@ -2038,11 +2041,88 @@ async function loadProfiles() {
       data.listProfiles()
     ]);
     renderProfiles();
+    const mayClean = data.mode === "supabase" && currentUserProfile?.active && currentUserProfile.role === "administrador";
+    document.querySelector("#adminCleanupPanel").hidden = !mayClean;
+    if (mayClean) {
+      const imports = await data.listAccountingImports();
+      const selector = document.querySelector("#cleanupImportType");
+      const selected = selector.value;
+      selector.innerHTML = `<option value="excel">Proyectos del Excel histórico</option>${imports.map((batch) =>
+        `<option value="accounting:${escapeHtml(batch.id)}">Auxiliar: ${escapeHtml(batch.original_file_name)} (${escapeHtml(batch.report_period)})</option>`).join("")}`;
+      if ([...selector.options].some((option) => option.value === selected)) selector.value = selected;
+      document.querySelector("#cleanupCenterOptions").innerHTML = currentProjects.map((project) =>
+        `<option value="${escapeHtml(project.costCenter)}">${escapeHtml(project.projectName)}</option>`).join("");
+    }
     setMessage(message, currentUserProfile.role === "administrador"
       ? "Administración habilitada."
       : "Consulta de perfil disponible; los cambios requieren rol administrador.");
   } catch (error) {
     setMessage(message, error.message || "No fue posible consultar los usuarios.", true);
+  }
+}
+
+function describeCleanup(preview) {
+  if (preview.kind === "excel") {
+    return `<p>Se eliminarán <strong>${preview.removable} proyectos</strong> importados sin registros vinculados.</p>
+      <ul><li>${preview.blocked} proyectos vinculados se conservarán.</li><li>${preview.accountingEntriesRetained} filas del auxiliar contable se conservarán.</li></ul>
+      <p>Los proyectos creados en la aplicación, los movimientos vinculados y el historial se conservan.</p>`;
+  }
+  if (preview.kind === "accounting") {
+    return `<p>Se eliminará <strong>${escapeHtml(preview.fileName)}</strong> y sus <strong>${preview.entries} filas contables</strong>.</p>
+      <p>Los ${preview.projectsRetained} proyectos, sus movimientos y el historial se conservan.</p>`;
+  }
+  return `<p><strong>${escapeHtml(preview.identifier)} · ${escapeHtml(preview.projectName)}</strong></p>
+    <ul><li>${preview.contracts} contratos · ${preview.tracking} seguimientos · ${preview.invoices} facturas · ${preview.payments} recaudos · ${preview.costs} costos y gastos.</li>
+    <li>${preview.accountingEntriesRetained} filas del auxiliar contable original se conservarán.</li></ul>
+    ${preview.children ? `<p>Este centro tiene ${preview.children} centros secundarios: sepáralos antes de borrarlo.</p>` : ""}
+    <p>Los soportes cargados en almacenamiento no se eliminan; las acciones quedan en el historial.</p>`;
+}
+
+async function previewCleanup(kind, identifier = null) {
+  const message = document.querySelector("#cleanupModuleMessage");
+  setMessage(message, "Consultando registros…");
+  pendingCleanup = null;
+  try {
+    if (currentUserProfile?.role !== "administrador" || !currentUserProfile.active) throw new Error("Solo un administrador activo puede borrar datos.");
+    const preview = await (await ensureGateway()).previewAdminCleanup(kind, identifier);
+    pendingCleanup = preview;
+    document.querySelector("#cleanupDialogTitle").textContent = kind === "center" ? "Borrar centro de costo" : "Eliminar datos importados";
+    document.querySelector("#cleanupPreviewDetails").innerHTML = describeCleanup(preview);
+    document.querySelector("#cleanupConfirmationLabel").textContent = preview.confirmation;
+    document.querySelector("#cleanupConfirmationInput").value = "";
+    document.querySelector("#executeCleanupButton").disabled = true;
+    setMessage(document.querySelector("#cleanupDialogMessage"));
+    document.querySelector("#adminCleanupDialog").showModal();
+    setMessage(message);
+  } catch (error) {
+    setMessage(message, error.message || "No fue posible revisar el borrado.", true);
+  }
+}
+
+async function executeCleanup() {
+  const preview = pendingCleanup;
+  if (!preview) return;
+  const button = document.querySelector("#executeCleanupButton");
+  const message = document.querySelector("#cleanupDialogMessage");
+  setBusy(button, true, "Eliminando…");
+  try {
+    if (currentUserProfile?.role !== "administrador" || !currentUserProfile.active) throw new Error("Solo un administrador activo puede borrar datos.");
+    const result = await (await ensureGateway()).executeAdminCleanup(preview.kind, preview.identifier, preview.token,
+      document.querySelector("#cleanupConfirmationInput").value);
+    pendingCleanup = null;
+    document.querySelector("#adminCleanupDialog").close();
+    await loadReferenceData();
+    renderDashboard();
+    await loadProfiles();
+    const outcome = preview.kind === "accounting" ? `Se eliminó el archivo y sus ${result.deletedEntries} filas contables.`
+      : `Se eliminaron ${result.deletedProjects} proyecto(s).${result.protectedProjects ? ` Se conservaron ${result.protectedProjects} con registros vinculados.` : ""}`;
+    setMessage(document.querySelector("#cleanupModuleMessage"), outcome);
+    updateSystemStatus();
+  } catch (error) {
+    setMessage(message, error.message || "No fue posible borrar los datos.", true);
+  } finally {
+    setBusy(button, false);
+    button.disabled = true;
   }
 }
 
@@ -2339,6 +2419,20 @@ document.querySelector("#paymentProject").addEventListener("change", () => popul
 document.querySelector("#exportReportButton").addEventListener("click", exportManagementReport);
 document.querySelector("#reportProgressForm").addEventListener("submit", saveReportProgress);
 document.querySelector("#reloadProfilesButton").addEventListener("click", loadProfiles);
+document.querySelector("#previewImportCleanupButton").addEventListener("click", () => {
+  const selected = document.querySelector("#cleanupImportType").value;
+  if (selected === "excel") previewCleanup("excel");
+  else if (selected.startsWith("accounting:")) previewCleanup("accounting", selected.slice("accounting:".length));
+});
+document.querySelector("#previewCenterCleanupButton").addEventListener("click", () =>
+  previewCleanup("center", document.querySelector("#cleanupCostCenter").value.trim()));
+document.querySelector("#cleanupConfirmationInput").addEventListener("input", (event) => {
+  document.querySelector("#executeCleanupButton").disabled = !pendingCleanup
+    || event.target.value !== pendingCleanup.confirmation
+    || pendingCleanup.kind === "excel" && pendingCleanup.removable === 0
+    || pendingCleanup.kind === "center" && pendingCleanup.children > 0;
+});
+document.querySelector("#executeCleanupButton").addEventListener("click", executeCleanup);
 document.querySelector("#projectFilters").addEventListener("submit", (event) => { event.preventDefault(); loadProjects(); });
 document.querySelector("#clearProjectFilters").addEventListener("click", () => { document.querySelector("#projectFilters").reset(); loadProjects(); });
 document.querySelector("#monthlyFilters").addEventListener("submit", (event) => { event.preventDefault(); loadMonthlyModule(); });
