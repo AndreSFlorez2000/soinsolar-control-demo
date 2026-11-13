@@ -87,6 +87,9 @@ export function historicalWorkbookSheet(projects = [], projectId = "") {
         row[15] === "Excel; sin mes" ? project.importedUndatedCollected ?? null : null,
         index === 0 ? project.importedCollectionBasis || "" : "",
         index === 0 ? project.importedCollectionReview || "" : "");
+      row.push(index === 0 ? project.importedPendingToInvoice ?? null : null,
+        index === 0 && project.importedPendingPercentage != null
+          ? Number(project.importedPendingPercentage) / 100 : null);
     }
   }
   return {
@@ -94,23 +97,24 @@ export function historicalWorkbookSheet(projects = [], projectId = "") {
     title: "Seguimiento mensual y notas del libro histórico",
     notes: [
       "El porcentaje facturado del Excel corresponde a la columna % junto a FACTURADO. El porcentaje calculado divide el importe mensual entre el valor contractual principal.",
-      "El avance general del Excel se ubica en el mes MES y el año único de los encabezados del libro. No es ejecución mensual validada. Un importe descontado literalmente en AI sin fecha figura en una fila separada.",
+      "AI es PENDIENTE FACTURAR y AJ su porcentaje en la hoja principal de 2025; AK es avance general ejecutado. En PENDEINTE 2024 AI significa VALOR CONTRATO: el saldo está en BH, su porcentaje en BI y el avance en BJ. Un importe descontado literalmente en AI sin fecha figura en una fila separada.",
       "El recaudo se carga con el criterio de SOINSOLAR para este libro. Las notas de pago sin mes se muestran en el total sin distribuirlas entre meses; una nota pendiente prevalece sobre un ajuste sin mes de AI.",
       "Las filas de otras hojas indican si sus meses nuevos ya se incorporaron al acumulado o si son alternativas sin sumar. No se deben sumar otra vez.",
       "Los datos originales del proyecto y su potencia se muestran en columnas separadas. kW y kWp conservan la unidad que consta en la descripción; no se convierten."
     ],
     headers: ["Centro de costo", "Proyecto", "Hoja / fuente", "Mes facturado", "Contrato principal (COP)",
       "Facturado mes (COP)", "% facturado Excel", "% importe / contrato", "Facturado acumulado (COP)",
-      "Facturado al corte (COP)", "Avance ejecución general Excel", "Mes de ejecución (sin año)",
+      "Facturado al corte (COP)", "Avance ejecución general Excel (AK / BJ 2024)", "Mes de ejecución (sin año)",
       "Referencias de factura", "Notas de seguimiento", "Pendiente de revisión", "Procedencia",
       "Descripción del proyecto", "T.S. Excel", "Tipo Excel", "Estado Excel", "O.C. Excel",
       "Columna N.º FAC", "Potencia Excel", "Unidad potencia", "Recaudado al corte Excel (COP)",
-      "Recaudado mes Excel (COP)", "Recaudo sin mes Excel (COP)", "Base del recaudo", "Revisión recaudo"],
+      "Recaudado mes Excel (COP)", "Recaudo sin mes Excel (COP)", "Base del recaudo", "Revisión recaudo",
+      "Pendiente por facturar Excel (AI / BH 2024)", "% pendiente por facturar Excel (AJ / BI 2024)"],
     types: ["text", "text", "text", "text", "money", "money", "percent", "percent", "money", "money", "percent", "text", "text", "text", "text", "text",
-      "text", "text", "text", "text", "text", "text", "number", "text", "money", "money", "money", "text", "text"],
+      "text", "text", "text", "text", "text", "text", "number", "text", "money", "money", "money", "text", "text", "money", "percent"],
     rows, freezeColumns: 2, wrapColumns: [12, 13, 14, 16, 27, 28], tabColor: "8053A0",
     columnWidths: [18, 36, 32, 17, 23, 23, 20, 22, 27, 26, 27, 23, 32, 55, 55, 24,
-      48, 18, 24, 20, 24, 22, 18, 18, 26, 25, 26, 55, 50]
+      48, 18, 24, 20, 24, 22, 18, 18, 26, 25, 26, 55, 50, 27, 27]
   };
 }
 

@@ -1,7 +1,7 @@
-import { projectInputToRecord } from "../data/models.js?v=1.18.15";
+import { projectInputToRecord } from "../data/models.js?v=1.18.16";
 import { parseCostCsv } from "./cost-import.js?v=1.16.0";
 import { centerKey } from "./accounting-projects.js?v=1.16.0";
-import { deriveHistoricalCollection } from "./excel-payment-evidence.js?v=1.18.15";
+import { deriveHistoricalCollection } from "./excel-payment-evidence.js?v=1.18.16";
 
 export const PROJECT_IMPORT_HEADERS = Object.freeze([
   "Centro de costo", "Nombre del proyecto", "Municipio", "Tipo de servicio",
@@ -9,7 +9,8 @@ export const PROJECT_IMPORT_HEADERS = Object.freeze([
   "Centro principal", "Observaciones", "Valor del contrato", "Número de contrato",
   "Facturado acumulado", "Corte de facturación", "Avance ejecución Excel (%)",
   "Mes informado de ejecución", "Notas de seguimiento Excel", "Referencias factura Excel",
-  "Facturado sin mes (Excel)"
+  "Facturado sin mes (Excel)", "Pendiente por facturar Excel",
+  "Porcentaje pendiente por facturar Excel"
 ]);
 
 // Compatibilidad con las exportaciones anteriores, que dejaban el valor en notas.
@@ -39,7 +40,9 @@ const columns = {
   executionMonth: ["mes_informado_de_ejecucion"],
   followupNotes: ["notas_de_seguimiento_excel"],
   invoiceReferences: ["referencias_factura_excel"],
-  undatedBilled: ["facturado_sin_mes_excel", "facturado_sin_mes"]
+  undatedBilled: ["facturado_sin_mes_excel", "facturado_sin_mes"],
+  pendingToInvoice: ["pendiente_por_facturar_excel", "pendiente_por_facturar_excel_ai"],
+  pendingPercentage: ["porcentaje_pendiente_por_facturar_excel", "porcentaje_pendiente_por_facturar_excel_aj"]
 };
 
 const headerKey = (value) => String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
@@ -202,6 +205,11 @@ function legacyRows(sheet) {
   const invoiceColumn = sheet.rows[header].findIndex((value) => /^N[ªº°]?\s*FAC$/i.test(String(value ?? "").trim()));
   const executionColumn = sheet.rows[header].findIndex((value) => /^%\s*AVANCE$/i.test(String(value ?? "").trim()));
   const executionMonthColumn = sheet.rows[header].findIndex((value) => /^MES$/i.test(String(value ?? "").trim()));
+  // En el formato 2025 AI es PENDIENTE / FACTURAR; en 2024 AI
+  // significa VALOR CONTRATO. Verificar el encabezado evita mezclarlos.
+  const pendingColumn = sheet.rows[header].findIndex((value, index) =>
+    /^PENDIENTE$/i.test(String(value ?? "").trim()) &&
+    /^FACTURAR$/i.test(String(sheet.rows[header + 1]?.[index] ?? "").trim()));
   const monthlyColumns = sheet.rows[header].flatMap((value, index) => {
     const month = monthFromHeader(value);
     return month && String(sheet.rows[header + 1]?.[index] ?? "").trim().toUpperCase() === "FACTURADO"
@@ -291,6 +299,11 @@ function legacyRows(sheet) {
       __executionSnapshotPercentage__: executionColumn >= 0 && typeof row[executionColumn] === "number"
         && row[executionColumn] >= 0 && row[executionColumn] <= 1
           ? Math.round(row[executionColumn] * 10000) / 100 : null,
+      __sourcePendingToInvoice__: pendingColumn >= 0 && typeof row[pendingColumn] === "number"
+        && Number.isFinite(row[pendingColumn]) ? Math.round(row[pendingColumn] * 100) / 100 : null,
+      __sourcePendingPercentage__: pendingColumn >= 0 && typeof row[pendingColumn + 1] === "number"
+        && Number.isFinite(row[pendingColumn + 1])
+          ? Math.round(row[pendingColumn + 1] * 10000) / 100 : null,
       __executionMonthLabel__: executionMonthColumn >= 0 ? String(row[executionMonthColumn] ?? "").trim() : "",
       __followupNotes__: followupNotes,
       __invoiceReferences__: invoiceReferences,
@@ -469,10 +482,19 @@ export function extractLegacyProjectRows(sheets) {
         if (Math.abs(difference) > 1) row.__financialReview__ +=
           ` La fórmula AI difiere en ${difference} COP de las facturas fechadas de 2024 y 2025; conciliar sin asignar un mes inventado.`;
       }
-      const matches = alternate.filter((other) => (other.__sourceCostCenter__ ?? other["Centro de costo"]) === (row.__sourceCostCenter__ ?? row["Centro de costo"])
-        && headerKey(other["Nombre del proyecto"]) === headerKey(row["Nombre del proyecto"]));
+      const sameCenter = alternate.filter((other) => (other.__sourceCostCenter__ ?? other["Centro de costo"])
+        === (row.__sourceCostCenter__ ?? row["Centro de costo"]));
+      const originalName = headerKey(row["Nombre del proyecto"]);
+      const exact = sameCenter.filter((other) => headerKey(other["Nombre del proyecto"]) === originalName);
+      const matches = exact.length ? exact : sameCenter.filter((other) =>
+        headerKey(other["Nombre del proyecto"]).startsWith(`${originalName}_`));
       if (matches.length === 1) {
         const other = matches[0];
+        if (row.__executionSnapshotPercentage__ == null && other.__executionSnapshotPercentage__ != null) {
+          row.__executionSnapshotPercentage__ = other.__executionSnapshotPercentage__;
+          row.__executionMonthLabel__ = other.__executionMonthLabel__;
+          row.__financialReview__ += ` AK ausente en la hoja principal; se tomó de ${other.__sourceSheet__}, fila ${other.__rowNum__ + 1}.`;
+        }
         const notes = new Set(row.__followupNotes__.map(({ text }) => headerKey(text)));
         for (const item of other.__followupNotes__) if (!notes.has(headerKey(item.text))) {
           row.__followupNotes__.push(item);
@@ -522,7 +544,6 @@ export function parseProjectCsv(text) {
 }
 
 // Una segunda carga del mismo libro no debe generar cientos de auditorías sin cambios.
-// AI/AJ se dejan fuera de esta actualización hasta conciliar su significado.
 export function changedHistoricalUpdates(updates, existingProjects) {
   const fields = ["importedContractValue", "importedBilledTotal", "importedUndatedBilled",
     "importedCollectedTotal", "importedMonthlyCollected", "importedUndatedCollected", "importedCollectionBasis", "importedCollectionReview",
@@ -530,7 +551,8 @@ export function changedHistoricalUpdates(updates, existingProjects) {
     "importedExecutionSnapshotPercentage", "importedExecutionMonthLabel", "importedFollowupNotes",
     "importedInvoiceReferences", "importedAlternateSnapshots", "importedAsOf", "importedFinancialReview",
     "importedProjectDescription", "importedServiceCode", "importedProjectType", "importedSourceStatus",
-    "importedOrderReference", "importedInvoiceMarker", "importedPowerValue", "importedPowerUnit"];
+    "importedOrderReference", "importedInvoiceMarker", "importedPowerValue", "importedPowerUnit",
+    "importedPendingToInvoice", "importedPendingPercentage"];
   const canonical = (value) => Array.isArray(value) ? value.map(canonical)
     : value && typeof value === "object" ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonical(value[key])]))
     : value === "" || value == null ? null : value;
@@ -538,6 +560,7 @@ export function changedHistoricalUpdates(updates, existingProjects) {
   return updates.filter((input) => {
     const existing = byId.get(input.id);
     return !existing || fields.some((field) => Object.hasOwn(input, field)
+      && (!(field === "importedPendingToInvoice" || field === "importedPendingPercentage") || input[field] != null)
       && JSON.stringify(canonical(input[field])) !== JSON.stringify(canonical(existing[field])));
   });
 }
@@ -642,8 +665,11 @@ export function resolveProjectImportRows(rows, existingProjects = [], newId = ()
           importedCollectionBasis: collection.basis,
           importedCollectionReview: collection.review } : {}),
         importedUndatedBilled: billed.undated,
-        importedPendingToInvoice: row.__sourcePendingToInvoice__ ?? null,
-        importedPendingPercentage: row.__sourcePendingPercentage__ ?? null,
+        importedPendingToInvoice: row.__sourcePendingToInvoice__ ??
+          (field(values, columns.pendingToInvoice) === "" ? null : billedAmount(field(values, columns.pendingToInvoice))),
+        importedPendingPercentage: row.__sourcePendingPercentage__ ??
+          (field(values, columns.pendingPercentage) === "" ? null
+            : Number(String(field(values, columns.pendingPercentage)).replace(",", "."))),
         importedMonthlyBilled: billed.monthly,
         importedMonthlyBilledPercentages: billedPercentages,
         importedContractComponents: row.__contractComponents__ ?? [],

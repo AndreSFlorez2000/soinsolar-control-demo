@@ -1,5 +1,5 @@
-import { PROJECT_IMPORT_HEADERS, changedHistoricalUpdates, extractLegacyProjectRows, parseProjectCsv, referencedContractValue, resolveProjectImportRows } from "./domain/project-import.js?v=1.18.15";
-import { displayProjectCenter } from "./domain/project-center.js?v=1.18.15";
+import { PROJECT_IMPORT_HEADERS, changedHistoricalUpdates, extractLegacyProjectRows, parseProjectCsv, referencedContractValue, resolveProjectImportRows } from "./domain/project-import.js?v=1.18.16";
+import { displayProjectCenter } from "./domain/project-center.js?v=1.18.16";
 import { createXlsx } from "./domain/xlsx-export.js?v=1.17.0";
 
 const $ = (selector) => document.querySelector(selector);
@@ -29,9 +29,10 @@ function template() {
 function projectSheet(rows, months = []) {
   const headers = [...PROJECT_IMPORT_HEADERS, ...months.flatMap((month) => [`Facturado ${month}`, `Porcentaje facturado ${month}`])];
   return { name: "Proyectos", headers, rows,
-    types: headers.map((_, index) => index === 6 || index === 15 || (index >= PROJECT_IMPORT_HEADERS.length && (index - PROJECT_IMPORT_HEADERS.length) % 2 === 1)
-      ? "number" : [11, 13, 19].includes(index) || index >= PROJECT_IMPORT_HEADERS.length ? "money" : "text"),
-    freezeColumns: 2, columnWidths: [20, 34, 22, 28, 16, 26, 16, 18, 18, 20, 44, 22, 28, 22, 18, 25, 24, 56, 36, 25, ...months.flatMap(() => [22, 26])] };
+    types: headers.map((_, index) => index === 6 || index === 15 || index === 21 ||
+      (index >= PROJECT_IMPORT_HEADERS.length && (index - PROJECT_IMPORT_HEADERS.length) % 2 === 1)
+      ? "number" : [11, 13, 19, 20].includes(index) || index >= PROJECT_IMPORT_HEADERS.length ? "money" : "text"),
+    freezeColumns: 2, columnWidths: [20, 34, 22, 28, 16, 26, 16, 18, 18, 20, 44, 22, 28, 22, 18, 25, 24, 56, 36, 25, 28, 32, ...months.flatMap(() => [22, 26])] };
 }
 
 function download(blob, fileName) {
@@ -134,6 +135,7 @@ async function exportProjects() {
         (project.importedFollowupNotes ?? []).map((item) => item.text).join("\n"),
         (project.importedInvoiceReferences ?? []).map((item) => item.reference).join("\n"),
         project.importedUndatedBilled || "",
+        project.importedPendingToInvoice ?? "", project.importedPendingPercentage ?? "",
         ...months.flatMap((month) => [monthly[month] ?? "", project.importedMonthlyBilledPercentages?.[month] ?? ""])];
     });
     download(createXlsx([projectSheet(rows, months)]), `proyectos-soinsolar-${new Date().toISOString().slice(0, 10)}.xlsx`);

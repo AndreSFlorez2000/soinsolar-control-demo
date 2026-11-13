@@ -1,4 +1,4 @@
-import { extractPaymentEvidence } from "../domain/excel-payment-evidence.js?v=1.18.15";
+import { extractPaymentEvidence } from "../domain/excel-payment-evidence.js?v=1.18.16";
 
 export class ValidationError extends Error {
   constructor(message, field) {
@@ -424,7 +424,13 @@ export function projectInputToRecord(input, userId) {
     record.imported_pending_to_invoice = input.importedPendingToInvoice == null
       ? null : signedMoney(input.importedPendingToInvoice, "pendiente facturar Excel");
     record.imported_pending_percentage = input.importedPendingPercentage == null
-      ? null : Number(input.importedPendingPercentage);
+      ? null : (() => {
+        const percentage = Number(input.importedPendingPercentage);
+        if (!Number.isFinite(percentage) || Math.abs(percentage) > 10000) {
+          throw new ValidationError("El porcentaje pendiente del Excel es inválido.", "importedPendingPercentage");
+        }
+        return Math.round(percentage * 100) / 100;
+      })();
     record.imported_monthly_billed = input.importedMonthlyBilled || {};
     record.imported_monthly_billed_percentages = input.importedMonthlyBilledPercentages || {};
     record.imported_contract_components = input.importedContractComponents || [];

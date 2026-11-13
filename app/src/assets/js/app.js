@@ -1,19 +1,19 @@
 import { buildMonthlySeries, calculateDashboardIndicators } from "./domain/dashboard.js?v=1.5.9";
-import { createDashboardUI } from "./dashboard-ui.js?v=1.18.15";
+import { createDashboardUI } from "./dashboard-ui.js?v=1.18.16";
 import { calculateProjectIndicators } from "./domain/project-analytics.js?v=1.4.1";
-import { buildManagementReport, buildMonthlyExecutionReport } from "./domain/reports.js?v=1.18.15";
-import { historicalProjectGroups, historicalWorkbookSheet, managementSummarySheet, monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.18.15";
-import { hasMonthlyActivity, historicalMonthVisibility, monthlyDisplayCounts, monthlyDisplayRows } from "./domain/monthly-display.js?v=1.18.15";
-import { contractPosition, paymentEvidenceHeadline } from "./domain/excel-payment-evidence.js?v=1.18.15";
+import { buildManagementReport, buildMonthlyExecutionReport } from "./domain/reports.js?v=1.18.16";
+import { historicalProjectGroups, historicalWorkbookSheet, managementSummarySheet, monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.18.16";
+import { hasMonthlyActivity, historicalMonthVisibility, monthlyDisplayCounts, monthlyDisplayRows } from "./domain/monthly-display.js?v=1.18.16";
+import { contractPosition, paymentEvidenceHeadline } from "./domain/excel-payment-evidence.js?v=1.18.16";
 import { createXlsx } from "./domain/xlsx-export.js?v=1.5.8";
 import { costWorkbookSheets } from "./domain/cost-workbook.js?v=1.5.8";
 import { canEditExecution } from "./domain/execution.js?v=1.9.0";
-import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=1.18.15";
-import { importedBillingRows, recognizedInvoices } from "./domain/finance-history.js?v=1.18.15";
+import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=1.18.16";
+import { importedBillingRows, recognizedInvoices } from "./domain/finance-history.js?v=1.18.16";
 import { invoicePendingAmount, isSampleProject, payableInvoicesForProject } from "./domain/payment-selection.js?v=1.5.1";
 import { forgetProject, hasProject, recallProject, rememberProject } from "./domain/project-context.js?v=1.8.0";
-import { displayProjectCenter } from "./domain/project-center.js?v=1.18.15";
-import { createApplicationDataGateway } from "./services/application-data.js?v=1.18.15";
+import { displayProjectCenter } from "./domain/project-center.js?v=1.18.16";
+import { createApplicationDataGateway } from "./services/application-data.js?v=1.18.16";
 import { getCurrentSession, isDemoMode, registerAccount, signIn, signOut } from "./services/supabase.js?v=1.13.1";
 
 const loginView = document.querySelector("#loginView");
@@ -207,6 +207,18 @@ function contractPositionDisplay(project, source) {
   if (position.kind === "excess") return { label: "Exceso facturado", value: formatCop(position.amount) };
   if (position.kind === "settled") return { label: "Saldo por facturar", value: formatCop(0) };
   return { label: "Saldo por facturar", value: formatCop(position.amount) };
+}
+
+function importedPendingText(amount) {
+  if (amount == null) return "Sin dato en AI";
+  if (Math.abs(amount) < 1) return "Sin saldo material · redondeo";
+  return amount < 0 ? `Exceso facturado: ${formatCop(-amount)}` : formatCop(amount);
+}
+
+function excelSourceColumns(source) {
+  return /(?:PENDEINTE|PENDIENTE) 2024/i.test(source?.importedFinancialSource || "")
+    ? { pending: "BH", pendingPercent: "BI", execution: "BJ" }
+    : { pending: "AI", pendingPercent: "AJ", execution: "AK" };
 }
 
 function formatDate(value) {
@@ -468,7 +480,7 @@ function renderDashboard() {
   document.querySelector("#costValue").textContent = formatCop(indicators.costsExpenses);
   document.querySelector("#activeProjectKpi").textContent = `${indicators.activeProjects} proyecto(s) activo(s)`;
   document.querySelector("#invoicedRatioText").textContent = `${formatPercent(indicators.financialProgress)} del valor contractual`;
-  document.querySelector("#receivableValue").textContent = "Solo facturas del sistema; histórico Excel por conciliar";
+  document.querySelector("#receivableValue").textContent = "Cartera formal del sistema; anticipos del Excel en recaudo";
   document.querySelector("#costRatio").textContent = `${formatPercent(indicators.costRatio)} del contrato`;
   document.querySelector("#contractualBalanceValue").textContent = formatCop(indicators.contractualBalance);
   document.querySelector("#paymentPendingValue").textContent = formatCop(indicators.paymentPending);
@@ -495,7 +507,7 @@ function renderDashboard() {
         <td><span class="project-name-cell"><strong>${escapeHtml(project.projectName)}</strong><small>${escapeHtml(displayProjectCenter(project.costCenter))}</small></span></td>
         <td><div class="execution-progress-cell"><div class="execution-track"><span style="width:${Math.min(100, Math.max(0, Number(project.executedProgressPercentage) || 0))}%"></span></div><span><strong>${formatExecutionPercent(project.executedProgressPercentage)}</strong>${project.executionProgressSource === "excel" ? '<small>Excel histórico</small>' : ""}</span></div></td>
         <td>${!contractKnown ? "Sin valor contractual" : project.executedProgressPercentage === null ? "—" : formatCop(Math.round(project.contractValue * project.executedProgressPercentage) / 100)}</td>
-        <td>${contractKnown ? formatCop(project.contractValue) : "Sin valor contractual"}</td><td>${formatCop(project.totalInvoiced)}</td><td>${noReceiptAmount ? "Recaudo por conciliar" : formatCop(project.totalPaid)}${receiptNote ? `<br><small>${escapeHtml(receiptNote)}</small>` : ""}</td>
+        <td>${contractKnown ? formatCop(project.contractValue) : "Sin valor contractual"}</td><td>${source?.importedFinancialSource && !project.totalInvoiced ? "Sin factura en Excel" : formatCop(project.totalInvoiced)}</td><td>${noReceiptAmount ? "Recaudo por conciliar" : formatCop(project.totalPaid)}${receiptNote ? `<br><small>${escapeHtml(receiptNote)}</small>` : ""}</td>
         <td>${noReceiptAmount ? "Sin dato" : project.contractValue > 0 ? formatPercent(project.totalPaid / project.contractValue * 100) : "—"}</td>
         <td><button class="open-project" type="button" data-action="open-project" data-project-id="${project.projectId}">Abrir</button></td>
       </tr>`;
@@ -690,9 +702,13 @@ async function loadProjects(filters) {
     ], "projectFilters");
 
     const rows = await (await ensureGateway()).listProjects(appliedFilters);
+    const sourceById = new Map(historicalProjectDetails.map((item) => [item.id, item]));
     document.querySelector("#projectResultCount").textContent = rows.length;
-    document.querySelector("#projectsManagementRows").innerHTML = rows.map((project) => `
-      <tr><td><strong>${escapeHtml(displayProjectCenter(project.costCenter))}</strong></td><td><span class="project-name-cell"><strong>${escapeHtml(project.projectName)}</strong><small>${escapeHtml(project.contractNumber || (project.contractValue > 0 ? "Valor según Excel; contrato por registrar" : "Sin contrato registrado"))}</small></span></td><td>${escapeHtml(project.municipality)}</td><td>${escapeHtml(project.serviceType)}</td><td><span class="status-badge ${escapeHtml(project.status)}">${escapeHtml(capitalize(project.status))}</span></td><td>${formatExecutionPercent(project.executedProgressPercentage)}${project.executionProgressSource === "excel" ? '<br><small>Excel histórico</small>' : ""}</td><td>${formatPercent(project.financialProgressPercentage)}</td><td><span class="table-actions"><button class="table-action" type="button" data-action="open-project" data-project-id="${project.projectId}">Abrir</button><button class="table-action" type="button" data-action="edit-project" data-project-id="${project.projectId}">Editar</button><button class="table-action danger" type="button" data-action="delete-project" data-project-id="${project.projectId}">Eliminar</button></span></td></tr>`).join("");
+    document.querySelector("#projectsManagementRows").innerHTML = rows.map((project) => {
+      const source = sourceById.get(project.projectId);
+      const pending = source?.importedPendingToInvoice;
+      return `<tr><td><strong>${escapeHtml(displayProjectCenter(project.costCenter))}</strong></td><td><span class="project-name-cell"><strong>${escapeHtml(project.projectName)}</strong><small>${escapeHtml(project.contractNumber || (project.contractValue > 0 ? "Valor según Excel; contrato por registrar" : "Sin contrato registrado"))}</small></span></td><td>${escapeHtml(project.municipality)}</td><td>${escapeHtml(project.serviceType)}</td><td><span class="status-badge ${escapeHtml(project.status)}">${escapeHtml(capitalize(project.status))}</span></td><td>${formatExecutionPercent(project.executedProgressPercentage)}${project.executionProgressSource === "excel" ? `<br><small>Excel histórico · ${excelSourceColumns(source).execution}</small>` : ""}</td><td>${source?.importedFinancialSource && !project.totalInvoiced ? "Sin factura en Excel" : formatPercent(project.financialProgressPercentage)}</td><td>${pending == null ? "—" : `${escapeHtml(importedPendingText(pending))}${source.importedPendingPercentage == null ? "" : `<br><small>${excelSourceColumns(source).pendingPercent} ${formatPercent(source.importedPendingPercentage)}</small>`}`}</td><td><span class="table-actions"><button class="table-action" type="button" data-action="open-project" data-project-id="${project.projectId}">Abrir</button><button class="table-action" type="button" data-action="edit-project" data-project-id="${project.projectId}">Editar</button><button class="table-action danger" type="button" data-action="delete-project" data-project-id="${project.projectId}">Eliminar</button></span></td></tr>`;
+    }).join("");
     document.querySelector("#projectsEmpty").hidden = rows.length > 0;
     setMessage(message, rows.length ? "Consulta actualizada." : "");
   } catch (error) {
@@ -918,8 +934,9 @@ async function openProjectDetail(projectId) {
   document.querySelector("#detailContractLabel").textContent = projectRecord.importedContractValue != null && !project.contractId
     ? "Valor contractual según Excel" : "Valor contractual vigente";
   document.querySelector("#detailProjectProgress").textContent = formatExecutionPercent(project.executedProgressPercentage);
+  const sourceColumns = excelSourceColumns(projectRecord);
   document.querySelector("#detailProjectProgressSource").textContent = project.executionProgressSource === "excel"
-    ? "Corte del Excel · sin validación mensual" : "";
+    ? `Corte del Excel · ${sourceColumns.execution} · sin validación mensual` : "";
   const noImportedBilling = imported && !project.totalInvoiced;
   document.querySelector("#detailFinancialProgress").textContent = noImportedBilling
     ? "Sin facturación" : formatPercent(project.financialProgressPercentage);
@@ -933,6 +950,20 @@ async function openProjectDetail(projectId) {
     ? "Sin costos cargados" : formatCop(project.totalCostsExpenses);
   document.querySelector("#detailContractBalanceLabel").textContent = contractPositionText.label;
   document.querySelector("#detailContractBalance").textContent = contractPositionText.value;
+  const excelPending = projectRecord.importedPendingToInvoice;
+  document.querySelector("#detailExcelPendingSummaryWrap").hidden = !imported || excelPending == null;
+  document.querySelector("#detailExcelPendingSummaryWrap span").textContent = `Pendiente por facturar · Excel (${sourceColumns.pending})`;
+  document.querySelector("#detailExcelPendingSummary").textContent = importedPendingText(excelPending);
+  document.querySelector("#detailExcelPendingPercent").textContent = projectRecord.importedPendingPercentage == null
+    ? `Porcentaje ${sourceColumns.pendingPercent} sin dato` : `${sourceColumns.pendingPercent}: ${formatPercent(projectRecord.importedPendingPercentage)}`;
+  const excelExecution = projectRecord.importedExecutionSnapshotPercentage;
+  const excelContract = projectRecord.importedContractValue;
+  document.querySelector("#detailExcelExecutedWrap").hidden = !imported || excelExecution == null || excelContract == null;
+  document.querySelector("#detailExcelExecutedWrap span").textContent = `Ejecutado equivalente · Excel (${sourceColumns.execution})`;
+  document.querySelector("#detailExcelExecuted").textContent = excelExecution == null || excelContract == null
+    ? "—" : formatCop(Math.round(excelContract * excelExecution) / 100);
+  document.querySelector("#detailExcelExecutedBasis").textContent = excelExecution == null
+    ? "" : `Referencia física: ${formatPercent(excelExecution)} de ${sourceColumns.execution} × contrato Excel`;
   document.querySelector("#detailProgressLabel").textContent = noImportedBilling
     ? "Sin facturación" : formatPercent(project.financialProgressPercentage);
   document.querySelector("#detailProgressBar").style.width = `${Math.min(100, Math.max(0, project.financialProgressPercentage))}%`;
@@ -976,8 +1007,8 @@ async function openProjectDetail(projectId) {
     document.querySelector("#detailImportedSource").textContent =
       `${projectRecord.importedFinancialSource || "Archivo de proyectos"}${projectRecord.importedAsOf ? ` · corte ${formatDate(projectRecord.importedAsOf)}` : ""}`;
     document.querySelector("#detailImportedOverview").textContent = project.totalInvoiced > 0
-      ? `Facturado acumulado: ${formatCop(project.totalInvoiced)}. Recaudado según el Excel: ${projectRecord.importedCollectedTotal == null ? "por conciliar" : formatCop(projectRecord.importedCollectedTotal)}. Avance general AK: ${projectRecord.importedExecutionSnapshotPercentage == null ? "sin dato" : formatPercent(projectRecord.importedExecutionSnapshotPercentage)}.`
-      : `El Excel no registra facturación para este proyecto. Avance general AK: ${projectRecord.importedExecutionSnapshotPercentage == null ? "sin dato" : formatPercent(projectRecord.importedExecutionSnapshotPercentage)}. El saldo por facturar se calcula con el valor contractual conocido.`;
+      ? `Facturado acumulado: ${formatCop(project.totalInvoiced)}. Recaudado según el Excel: ${projectRecord.importedCollectedTotal == null ? "por conciliar" : formatCop(projectRecord.importedCollectedTotal)}. Avance general ${sourceColumns.execution}: ${projectRecord.importedExecutionSnapshotPercentage == null ? "sin dato" : formatPercent(projectRecord.importedExecutionSnapshotPercentage)}.`
+      : `El Excel no registra facturación para este proyecto. Avance general ${sourceColumns.execution}: ${projectRecord.importedExecutionSnapshotPercentage == null ? "sin dato" : formatPercent(projectRecord.importedExecutionSnapshotPercentage)}. ${excelPending == null ? "El saldo por facturar se calcula con el valor contractual conocido." : `Saldo ${sourceColumns.pending} del libro: ${importedPendingText(excelPending)}.`}`;
     if (!project.totalInvoiced && projectRecord.importedCollectedTotal != null) {
       document.querySelector("#detailImportedOverview").textContent +=
         ` Anticipo recibido según las notas: ${formatCop(projectRecord.importedCollectedTotal)}; sin mes de recaudo indicado.`;
@@ -994,9 +1025,10 @@ async function openProjectDetail(projectId) {
       paymentEvidenceHeadline(projectRecord.importedPaymentEvidence);
     document.querySelector("#detailImportedUndatedWrap").hidden = !projectRecord.importedUndatedBilled;
     document.querySelector("#detailImportedUndated").textContent = formatCop(projectRecord.importedUndatedBilled);
-    document.querySelector("#detailImportedPendingWrap").hidden = !projectRecord.importedPendingToInvoice;
+    document.querySelector("#detailImportedPendingWrap").hidden = projectRecord.importedPendingToInvoice == null;
+    document.querySelector("#detailImportedPendingWrap span").textContent = `Pendiente por facturar (${sourceColumns.pending}) · porcentaje (${sourceColumns.pendingPercent})`;
     document.querySelector("#detailImportedPending").textContent = projectRecord.importedPendingToInvoice == null
-      ? "—" : `${formatCop(projectRecord.importedPendingToInvoice)}${projectRecord.importedPendingPercentage == null ? "" : ` · ${formatPercent(projectRecord.importedPendingPercentage)}`}`;
+      ? "—" : `${importedPendingText(projectRecord.importedPendingToInvoice)}${projectRecord.importedPendingPercentage == null ? "" : ` · ${sourceColumns.pendingPercent} ${formatPercent(projectRecord.importedPendingPercentage)}`}`;
     const review = document.querySelector("#detailImportedReview");
     review.hidden = !projectRecord.importedFinancialReview;
     review.textContent = projectRecord.importedFinancialReview || "";
@@ -1191,8 +1223,9 @@ function renderMonthly() {
     const paymentNote = paymentEvidence.length
       ? paymentEvidenceHeadline(paymentEvidence)
       : source?.importedCollectedTotal != null ? "Anticipos importados del Excel" : "";
+    const sourceColumns = excelSourceColumns(source);
     const executionLabel = project?.executionProgressSource === "sistema"
-      ? "Avance registrado" : "Avance general Excel (AK)";
+      ? "Avance registrado" : `Avance general Excel (${sourceColumns.execution})`;
     const activityCount = months.filter(hasMonthlyActivity).length;
     const header = `<tr class="monthly-project-heading"><th colspan="8" scope="rowgroup">
       <div class="monthly-project-summary">
@@ -1200,6 +1233,7 @@ function renderMonthly() {
         <div><span>Contrato</span><strong>${balance.value === "Sin valor contractual" ? "Sin valor en Excel" : monthlyMoney(contract)}</strong></div>
         <div><span>${escapeHtml(balance.label)}</span><strong>${balance.value}</strong></div>
         <div><span>Facturado total</span><strong>${monthlyMoney(project?.totalInvoiced ?? 0)}</strong></div>
+        ${source?.importedPendingToInvoice == null ? "" : `<div><span>Pendiente ${sourceColumns.pending} · porcentaje ${sourceColumns.pendingPercent}</span><strong>${escapeHtml(importedPendingText(source.importedPendingToInvoice))}</strong><small>${source.importedPendingPercentage == null ? `${sourceColumns.pendingPercent} sin dato` : formatPercent(source.importedPendingPercentage)}</small></div>`}
         <div><span>${executionLabel}</span><strong>${executed == null ? "—" : formatPercent(executed)}</strong></div>
         <div><span>Recaudo registrado</span><strong>${source?.importedCollectedTotal == null && !project?.totalPaid ? "Por conciliar" : monthlyMoney(project?.totalPaid ?? 0)}</strong>${paymentNote ? `<small>${escapeHtml(paymentNote)}</small>` : ""}</div>
         <button class="table-action" type="button" data-action="open-project" data-project-id="${escapeHtml(projectId)}">Ver ficha</button>
@@ -1228,7 +1262,7 @@ function renderMonthly() {
       const advance = tracking.monthlyProgressPercentage != null
         ? `<strong>${formatPercent(tracking.monthlyProgressPercentage)}</strong><small>Acum. ${formatPercent(tracking.cumulativeProgressPercentage)}</small>`
         : tracking.importedExecutionPercentage != null
-          ? `<strong>${formatPercent(tracking.importedExecutionPercentage)}</strong><small>AK del Excel · referencia</small>`
+          ? `<strong>${formatPercent(tracking.importedExecutionPercentage)}</strong><small>${sourceColumns.execution} del Excel · referencia</small>`
           : '<span class="monthly-muted">—</span>';
       const billedExcel = tracking.importedBillingPercentage != null
         && (Number(tracking.invoicedValue) !== 0 || Number(tracking.importedBillingPercentage) !== 0)
@@ -1238,7 +1272,7 @@ function renderMonthly() {
         ["Ejecución del mes", tracking.monthlyProgressPercentage == null ? "—" : formatPercent(tracking.monthlyProgressPercentage)],
         ["Ejecución acumulada", tracking.cumulativeProgressPercentage == null ? "—" : formatPercent(tracking.cumulativeProgressPercentage)],
         ["Equivalente ejecutado", payment?.executionRecorded ? formatCop(payment.cumulativeEquivalent) : "—"],
-        ["Avance general AK", tracking.importedExecutionPercentage == null ? "—" : formatPercent(tracking.importedExecutionPercentage)],
+        [`Avance general ${sourceColumns.execution}`, tracking.importedExecutionPercentage == null ? "—" : formatPercent(tracking.importedExecutionPercentage)],
         ["Facturado del mes", formatCop(tracking.invoicedValue)],
         ["% facturado Excel", tracking.importedBillingPercentage == null ? "—" : formatPercent(tracking.importedBillingPercentage)],
         ["Facturado acumulado", formatCop(cumulativeBilled)],
@@ -1276,7 +1310,7 @@ function importedFollowupHtml(project) {
   const alternates = project.importedAlternateSnapshots ?? [];
   const components = project.importedContractComponents ?? [];
   const snapshot = project.importedExecutionSnapshotPercentage;
-  return `${paymentEvidence.length ? `<h5>Notas de pago del Excel</h5><p><strong>${escapeHtml(paymentEvidenceHeadline(paymentEvidence))}</strong>. El importe, cuando se puede calcular, aparece en el recaudo histórico sin asignarle un mes inexistente.</p><ul>${paymentEvidence.map((item) => `<li>${escapeHtml(item.text)} <small>(${escapeHtml(item.sheet)}, fila ${escapeHtml(item.row)})</small></li>`).join("")}</ul>` : ""}${project.importedUndatedBilled > 0 ? `<p><strong>Facturado sin mes identificado en la fórmula AI:</strong> ${formatCop(project.importedUndatedBilled)}. Incluido en el total sin asignarlo a un mes.</p>` : ""}${snapshot == null ? "" : `<p><strong>Avance de ejecución general (columna AK del Excel):</strong> ${formatPercent(snapshot)}${project.importedExecutionMonthLabel ? ` · mes indicado «${escapeHtml(project.importedExecutionMonthLabel)}»` : ""}. Es una referencia general; si el libro mezcla años, no se asigna a un año sin evidencia. No equivale a un avance mensual validado.</p>`}
+  return `${paymentEvidence.length ? `<h5>Notas de pago del Excel</h5><p><strong>${escapeHtml(paymentEvidenceHeadline(paymentEvidence))}</strong>. El importe, cuando se puede calcular, aparece en el recaudo histórico sin asignarle un mes inexistente.</p><ul>${paymentEvidence.map((item) => `<li>${escapeHtml(item.text)} <small>(${escapeHtml(item.sheet)}, fila ${escapeHtml(item.row)})</small></li>`).join("")}</ul>` : ""}${project.importedUndatedBilled > 0 ? `<p><strong>Facturado sin mes identificado en la fórmula AI:</strong> ${formatCop(project.importedUndatedBilled)}. Incluido en el total sin asignarlo a un mes.</p>` : ""}${snapshot == null ? "" : `<p><strong>Avance de ejecución general (columna ${excelSourceColumns(project).execution} del Excel):</strong> ${formatPercent(snapshot)}${project.importedExecutionMonthLabel ? ` · mes indicado «${escapeHtml(project.importedExecutionMonthLabel)}»` : ""}. Es una referencia general; si el libro mezcla años, no se asigna a un año sin evidencia. No equivale a un avance mensual validado.</p>`}
     ${components.length > 1 ? `<details><summary>Valores contractuales por fila (${components.length})</summary><ul>${components.map((item) => `<li>Fila ${escapeHtml(item.row)}: ${formatCop(item.amount)}</li>`).join("")}</ul><p>Suma de líneas J: ${formatCop(components.reduce((sum, item) => sum + Number(item.amount || 0), 0))}. Algunas líneas son adiciones o contratos separados; consulta la fórmula AI y la revisión antes de usarlas como valor contractual único.</p></details>` : ""}
     ${notes.length ? `<h5>Notas de seguimiento del Excel</h5><ul>${notes.map((item) => `<li>${escapeHtml(item.text)} <small>(${escapeHtml(item.sheet)}, fila ${escapeHtml(item.row)})</small></li>`).join("")}</ul>` : ""}
     ${references.length ? `<p><strong>Referencias de factura en Excel:</strong> ${references.map((item) => escapeHtml(item.reference)).join("; ")}. No acreditan pagos.</p>` : ""}
@@ -1864,8 +1898,8 @@ function renderReports() {
         ? "Recaudo importado del Excel" : "";
     return `<tr>
     <td>${escapeHtml(displayProjectCenter(row.costCenter))}</td><td>${escapeHtml(row.parentCostCenter || "—")}</td><td><strong>${escapeHtml(row.projectName)}</strong><br><small>${escapeHtml(row.municipality)}</small></td>
-    <td>${known ? formatCop(row.contractValue) : "Sin valor contractual"}</td><td>${formatExecutionPercent(row.executionProgress)}</td><td>${formatCop(row.invoiced)}</td><td>${source?.importedCollectedTotal == null && !row.paid ? "Por conciliar" : formatCop(row.paid)}${receiptNote ? `<br><small>${escapeHtml(receiptNote)}</small>` : ""}</td>
-    <td>${formatCop(row.costsExpenses)}</td><td>${formatCop(row.profitability)}</td><td>${balance.label === "Exceso facturado" ? `Exceso ${balance.value}` : balance.value}</td><td>${monthlyMoney(row.paymentPending)}</td>
+    <td>${known ? formatCop(row.contractValue) : "Sin valor contractual"}</td><td>${formatExecutionPercent(row.executionProgress)}</td><td>${source?.importedFinancialSource && !row.invoiced ? "Sin factura en Excel" : formatCop(row.invoiced)}</td><td>${source?.importedCollectedTotal == null && !row.paid ? "Por conciliar" : formatCop(row.paid)}${receiptNote ? `<br><small>${escapeHtml(receiptNote)}</small>` : ""}</td>
+    <td>${formatCop(row.costsExpenses)}</td><td>${formatCop(row.profitability)}</td><td>${balance.label === "Exceso facturado" ? `Exceso ${balance.value}` : balance.value}</td><td>${source?.importedPendingToInvoice == null ? "—" : `${escapeHtml(importedPendingText(source.importedPendingToInvoice))}${source.importedPendingPercentage == null ? "" : `<br><small>${excelSourceColumns(source).pendingPercent} ${formatPercent(source.importedPendingPercentage)}</small>`}`}</td><td>${monthlyMoney(row.paymentPending)}</td>
     <td><strong>${formatPercent(row.financialProgress)}</strong></td>
     <td>${canEditExecution(currentUserProfile)
       ? `<button class="table-action" type="button" data-action="edit-report-progress" data-project-id="${escapeHtml(row.projectId)}" aria-label="Corregir avance general de ${escapeHtml(row.projectName)}">Corregir avance general</button>`

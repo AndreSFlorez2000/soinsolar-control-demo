@@ -22,7 +22,7 @@ import {
   INVOICE_STATUSES,
   PAYMENT_STATUSES,
   VALIDATION_STATUSES
-} from "./models.js?v=1.18.15";
+} from "./models.js?v=1.18.16";
 
 export class DataAccessError extends Error {
   constructor(message, cause = null) {
@@ -188,7 +188,10 @@ export class ProjectRepository {
     for (const input of inputs) {
       const record = projectInputToRecord(input, user);
       const history = Object.fromEntries(Object.entries(record).filter(([key]) =>
-        key.startsWith("imported_") && !["imported_pending_to_invoice", "imported_pending_percentage"].includes(key)));
+        key.startsWith("imported_") && (
+          key !== "imported_pending_to_invoice" && key !== "imported_pending_percentage"
+          || key === "imported_pending_to_invoice" && input.importedPendingToInvoice != null
+          || key === "imported_pending_percentage" && input.importedPendingPercentage != null)));
       const rows = await unwrap(this.client.from("projects")
         .update({ ...history, updated_by: user })
         .eq("id", assertUuid(input.id, "proyecto"))

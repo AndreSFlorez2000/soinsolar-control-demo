@@ -11,7 +11,7 @@
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.18.15" />
+    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.18.16" />
   </head>
   <body>
     <section id="loginView" class="login-shell">
@@ -224,6 +224,8 @@
                   <div><span>Recaudo registrado</span><strong id="detailPaid">$0</strong></div>
                   <div><span>Costos y gastos</span><strong id="detailCosts">$0</strong></div>
                   <div><span id="detailContractBalanceLabel">Saldo por facturar</span><strong id="detailContractBalance">$0</strong></div>
+                  <div id="detailExcelPendingSummaryWrap" hidden><span>Pendiente por facturar · Excel (AI)</span><strong id="detailExcelPendingSummary">—</strong><small id="detailExcelPendingPercent"></small></div>
+                  <div id="detailExcelExecutedWrap" hidden><span>Ejecutado equivalente · Excel (AK)</span><strong id="detailExcelExecuted">—</strong><small id="detailExcelExecutedBasis"></small></div>
                 </div>
                 <div class="progress-label"><strong>Facturación del contrato</strong><strong id="detailProgressLabel">0 %</strong></div>
                 <div class="progress"><div id="detailProgressBar" class="progress-bar bg-success" style="width:0%"></div></div>
@@ -253,7 +255,7 @@
               <p id="detailImportedOverview" class="excel-overview"></p>
               <div class="summary-grid imported-exceptions">
                 <div id="detailImportedUndatedWrap" hidden><span>Facturado sin mes en la fórmula AI</span><strong id="detailImportedUndated">—</strong></div>
-                <div id="detailImportedPendingWrap" hidden><span>Saldo de AI según el Excel</span><strong id="detailImportedPending">—</strong></div>
+                <div id="detailImportedPendingWrap" hidden><span>Pendiente por facturar (AI) · porcentaje (AJ)</span><strong id="detailImportedPending">—</strong></div>
                 <div id="detailImportedPaymentStatusWrap" hidden><span>Pago indicado en notas del Excel</span><strong id="detailImportedPaymentStatus">—</strong></div>
               </div>
               <p id="detailImportedCollectionBasis" class="source-caption"></p>
@@ -414,7 +416,7 @@
             <article class="panel data-panel">
               <div class="table-responsive">
                 <table class="table align-middle mb-0">
-                  <thead><tr><th>Centro de costo</th><th>Proyecto</th><th>Municipio</th><th>Tipo de servicio</th><th>Estado</th><th>Avance de ejecución</th><th>Facturación %</th><th>Acciones</th></tr></thead>
+                  <thead><tr><th>Centro de costo</th><th>Proyecto</th><th>Municipio</th><th>Tipo de servicio</th><th>Estado</th><th>Avance de ejecución</th><th>Facturación %</th><th>Pendiente según Excel</th><th>Acciones</th></tr></thead>
                   <tbody id="projectsManagementRows"></tbody>
                 </table>
               </div>
@@ -649,14 +651,14 @@
                 <span>Rentabilidad estimada = contrato vigente − costos y gastos</span>
                 <span>Cobro = pagado ÷ facturado</span>
                 <span>Saldo contractual = contrato vigente − facturado</span>
-                <span>El histórico del Excel no confirma recaudos; su cartera requiere conciliación</span>
+                <span>El recaudo histórico importado sigue el criterio del libro; cartera formal y saldo por facturar se muestran aparte</span>
               </div>
             </article>
 
             <article class="panel data-panel report-data-panel">
               <div class="panel-heading"><div><h4>Resultados por proyecto</h4><small id="reportResultCount">0 proyectos incluidos</small></div></div>
               <div id="reportModuleMessage" class="module-message module-message-block" role="status" aria-live="polite"></div>
-              <div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Centro</th><th>Principal</th><th>Proyecto</th><th>Contrato</th><th>Avance de ejecución</th><th>Facturado</th><th>Recaudo registrado</th><th>Costos</th><th>Rentabilidad</th><th>Saldo por facturar</th><th>Cartera formal</th><th>Facturación %</th><th>Acción</th></tr></thead><tbody id="reportRows"></tbody></table></div>
+              <div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Centro</th><th>Principal</th><th>Proyecto</th><th>Contrato</th><th>Avance de ejecución</th><th>Facturado</th><th>Recaudo registrado</th><th>Costos</th><th>Rentabilidad</th><th>Saldo por facturar</th><th>Pendiente según Excel</th><th>Cartera formal</th><th>Facturación %</th><th>Acción</th></tr></thead><tbody id="reportRows"></tbody></table></div>
               <div id="reportEmpty" class="inline-empty" hidden>No hay proyectos que coincidan con los filtros.</div>
             </article>
 
@@ -951,11 +953,11 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="src/assets/js/config.js?v=1.12.0"></script>
-    <script type="module" src="src/assets/js/app.js?v=1.18.15"></script>
-    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.18.15"></script>
-    <script type="module" src="src/assets/js/accounting-ui.js?v=1.18.15"></script>
-    <script type="module" src="src/assets/js/project-import-ui.js?v=1.18.15"></script>
-    <script type="module" src="src/assets/js/assistant-ui.js?v=1.18.15"></script>
+    <script type="module" src="src/assets/js/app.js?v=1.18.16"></script>
+    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.18.16"></script>
+    <script type="module" src="src/assets/js/accounting-ui.js?v=1.18.16"></script>
+    <script type="module" src="src/assets/js/project-import-ui.js?v=1.18.16"></script>
+    <script type="module" src="src/assets/js/assistant-ui.js?v=1.18.16"></script>
   </body>
 </html>
 
