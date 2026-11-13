@@ -1,19 +1,19 @@
 import { buildMonthlySeries, calculateDashboardIndicators } from "./domain/dashboard.js?v=1.5.9";
-import { createDashboardUI } from "./dashboard-ui.js?v=1.18.16";
+import { createDashboardUI } from "./dashboard-ui.js?v=1.18.17";
 import { calculateProjectIndicators } from "./domain/project-analytics.js?v=1.4.1";
-import { buildManagementReport, buildMonthlyExecutionReport } from "./domain/reports.js?v=1.18.16";
-import { historicalProjectGroups, historicalWorkbookSheet, managementSummarySheet, monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.18.16";
-import { hasMonthlyActivity, historicalMonthVisibility, monthlyDisplayCounts, monthlyDisplayRows } from "./domain/monthly-display.js?v=1.18.16";
-import { contractPosition, paymentEvidenceHeadline } from "./domain/excel-payment-evidence.js?v=1.18.16";
+import { buildManagementReport, buildMonthlyExecutionReport } from "./domain/reports.js?v=1.18.17";
+import { historicalProjectGroups, historicalWorkbookSheet, managementSummarySheet, monthlyWorkbookSheets } from "./domain/monthly-workbook.js?v=1.18.17";
+import { hasMonthlyActivity, historicalMonthVisibility, monthlyDisplayCounts, monthlyDisplayRows } from "./domain/monthly-display.js?v=1.18.17";
+import { contractPosition, paymentEvidenceHeadline } from "./domain/excel-payment-evidence.js?v=1.18.17";
 import { createXlsx } from "./domain/xlsx-export.js?v=1.5.8";
 import { costWorkbookSheets } from "./domain/cost-workbook.js?v=1.5.8";
 import { canEditExecution } from "./domain/execution.js?v=1.9.0";
-import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=1.18.16";
-import { importedBillingRows, recognizedInvoices } from "./domain/finance-history.js?v=1.18.16";
+import { formatCop, paymentPending, safePercent } from "./domain/financial.js?v=1.18.17";
+import { importedBillingRows, recognizedInvoices } from "./domain/finance-history.js?v=1.18.17";
 import { invoicePendingAmount, isSampleProject, payableInvoicesForProject } from "./domain/payment-selection.js?v=1.5.1";
 import { forgetProject, hasProject, recallProject, rememberProject } from "./domain/project-context.js?v=1.8.0";
-import { displayProjectCenter } from "./domain/project-center.js?v=1.18.16";
-import { createApplicationDataGateway } from "./services/application-data.js?v=1.18.16";
+import { displayProjectCenter } from "./domain/project-center.js?v=1.18.17";
+import { createApplicationDataGateway } from "./services/application-data.js?v=1.18.17";
 import { getCurrentSession, isDemoMode, registerAccount, signIn, signOut } from "./services/supabase.js?v=1.13.1";
 
 const loginView = document.querySelector("#loginView");
@@ -211,8 +211,17 @@ function contractPositionDisplay(project, source) {
 
 function importedPendingText(amount) {
   if (amount == null) return "Sin dato en AI";
+  if (amount === 0) return "Sin saldo pendiente según Excel";
   if (Math.abs(amount) < 1) return "Sin saldo material · redondeo";
   return amount < 0 ? `Exceso facturado: ${formatCop(-amount)}` : formatCop(amount);
+}
+
+function importedContractComponentsText(source) {
+  if (source?.importedContractValue != null) return "";
+  const components = source?.importedContractComponents ?? [];
+  if (!components.length) return "";
+  const amount = components.reduce((total, item) => total + Number(item.amount || 0), 0);
+  return `Partidas J: ${formatCop(amount)} · total contractual por conciliar`;
 }
 
 function excelSourceColumns(source) {
@@ -929,10 +938,11 @@ async function openProjectDetail(projectId) {
   document.querySelector("#detailMunicipality").textContent = project.municipality;
   const contractPositionText = contractPositionDisplay(project, projectRecord);
   document.querySelector("#detailContractValue").textContent = contractPositionText.value === "Sin valor contractual"
-    ? projectRecord.importedFinancialSource ? "Sin valor en el Excel" : "Sin contrato registrado"
+    ? importedContractComponentsText(projectRecord) || (projectRecord.importedFinancialSource ? "Sin valor en el Excel" : "Sin contrato registrado")
     : formatCop(project.contractValue);
   document.querySelector("#detailContractLabel").textContent = projectRecord.importedContractValue != null && !project.contractId
-    ? "Valor contractual según Excel" : "Valor contractual vigente";
+    ? "Valor contractual según Excel" : importedContractComponentsText(projectRecord)
+      ? "Partidas del Excel · contrato sin total" : "Valor contractual vigente";
   document.querySelector("#detailProjectProgress").textContent = formatExecutionPercent(project.executedProgressPercentage);
   const sourceColumns = excelSourceColumns(projectRecord);
   document.querySelector("#detailProjectProgressSource").textContent = project.executionProgressSource === "excel"
@@ -1014,7 +1024,7 @@ async function openProjectDetail(projectId) {
         ` Anticipo recibido según las notas: ${formatCop(projectRecord.importedCollectedTotal)}; sin mes de recaudo indicado.`;
     }
     document.querySelector("#detailImportedContract").textContent = projectRecord.importedContractValue == null
-      ? "Sin valor" : formatCop(projectRecord.importedContractValue);
+      ? importedContractComponentsText(projectRecord) || "Sin valor" : formatCop(projectRecord.importedContractValue);
     document.querySelector("#detailImportedBilled").textContent = formatCop(projectRecord.importedBilledTotal || 0);
     document.querySelector("#detailImportedPaid").textContent =
       projectRecord.importedCollectedTotal == null ? "Por conciliar" : formatCop(projectRecord.importedCollectedTotal);
@@ -1230,7 +1240,7 @@ function renderMonthly() {
     const header = `<tr class="monthly-project-heading"><th colspan="8" scope="rowgroup">
       <div class="monthly-project-summary">
         <div class="monthly-project-title"><strong>${escapeHtml(displayProjectCenter(latest.costCenter))} · ${escapeHtml(latest.projectName)}</strong><small>${activityCount} mes(es) con datos · ${months.length} periodo(s) disponibles</small></div>
-        <div><span>Contrato</span><strong>${balance.value === "Sin valor contractual" ? "Sin valor en Excel" : monthlyMoney(contract)}</strong></div>
+        <div><span>Contrato</span><strong>${balance.value === "Sin valor contractual" ? escapeHtml(importedContractComponentsText(source) || "Sin valor en Excel") : monthlyMoney(contract)}</strong></div>
         <div><span>${escapeHtml(balance.label)}</span><strong>${balance.value}</strong></div>
         <div><span>Facturado total</span><strong>${monthlyMoney(project?.totalInvoiced ?? 0)}</strong></div>
         ${source?.importedPendingToInvoice == null ? "" : `<div><span>Pendiente ${sourceColumns.pending} · porcentaje ${sourceColumns.pendingPercent}</span><strong>${escapeHtml(importedPendingText(source.importedPendingToInvoice))}</strong><small>${source.importedPendingPercentage == null ? `${sourceColumns.pendingPercent} sin dato` : formatPercent(source.importedPendingPercentage)}</small></div>`}

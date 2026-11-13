@@ -1,5 +1,5 @@
-import { PROJECT_IMPORT_HEADERS, changedHistoricalUpdates, extractLegacyProjectRows, parseProjectCsv, referencedContractValue, resolveProjectImportRows } from "./domain/project-import.js?v=1.18.16";
-import { displayProjectCenter } from "./domain/project-center.js?v=1.18.16";
+import { PROJECT_IMPORT_HEADERS, changedHistoricalUpdates, extractLegacyProjectRows, parseProjectCsv, referencedContractValue, resolveProjectImportRows } from "./domain/project-import.js?v=1.18.17";
+import { displayProjectCenter } from "./domain/project-center.js?v=1.18.17";
 import { createXlsx } from "./domain/xlsx-export.js?v=1.17.0";
 
 const $ = (selector) => document.querySelector(selector);
