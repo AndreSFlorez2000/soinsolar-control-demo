@@ -11,7 +11,7 @@
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.18.17" />
+    <link rel="stylesheet" href="src/assets/css/styles.css?v=1.18.18" />
   </head>
   <body>
     <section id="loginView" class="login-shell">
@@ -224,8 +224,6 @@
                   <div><span>Recaudo registrado</span><strong id="detailPaid">$0</strong></div>
                   <div><span>Costos y gastos</span><strong id="detailCosts">$0</strong></div>
                   <div><span id="detailContractBalanceLabel">Saldo por facturar</span><strong id="detailContractBalance">$0</strong></div>
-                  <div id="detailExcelPendingSummaryWrap" hidden><span>Pendiente por facturar · Excel (AI)</span><strong id="detailExcelPendingSummary">—</strong><small id="detailExcelPendingPercent"></small></div>
-                  <div id="detailExcelExecutedWrap" hidden><span>Ejecutado equivalente · Excel (AK)</span><strong id="detailExcelExecuted">—</strong><small id="detailExcelExecutedBasis"></small></div>
                 </div>
                 <div class="progress-label"><strong>Facturación del contrato</strong><strong id="detailProgressLabel">0 %</strong></div>
                 <div class="progress"><div id="detailProgressBar" class="progress-bar bg-success" style="width:0%"></div></div>
@@ -233,16 +231,16 @@
               <article class="panel">
                 <h4>Información del proyecto</h4>
                 <dl class="project-info-grid">
-                  <div id="detailExcelDescriptionWrap" class="span-2" hidden><dt>Descripción del proyecto en el Excel</dt><dd id="detailExcelDescription">—</dd></div>
+                  <div id="detailExcelDescriptionWrap" class="span-2" hidden><dt>Descripción</dt><dd id="detailExcelDescription">—</dd></div>
                   <div id="detailClientWrap"><dt>Cliente</dt><dd id="detailClient">Sin registrar</dd></div>
                   <div><dt>Contrato</dt><dd id="detailContractNumber">Sin registrar</dd></div>
                   <div id="detailPowerWrap"><dt>Potencia</dt><dd id="detailPower">Sin registrar</dd></div>
                   <div id="detailStartDateWrap"><dt>Fecha de inicio</dt><dd id="detailStartDate">Sin fecha</dd></div>
                   <div id="detailEndDateWrap"><dt>Fecha de finalización</dt><dd id="detailEndDate">Sin fecha</dd></div>
-                  <div id="detailExcelTypeWrap" hidden><dt>Tipo en el Excel</dt><dd id="detailExcelType">—</dd></div>
-                  <div id="detailExcelStatusWrap" hidden><dt>Estado indicado en el Excel</dt><dd id="detailExcelStatus">—</dd></div>
-                  <div id="detailExcelInvoiceWrap" hidden><dt>Columna N.º FAC del Excel</dt><dd id="detailExcelInvoice">—</dd></div>
-                  <div id="detailExcelOrderWrap" hidden><dt>O.C. / referencia del Excel</dt><dd id="detailExcelOrder">—</dd></div>
+                  <div id="detailExcelTypeWrap" hidden><dt>Tipo</dt><dd id="detailExcelType">—</dd></div>
+                  <div id="detailExcelStatusWrap" hidden><dt>Estado de origen</dt><dd id="detailExcelStatus">—</dd></div>
+                  <div id="detailExcelInvoiceWrap" hidden><dt>Referencia de factura</dt><dd id="detailExcelInvoice">—</dd></div>
+                  <div id="detailExcelOrderWrap" hidden><dt>Orden de compra</dt><dd id="detailExcelOrder">—</dd></div>
                   <div id="detailNotesWrap" class="span-2"><dt>Observaciones</dt><dd id="detailNotes">Sin observaciones</dd></div>
                 </dl>
                 <p id="detailMissingFields" class="project-missing-fields" hidden></p>
@@ -250,18 +248,18 @@
             </div>
 
             <article id="detailImportedFinance" class="panel" hidden>
-              <h4>Seguimiento del Excel</h4>
-              <p id="detailImportedSource" class="source-caption"></p>
-              <p id="detailImportedOverview" class="excel-overview"></p>
-              <div class="summary-grid imported-exceptions">
-                <div id="detailImportedUndatedWrap" hidden><span>Facturado sin mes en la fórmula AI</span><strong id="detailImportedUndated">—</strong></div>
-                <div id="detailImportedPendingWrap" hidden><span>Pendiente por facturar (AI) · porcentaje (AJ)</span><strong id="detailImportedPending">—</strong></div>
-                <div id="detailImportedPaymentStatusWrap" hidden><span>Pago indicado en notas del Excel</span><strong id="detailImportedPaymentStatus">—</strong></div>
-              </div>
-              <p id="detailImportedCollectionBasis" class="source-caption"></p>
-              <p id="detailImportedReview" hidden></p>
+              <h4>Histórico financiero</h4>
               <div id="detailImportedMonths"></div>
-              <details class="excel-source-details"><summary>Ver cifras y notas originales del archivo</summary>
+              <details class="excel-source-details"><summary>Origen y conciliación</summary>
+                <p id="detailImportedSource" class="source-caption"></p>
+                <p id="detailImportedOverview" class="excel-overview"></p>
+                <div class="summary-grid imported-exceptions">
+                  <div id="detailImportedUndatedWrap" hidden><span>Facturado sin mes en la fórmula AI</span><strong id="detailImportedUndated">—</strong></div>
+                  <div id="detailImportedPendingWrap" hidden><span>Pendiente por facturar (AI) · porcentaje (AJ)</span><strong id="detailImportedPending">—</strong></div>
+                  <div id="detailImportedPaymentStatusWrap" hidden><span>Pago indicado en notas del Excel</span><strong id="detailImportedPaymentStatus">—</strong></div>
+                </div>
+                <p id="detailImportedCollectionBasis" class="source-caption"></p>
+                <p id="detailImportedReview" hidden></p>
                 <div class="summary-grid">
                   <div><span>Valor contractual de la fila principal</span><strong id="detailImportedContract">—</strong></div>
                   <div><span>Facturado hasta el corte</span><strong id="detailImportedBilled">—</strong></div>
@@ -341,7 +339,7 @@
             </div>
 
             <article class="panel filter-panel monthly-filter-panel" aria-labelledby="monthlyFiltersTitle">
-              <div class="filter-panel-heading"><div><h4 id="monthlyFiltersTitle">Filtros de seguimiento</h4><p>Busca un centro o proyecto, o selecciona un periodo. Los avances del Excel se distinguen de los validados en el sistema.</p></div><span class="filter-panel-tip">Opcional</span></div>
+              <div class="filter-panel-heading"><div><h4 id="monthlyFiltersTitle">Filtros de seguimiento</h4><p>Busca un centro o proyecto, o selecciona un periodo. Los avances históricos se distinguen de los validados.</p></div><span class="filter-panel-tip">Opcional</span></div>
               <form id="monthlyFilters" class="filter-grid" autocomplete="off">
                 <label>Buscar centro o proyecto<input id="monthlyHistoricalSearch" class="form-control" type="search" placeholder="Ej.: 220 o DISLICORES" autocomplete="off" /></label>
                 <label>Proyecto<select id="monthlyFilterProject" class="form-select"><option value="">Todos</option></select></label>
@@ -354,12 +352,12 @@
 
             <div id="monthlyModuleMessage" class="module-message module-message-block" role="status" aria-live="polite"></div>
             <article class="panel data-panel">
-              <div class="panel-heading monthly-panel-heading"><div><h4>Mes a mes de proyectos</h4><small id="monthlyDisplayCount">Los meses sin actividad están disponibles para consulta. «% Excel» corresponde a facturación; AK corresponde a ejecución general.</small></div><label class="monthly-quiet-toggle"><input id="monthlyShowEmpty" type="checkbox" /> Mostrar meses sin movimiento</label></div>
+              <div class="panel-heading monthly-panel-heading"><div><h4>Mes a mes de proyectos</h4><small id="monthlyDisplayCount">Los meses sin actividad están disponibles para consulta.</small></div><label class="monthly-quiet-toggle"><input id="monthlyShowEmpty" type="checkbox" /> Mostrar meses sin movimiento</label></div>
               <div class="table-responsive"><table class="table monthly-table align-middle mb-0"><thead><tr><th scope="col">Periodo</th><th scope="col">Avance ejecutado</th><th scope="col">Facturado del mes</th><th scope="col">Facturado acumulado</th><th scope="col">Recaudado</th><th scope="col">Costos</th><th scope="col">Estado y detalle</th><th scope="col">Acciones</th></tr></thead><tbody id="monthlyRows"></tbody></table></div>
               <div id="monthlyEmpty" class="inline-empty" hidden>No se encontraron registros mensuales.</div>
             </article>
             <article class="panel data-panel period-panel">
-              <div class="panel-heading"><div><h4>Periodos del sistema</h4><small>Los periodos del Excel se identifican como históricos. El administrador puede cerrar o reabrir los periodos operativos.</small></div><span id="periodModuleMessage" class="module-message" role="status" aria-live="polite"></span></div>
+              <div class="panel-heading"><div><h4>Periodos del sistema</h4><small>Los periodos históricos son de consulta. El administrador puede cerrar o reabrir los periodos operativos.</small></div><span id="periodModuleMessage" class="module-message" role="status" aria-live="polite"></span></div>
               <div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Periodo</th><th>Estado</th><th>Fecha de cierre</th><th>Acción</th></tr></thead><tbody id="periodRows"></tbody></table></div>
             </article>
           </section>
@@ -416,7 +414,7 @@
             <article class="panel data-panel">
               <div class="table-responsive">
                 <table class="table align-middle mb-0">
-                  <thead><tr><th>Centro de costo</th><th>Proyecto</th><th>Municipio</th><th>Tipo de servicio</th><th>Estado</th><th>Avance de ejecución</th><th>Facturación %</th><th>Pendiente según Excel</th><th>Acciones</th></tr></thead>
+                  <thead><tr><th>Centro de costo</th><th>Proyecto</th><th>Municipio</th><th>Tipo de servicio</th><th>Estado</th><th>Avance de ejecución</th><th>Facturación %</th><th>Acciones</th></tr></thead>
                   <tbody id="projectsManagementRows"></tbody>
                 </table>
               </div>
@@ -577,12 +575,12 @@
 
           <section id="financeView" class="content-view" hidden>
             <div class="section-heading">
-              <div><h3>Facturación y pagos</h3><p>La tabla incluye lo facturado por mes en el Excel y las facturas formales del sistema. Los importes históricos no aportan fecha de emisión ni constancia de pago.</p></div>
+              <div><h3>Facturación y pagos</h3><p>Consulta la facturación histórica y las facturas formales. El recaudo se registra por separado.</p></div>
               <div class="heading-actions"><button id="newPaymentButton" class="btn btn-outline-primary" type="button">Registrar pago</button><button id="newInvoiceButton" class="btn btn-primary" type="button">Nueva factura</button></div>
             </div>
 
             <div class="cost-summary-grid">
-              <article class="mini-kpi"><span>Facturado (Excel + sistema)</span><strong id="financeInvoicedTotal">$0</strong></article>
+              <article class="mini-kpi"><span>Facturado total</span><strong id="financeInvoicedTotal">$0</strong></article>
               <article class="mini-kpi"><span>Pagos registrados en sistema</span><strong id="financePaidTotal">$0</strong></article>
               <article class="mini-kpi"><span>Saldo de facturas formales</span><strong id="financePendingTotal">$0</strong></article>
               <article class="mini-kpi"><span>Facturas con saldo</span><strong id="financePendingInvoices">0</strong></article>
@@ -645,7 +643,7 @@
             <article class="panel report-formulas">
               <h4>Lectura del reporte</h4>
               <div class="formula-grid">
-                <span>Avance de ejecución = registro del administrador; si falta, corte del Excel señalado como histórico</span>
+                <span>Avance de ejecución = registro del administrador; si falta, corte histórico identificado</span>
                 <span>Facturación % = facturación acumulada ÷ contrato vigente × 100</span>
                 <span>Recaudo Financiero = pagos acumulados ÷ contrato vigente × 100</span>
                 <span>Rentabilidad estimada = contrato vigente − costos y gastos</span>
@@ -658,7 +656,7 @@
             <article class="panel data-panel report-data-panel">
               <div class="panel-heading"><div><h4>Resultados por proyecto</h4><small id="reportResultCount">0 proyectos incluidos</small></div></div>
               <div id="reportModuleMessage" class="module-message module-message-block" role="status" aria-live="polite"></div>
-              <div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Centro</th><th>Principal</th><th>Proyecto</th><th>Contrato</th><th>Avance de ejecución</th><th>Facturado</th><th>Recaudo registrado</th><th>Costos</th><th>Rentabilidad</th><th>Saldo por facturar</th><th>Pendiente según Excel</th><th>Cartera formal</th><th>Facturación %</th><th>Acción</th></tr></thead><tbody id="reportRows"></tbody></table></div>
+              <div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Centro</th><th>Principal</th><th>Proyecto</th><th>Contrato</th><th>Avance de ejecución</th><th>Facturado</th><th>Recaudo registrado</th><th>Costos</th><th>Rentabilidad</th><th>Saldo por facturar</th><th>Cartera formal</th><th>Facturación %</th><th>Acción</th></tr></thead><tbody id="reportRows"></tbody></table></div>
               <div id="reportEmpty" class="inline-empty" hidden>No hay proyectos que coincidan con los filtros.</div>
             </article>
 
@@ -953,11 +951,11 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="src/assets/js/config.js?v=1.12.0"></script>
-    <script type="module" src="src/assets/js/app.js?v=1.18.17"></script>
-    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.18.17"></script>
-    <script type="module" src="src/assets/js/accounting-ui.js?v=1.18.17"></script>
-    <script type="module" src="src/assets/js/project-import-ui.js?v=1.18.17"></script>
-    <script type="module" src="src/assets/js/assistant-ui.js?v=1.18.17"></script>
+    <script type="module" src="src/assets/js/app.js?v=1.18.18"></script>
+    <script type="module" src="src/assets/js/adjustments-ui.js?v=1.18.18"></script>
+    <script type="module" src="src/assets/js/accounting-ui.js?v=1.18.18"></script>
+    <script type="module" src="src/assets/js/project-import-ui.js?v=1.18.18"></script>
+    <script type="module" src="src/assets/js/assistant-ui.js?v=1.18.18"></script>
   </body>
 </html>
 
