@@ -340,12 +340,14 @@
 
             <article class="panel filter-panel monthly-filter-panel" aria-labelledby="monthlyFiltersTitle">
               <div class="filter-panel-heading"><div><h4 id="monthlyFiltersTitle">Filtros de seguimiento</h4><p>Busca un centro o proyecto, o selecciona un periodo. Los avances históricos se distinguen de los validados.</p></div><span class="filter-panel-tip">Opcional</span></div>
-              <form id="monthlyFilters" class="filter-grid" autocomplete="off">
+              <form id="monthlyFilters" class="filter-grid filter-grid-projects" autocomplete="off">
                 <label>Buscar centro o proyecto<input id="monthlyHistoricalSearch" class="form-control" type="search" placeholder="Ej.: 220 o DISLICORES" autocomplete="off" /></label>
                 <label>Proyecto<select id="monthlyFilterProject" class="form-select"><option value="">Todos</option></select></label>
                 <label>Periodo<select id="monthlyFilterPeriod" class="form-select"><option value="">Todos</option></select></label>
                 <label>Validación<select id="monthlyFilterStatus" class="form-select"><option value="">Todos</option><option value="borrador">Borrador</option><option value="pendiente">Pendiente</option><option value="validado">Validado</option><option value="rechazado">Rechazado</option></select></label>
                 <label>Avance de ejecución<select id="monthlyFilterExecution" class="form-select"><option value="">Todos</option><option value="incomplete">Ocultar proyectos al 100 %</option></select></label>
+                <label>Ejecución desde (%)<input id="monthlyExecutionMin" class="form-control" type="number" min="0" step="any" placeholder="Sin mínimo" /></label>
+                <label>Ejecución hasta (%)<input id="monthlyExecutionMax" class="form-control" type="number" min="0" step="any" placeholder="Sin máximo" /></label>
                 <div class="filter-actions"><button class="btn btn-primary" type="submit">Aplicar filtros</button><button id="clearMonthlyFilters" class="btn btn-outline-secondary" type="button">Limpiar filtros</button></div>
               </form>
             </article>
@@ -979,7 +981,7 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="src/assets/js/config.js?v=1.12.0"></script>
-    <script type="module" src="src/assets/js/app.js?v=1.18.22"></script>
+    <script type="module" src="src/assets/js/app.js?v=1.18.23"></script>
     <script type="module" src="src/assets/js/adjustments-ui.js?v=1.18.21"></script>
     <script type="module" src="src/assets/js/accounting-ui.js?v=1.18.21"></script>
     <script type="module" src="src/assets/js/project-import-ui.js?v=1.18.21"></script>

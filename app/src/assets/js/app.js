@@ -1201,12 +1201,19 @@ function renderMonthly() {
   const executionFor = (projectId) => projectsById.get(projectId)?.executedProgressPercentage
     ?? historicalById.get(projectId)?.importedExecutionSnapshotPercentage;
   const incompleteOnly = document.querySelector("#monthlyFilterExecution").value === "incomplete";
+  const minimumExecution = document.querySelector("#monthlyExecutionMin").valueAsNumber;
+  const maximumExecution = document.querySelector("#monthlyExecutionMax").valueAsNumber;
+  const hasMinimum = Number.isFinite(minimumExecution);
+  const hasMaximum = Number.isFinite(maximumExecution);
   const search = document.querySelector("#monthlyHistoricalSearch").value.trim().normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es");
   for (const tracking of currentMonthly) {
-    if (incompleteOnly) {
+    if (incompleteOnly || hasMinimum || hasMaximum) {
       const execution = executionFor(tracking.projectId);
-      if (execution >= 100) continue;
+      if (incompleteOnly && execution >= 100) continue;
+      if ((hasMinimum || hasMaximum) && execution == null) continue;
+      if (hasMinimum && execution < minimumExecution) continue;
+      if (hasMaximum && execution > maximumExecution) continue;
     }
     if (search && !`${tracking.costCenter} ${tracking.projectName}`.normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es").includes(search)) continue;
@@ -2443,7 +2450,19 @@ document.querySelector("#cleanupConfirmationInput").addEventListener("input", (e
 document.querySelector("#executeCleanupButton").addEventListener("click", executeCleanup);
 document.querySelector("#projectFilters").addEventListener("submit", (event) => { event.preventDefault(); loadProjects(); });
 document.querySelector("#clearProjectFilters").addEventListener("click", () => { document.querySelector("#projectFilters").reset(); loadProjects(); });
-document.querySelector("#monthlyFilters").addEventListener("submit", (event) => { event.preventDefault(); loadMonthlyModule(); });
+const monthlyExecutionMin = document.querySelector("#monthlyExecutionMin");
+const monthlyExecutionMax = document.querySelector("#monthlyExecutionMax");
+document.querySelector("#monthlyFilters").addEventListener("input", () => monthlyExecutionMax.setCustomValidity(""));
+document.querySelector("#monthlyFilters").addEventListener("reset", () => monthlyExecutionMax.setCustomValidity(""));
+document.querySelector("#monthlyFilters").addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (monthlyExecutionMin.valueAsNumber > monthlyExecutionMax.valueAsNumber) {
+    monthlyExecutionMax.setCustomValidity("El porcentaje máximo debe ser mayor o igual al mínimo.");
+    monthlyExecutionMax.reportValidity();
+    return;
+  }
+  loadMonthlyModule();
+});
 document.querySelector("#clearMonthlyFilters").addEventListener("click", () => { document.querySelector("#monthlyFilters").reset(); document.querySelector("#monthlyHistoricalSearch").value = ""; document.querySelector("#monthlyShowEmpty").checked = false; loadMonthlyModule({}); });
 document.querySelector("#monthlyHistoricalSearch").addEventListener("input", renderMonthly);
 document.querySelector("#monthlyShowEmpty").addEventListener("change", renderMonthly);
