@@ -1196,9 +1196,18 @@ function renderMonthly() {
   const reportRows = new Map(buildMonthlyExecutionReport(currentProjects, currentMonthly, allMonthlyRows)
     .map((row) => [`${row.projectId}:${row.year}:${row.month}`, row]));
   const grouped = new Map();
+  const historicalById = new Map(historicalProjectDetails.map((item) => [item.id, item]));
+  const projectsById = new Map(currentProjects.map((item) => [item.projectId, item]));
+  const executionFor = (projectId) => projectsById.get(projectId)?.executedProgressPercentage
+    ?? historicalById.get(projectId)?.importedExecutionSnapshotPercentage;
+  const incompleteOnly = document.querySelector("#monthlyFilterExecution").value === "incomplete";
   const search = document.querySelector("#monthlyHistoricalSearch").value.trim().normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es");
   for (const tracking of currentMonthly) {
+    if (incompleteOnly) {
+      const execution = executionFor(tracking.projectId);
+      if (execution >= 100) continue;
+    }
     if (search && !`${tracking.costCenter} ${tracking.projectName}`.normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es").includes(search)) continue;
     if (!grouped.has(tracking.projectId)) grouped.set(tracking.projectId, []);
@@ -1209,7 +1218,6 @@ function renderMonthly() {
     return String(left.costCenter).localeCompare(String(right.costCenter), "es", { numeric: true })
       || left.projectName.localeCompare(right.projectName, "es");
   });
-  const historicalById = new Map(historicalProjectDetails.map((item) => [item.id, item]));
   const selectedPeriod = Boolean(document.querySelector("#monthlyFilterPeriod").value);
   const showQuiet = document.querySelector("#monthlyShowEmpty").checked || selectedPeriod;
   const counts = monthlyDisplayCounts([...grouped.values()].flat());
@@ -1220,14 +1228,14 @@ function renderMonthly() {
     const visibleMonths = monthlyDisplayRows(months, {
       includeQuiet: document.querySelector("#monthlyShowEmpty").checked, selectedPeriod
     });
-    const project = currentProjects.find((item) => item.projectId === projectId);
+    const project = projectsById.get(projectId);
     const latest = months.at(-1);
     const contract = project?.contractValue ?? latest.contractValue;
     const source = historicalById.get(projectId);
     const sourceContent = source ? importedFollowupHtml(source) : "";
     const sourceNotes = source && (sourceContent.trim() || source.importedFinancialReview)
       ? `<details class="monthly-source-details"><summary>Origen y notas</summary>${source.importedFinancialReview ? `<p><strong>Por conciliar:</strong> ${escapeHtml(source.importedFinancialReview)}</p>` : ""}${sourceContent}</details>` : "";
-    const executed = project?.executedProgressPercentage ?? source?.importedExecutionSnapshotPercentage;
+    const executed = executionFor(projectId);
     const balance = contractPositionDisplay(project, source);
     const paymentEvidence = source?.importedPaymentEvidence ?? [];
     const paymentNote = paymentEvidence.length
@@ -2439,6 +2447,7 @@ document.querySelector("#monthlyFilters").addEventListener("submit", (event) => 
 document.querySelector("#clearMonthlyFilters").addEventListener("click", () => { document.querySelector("#monthlyFilters").reset(); document.querySelector("#monthlyHistoricalSearch").value = ""; document.querySelector("#monthlyShowEmpty").checked = false; loadMonthlyModule({}); });
 document.querySelector("#monthlyHistoricalSearch").addEventListener("input", renderMonthly);
 document.querySelector("#monthlyShowEmpty").addEventListener("change", renderMonthly);
+document.querySelector("#monthlyFilterExecution").addEventListener("change", renderMonthly);
 document.querySelector("#financeFilters").addEventListener("submit", (event) => { event.preventDefault(); loadFinance(); });
 document.querySelector("#clearFinanceFilters").addEventListener("click", () => { document.querySelector("#financeFilters").reset(); loadFinance({}); });
 document.addEventListener("soinsolar:accounting-center-selected", (event) => {
